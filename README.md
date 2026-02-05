@@ -14,6 +14,11 @@ Pablo Toledo
 
 Este es un proyecto enfocado a brindar una plataforma en la cual clientes y proveedores de servicios puedan interacturar.
 
-Doc 1:
+Contenido de Cada Carpeta
 
-https://uvggt-my.sharepoint.com/:w:/r/personal/saz24710_uvg_edu_gt/Documents/Universidad%20del%20Valle%20de%20Guatemala2.docx?d=w94b9981cc03a4773aa3b0a2593d4f7cf&csf=1&web=1&e=P4OrpP
+- Avances 1: Archivos pdf y docx de los avances de la primera fase del proyecto
+- Avances 2: Placeholder (no olvidar editar)
+- Corte 1: Archivos pdf y docx de los archivos hechos en la fase 1 y pdf de la presentación
+- Corte 2: Placeholder (no olvidar editar)
+- Scrum: Placeholder (no olvidar editar)
+

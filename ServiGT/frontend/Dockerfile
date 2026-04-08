@@ -1,19 +1,17 @@
 FROM node:18
 
-# Crear directorio de trabajo
 WORKDIR /app
 
-# Copiar package.json
+# Copiar package.json e instalar dependencias
 COPY package*.json ./
-
-# Instalar dependencias
 RUN npm install
 
 # Copiar el resto del proyecto
 COPY . .
 
-# Exponer puerto de Expo
 EXPOSE 8081
 
-# Ejecutar Expo
-CMD ["npx", "expo", "start", "--tunnel"]
+ENV CI=1
+ENV REACT_NATIVE_PACKAGER_HOSTNAME=0.0.0.0
+
+CMD ["npx", "expo", "start", "--web", "--port", "8081"]

@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
 import {
+  ActivityIndicator,
+  Alert,
   StyleSheet,
   Text,
-  View,
   TextInput,
   TouchableOpacity,
-  Alert,
-  ActivityIndicator,
+  View,
 } from 'react-native';
 import { register } from '../services/api';
 
@@ -31,8 +31,8 @@ export default function RegisterScreen({ navigation }) {
         { text: 'Ir a Login', onPress: () => navigation?.navigate('Login') },
       ]);
     } catch (error) {
-      console.log('Error registro:', error.response?.data);
-      Alert.alert('Error', error.response?.data?.message || 'No se pudo registrar');
+      console.log('Error registro:', error.message);
+      Alert.alert('Registro no disponible', error.message);
     } finally {
       setLoading(false);
     }
@@ -42,6 +42,9 @@ export default function RegisterScreen({ navigation }) {
     <View style={styles.container}>
       <Text style={styles.title}>PServicios</Text>
       <Text style={styles.subtitle}>Crear Cuenta</Text>
+      <Text style={styles.helperText}>
+        Esta pantalla queda lista para UI y flujo basico, aunque el guardado real aun no dependa de base de datos.
+      </Text>
 
       <TextInput
         style={styles.input}
@@ -52,7 +55,7 @@ export default function RegisterScreen({ navigation }) {
 
       <TextInput
         style={styles.input}
-        placeholder="Correo electrónico"
+        placeholder="Correo electronico"
         value={email}
         onChangeText={setEmail}
         keyboardType="email-address"
@@ -61,7 +64,7 @@ export default function RegisterScreen({ navigation }) {
 
       <TextInput
         style={styles.input}
-        placeholder="Contraseña"
+        placeholder="Contrasena"
         value={password}
         onChangeText={setPassword}
         secureTextEntry
@@ -73,26 +76,18 @@ export default function RegisterScreen({ navigation }) {
           style={[styles.roleBtn, role === 'cliente' && styles.roleBtnActive]}
           onPress={() => setRole('cliente')}
         >
-          <Text style={[styles.roleText, role === 'cliente' && styles.roleTextActive]}>
-            Cliente
-          </Text>
+          <Text style={[styles.roleText, role === 'cliente' && styles.roleTextActive]}>Cliente</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.roleBtn, role === 'proveedor' && styles.roleBtnActive]}
           onPress={() => setRole('proveedor')}
         >
-          <Text style={[styles.roleText, role === 'proveedor' && styles.roleTextActive]}>
-            Proveedor
-          </Text>
+          <Text style={[styles.roleText, role === 'proveedor' && styles.roleTextActive]}>Proveedor</Text>
         </TouchableOpacity>
       </View>
 
       <TouchableOpacity style={styles.button} onPress={handleRegister} disabled={loading}>
-        {loading ? (
-          <ActivityIndicator color="#fff" />
-        ) : (
-          <Text style={styles.buttonText}>Registrarse</Text>
-        )}
+        {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Registrarse</Text>}
       </TouchableOpacity>
 
       <TouchableOpacity onPress={() => navigation?.navigate('Login')}>
@@ -119,8 +114,15 @@ const styles = StyleSheet.create({
     fontSize: 18,
     color: '#666',
     textAlign: 'center',
-    marginBottom: 32,
+    marginBottom: 12,
     marginTop: 4,
+  },
+  helperText: {
+    fontSize: 13,
+    color: '#666',
+    textAlign: 'center',
+    marginBottom: 24,
+    lineHeight: 18,
   },
   input: {
     backgroundColor: '#fff',

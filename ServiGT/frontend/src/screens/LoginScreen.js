@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
 import {
+  ActivityIndicator,
+  Alert,
   StyleSheet,
   Text,
-  View,
   TextInput,
   TouchableOpacity,
-  Alert,
-  ActivityIndicator,
+  View,
 } from 'react-native';
 import { login } from '../services/api';
 
@@ -27,8 +27,8 @@ export default function LoginScreen({ navigation }) {
       console.log('Login exitoso:', data);
       Alert.alert('Bienvenido', `Hola ${data.user.name}`);
     } catch (error) {
-      console.log('Error login:', error.response?.data);
-      Alert.alert('Error', error.response?.data?.message || 'No se pudo iniciar sesión');
+      console.log('Error login:', error.message);
+      Alert.alert('Acceso no disponible', error.message);
     } finally {
       setLoading(false);
     }
@@ -37,11 +37,14 @@ export default function LoginScreen({ navigation }) {
   return (
     <View style={styles.container}>
       <Text style={styles.title}>PServicios</Text>
-      <Text style={styles.subtitle}>Iniciar Sesion</Text>
+      <Text style={styles.subtitle}>Iniciar sesion</Text>
+      <Text style={styles.helperText}>
+        Mientras se define la base de datos, este acceso puede estar deshabilitado.
+      </Text>
 
       <TextInput
         style={styles.input}
-        placeholder="Correo electrónico"
+        placeholder="Correo electronico"
         value={email}
         onChangeText={setEmail}
         keyboardType="email-address"
@@ -50,18 +53,14 @@ export default function LoginScreen({ navigation }) {
 
       <TextInput
         style={styles.input}
-        placeholder="Contraseña"
+        placeholder="Contrasena"
         value={password}
         onChangeText={setPassword}
         secureTextEntry
       />
 
       <TouchableOpacity style={styles.button} onPress={handleLogin} disabled={loading}>
-        {loading ? (
-          <ActivityIndicator color="#fff" />
-        ) : (
-          <Text style={styles.buttonText}>Ingresar</Text>
-        )}
+        {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Ingresar</Text>}
       </TouchableOpacity>
 
       <TouchableOpacity onPress={() => navigation?.navigate('Register')}>
@@ -88,8 +87,15 @@ const styles = StyleSheet.create({
     fontSize: 18,
     color: '#666',
     textAlign: 'center',
-    marginBottom: 32,
+    marginBottom: 12,
     marginTop: 4,
+  },
+  helperText: {
+    fontSize: 13,
+    color: '#666',
+    textAlign: 'center',
+    marginBottom: 24,
+    lineHeight: 18,
   },
   input: {
     backgroundColor: '#fff',

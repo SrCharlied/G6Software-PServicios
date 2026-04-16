@@ -1,25 +1,25 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
-  StyleSheet,
-  Text,
-  View,
-  FlatList,
-  TouchableOpacity,
   ActivityIndicator,
   SafeAreaView,
   ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { registerRootComponent } from 'expo';
-import { getProviders } from './services/api';
+import { mockProviders } from './data/mockProviders';
 import LoginScreen from './screens/LoginScreen';
 import RegisterScreen from './screens/RegisterScreen';
+import { getProviders } from './services/api';
 
 export default function App() {
   const [screen, setScreen] = useState('home');
   const [proveedores, setProveedores] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [notice, setNotice] = useState('');
 
   useEffect(() => {
     loadProviders();
@@ -27,36 +27,36 @@ export default function App() {
 
   const loadProviders = async () => {
     setLoading(true);
-    setError(null);
+    setNotice('');
+
     try {
       const data = await getProviders();
       setProveedores(data.proveedores || []);
-    } catch (err) {
-      setError('No se pudo conectar con el backend.');
-      console.error(err);
+    } catch (error) {
+      setProveedores(mockProviders);
+      setNotice('Modo demo activo: mostrando proveedores de ejemplo mientras se define el backend y la base de datos.');
+      console.error(error);
     } finally {
       setLoading(false);
     }
   };
 
-  // Navegación simple sin librerías externas
   const navigation = {
     navigate: (name) => setScreen(name.toLowerCase()),
   };
 
   if (screen === 'login') {
-    return <LoginScreen navigation={{ ...navigation, navigate: (n) => setScreen(n.toLowerCase()) }} />;
+    return <LoginScreen navigation={{ ...navigation, navigate: (name) => setScreen(name.toLowerCase()) }} />;
   }
 
   if (screen === 'register') {
-    return <RegisterScreen navigation={{ ...navigation, navigate: (n) => setScreen(n.toLowerCase()) }} />;
+    return <RegisterScreen navigation={{ ...navigation, navigate: (name) => setScreen(name.toLowerCase()) }} />;
   }
 
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar style="light" />
 
-      {/* Header */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>PServicios</Text>
         <Text style={styles.headerSubtitle}>Conectando servicios en Guatemala</Text>
@@ -71,31 +71,33 @@ export default function App() {
       </View>
 
       <ScrollView style={styles.content}>
+        {notice ? (
+          <View style={styles.noticeBox}>
+            <Text style={styles.noticeText}>{notice}</Text>
+          </View>
+        ) : null}
+
         {loading ? (
           <View style={styles.center}>
             <ActivityIndicator size="large" color="#1a73e8" />
-            <Text style={styles.loadingText}>Conectando con PServicios...</Text>
+            <Text style={styles.loadingText}>Cargando proveedores...</Text>
           </View>
-        ) : error ? (
+        ) : proveedores.length === 0 ? (
           <View style={styles.center}>
-            <Text style={styles.errorText}>{error}</Text>
+            <Text style={styles.emptyText}>No hay proveedores disponibles todavia.</Text>
             <TouchableOpacity style={styles.retryBtn} onPress={loadProviders}>
-              <Text style={styles.retryText}>Reintentar</Text>
+              <Text style={styles.retryText}>Actualizar</Text>
             </TouchableOpacity>
           </View>
         ) : (
           <>
-            <Text style={styles.sectionTitle}>
-              Proveedores ({proveedores.length})
-            </Text>
+            <Text style={styles.sectionTitle}>Proveedores ({proveedores.length})</Text>
             {proveedores.map((prov) => (
               <View key={prov.id} style={styles.provCard}>
                 <View style={styles.provHeader}>
                   <Text style={styles.provName}>{prov.nombre}</Text>
                   <View style={styles.provBadge}>
-                    <Text style={styles.provBadgeText}>
-                      {prov.categoria?.nombre || 'Sin categoria'}
-                    </Text>
+                    <Text style={styles.provBadgeText}>{prov.categoria?.nombre || 'Sin categoria'}</Text>
                   </View>
                 </View>
                 <Text style={styles.provDesc}>{prov.descripcion}</Text>
@@ -111,9 +113,7 @@ export default function App() {
         )}
 
         <View style={styles.footer}>
-          <Text style={styles.footerText}>
-            PServicios Guatemala - Grupo 6 - Ingenieria de Software
-          </Text>
+          <Text style={styles.footerText}>PServicios Guatemala - Grupo 6 - Ingenieria de Software</Text>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -134,11 +134,24 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#666',
   },
-  errorText: {
+  emptyText: {
     fontSize: 16,
     color: '#666',
     textAlign: 'center',
     marginBottom: 20,
+  },
+  noticeBox: {
+    backgroundColor: '#fff7e6',
+    borderWidth: 1,
+    borderColor: '#f0c36d',
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 16,
+  },
+  noticeText: {
+    color: '#8a5a00',
+    fontSize: 14,
+    lineHeight: 20,
   },
   retryBtn: {
     backgroundColor: '#1a73e8',

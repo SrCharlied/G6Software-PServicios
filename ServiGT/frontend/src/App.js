@@ -5,6 +5,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -15,11 +16,19 @@ import LoginScreen from './screens/LoginScreen';
 import RegisterScreen from './screens/RegisterScreen';
 import { getProviders } from './services/api';
 
+const normalizeText = (value) =>
+  (value || '')
+    .toString()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
+
 export default function App() {
   const [screen, setScreen] = useState('home');
   const [proveedores, setProveedores] = useState([]);
   const [loading, setLoading] = useState(true);
   const [notice, setNotice] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
     loadProviders();
@@ -44,6 +53,25 @@ export default function App() {
   const navigation = {
     navigate: (name) => setScreen(name.toLowerCase()),
   };
+
+  const normalizedQuery = normalizeText(searchQuery.trim());
+
+  const filteredProviders = proveedores.filter((prov) => {
+    if (!normalizedQuery) {
+      return true;
+    }
+
+    const searchableFields = [
+      prov.nombre,
+      prov.descripcion,
+      prov.departamento,
+      prov.municipio,
+      prov.telefono,
+      prov.categoria?.nombre,
+    ];
+
+    return searchableFields.some((field) => normalizeText(field).includes(normalizedQuery));
+  });
 
   if (screen === 'login') {
     return <LoginScreen navigation={{ ...navigation, navigate: (name) => setScreen(name.toLowerCase()) }} />;
@@ -91,24 +119,61 @@ export default function App() {
           </View>
         ) : (
           <>
-            <Text style={styles.sectionTitle}>Proveedores ({proveedores.length})</Text>
-            {proveedores.map((prov) => (
-              <View key={prov.id} style={styles.provCard}>
-                <View style={styles.provHeader}>
-                  <Text style={styles.provName}>{prov.nombre}</Text>
-                  <View style={styles.provBadge}>
-                    <Text style={styles.provBadgeText}>{prov.categoria?.nombre || 'Sin categoria'}</Text>
+            <View style={styles.searchCard}>
+              <Text style={styles.searchLabel}>Buscar proveedores</Text>
+              <TextInput
+                style={styles.searchInput}
+                placeholder="Nombre, categoria, ubicacion o servicio"
+                placeholderTextColor="#8a94a6"
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+              />
+              <View style={styles.searchMetaRow}>
+                <Text style={styles.searchMetaText}>
+                  {normalizedQuery
+                    ? `${filteredProviders.length} resultado(s) de ${proveedores.length}`
+                    : `${proveedores.length} proveedor(es) disponibles`}
+                </Text>
+                {searchQuery.trim() ? (
+                  <TouchableOpacity onPress={() => setSearchQuery('')}>
+                    <Text style={styles.clearSearchText}>Limpiar</Text>
+                  </TouchableOpacity>
+                ) : null}
+              </View>
+            </View>
+
+            <Text style={styles.sectionTitle}>
+              {normalizedQuery
+                ? `Resultados para "${searchQuery.trim()}"`
+                : `Proveedores (${proveedores.length})`}
+            </Text>
+
+            {filteredProviders.length === 0 ? (
+              <View style={styles.center}>
+                <Text style={styles.emptyText}>No encontramos proveedores con esa busqueda.</Text>
+                <TouchableOpacity style={styles.retryBtn} onPress={() => setSearchQuery('')}>
+                  <Text style={styles.retryText}>Ver todos</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              filteredProviders.map((prov) => (
+                <View key={prov.id} style={styles.provCard}>
+                  <View style={styles.provHeader}>
+                    <Text style={styles.provName}>{prov.nombre}</Text>
+                    <View style={styles.provBadge}>
+                      <Text style={styles.provBadgeText}>{prov.categoria?.nombre || 'Sin categoria'}</Text>
+                    </View>
+                  </View>
+                  <Text style={styles.provDesc}>{prov.descripcion}</Text>
+                  <View style={styles.provMeta}>
+                    <Text style={styles.provLocation}>
+                      {prov.municipio}, {prov.departamento}
+                    </Text>
+                    <Text style={styles.provPhone}>{prov.telefono}</Text>
                   </View>
                 </View>
-                <Text style={styles.provDesc}>{prov.descripcion}</Text>
-                <View style={styles.provMeta}>
-                  <Text style={styles.provLocation}>
-                    {prov.municipio}, {prov.departamento}
-                  </Text>
-                  <Text style={styles.provPhone}>{prov.telefono}</Text>
-                </View>
-              </View>
-            ))}
+              ))
+            )}
           </>
         )}
 
@@ -207,6 +272,48 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     padding: 16,
+  },
+  searchCard: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  searchLabel: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#333',
+    marginBottom: 10,
+  },
+  searchInput: {
+    backgroundColor: '#f7f9fc',
+    borderWidth: 1,
+    borderColor: '#d9e2ef',
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 15,
+    color: '#333',
+  },
+  searchMetaRow: {
+    marginTop: 10,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  searchMetaText: {
+    fontSize: 13,
+    color: '#667085',
+  },
+  clearSearchText: {
+    fontSize: 13,
+    color: '#1a73e8',
+    fontWeight: '700',
   },
   sectionTitle: {
     fontSize: 18,

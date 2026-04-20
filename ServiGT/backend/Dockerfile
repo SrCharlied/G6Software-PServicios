@@ -14,6 +14,9 @@ WORKDIR /app
 # Crear proyecto Laravel
 RUN composer create-project laravel/laravel . --no-interaction --prefer-dist
 
+# Instalar Sanctum (autenticacion por tokens)
+RUN composer require laravel/sanctum --no-interaction --no-progress --quiet
+
 # Copiar archivos personalizados sobre el proyecto Laravel
 COPY routes/api.php /app/routes/api.php
 COPY app/Http/Controllers/ /app/app/Http/Controllers/
@@ -21,6 +24,7 @@ COPY app/Models/ /app/app/Models/
 COPY config/cors.php /app/config/cors.php
 COPY bootstrap/app.php /app/bootstrap/app.php
 COPY docker/entrypoint.sh /app/docker/entrypoint.sh
+COPY docker/sync_schema.php /app/docker/sync_schema.php
 
 RUN sed -i 's/\r$//' /app/docker/entrypoint.sh \
     && chmod +x /app/docker/entrypoint.sh

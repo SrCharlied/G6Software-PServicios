@@ -23,10 +23,18 @@ DB_USERNAME=${DB_USERNAME:-pservicios_user}
 DB_PASSWORD=${DB_PASSWORD:-pservicios_secret}
 CACHE_STORE=file
 SESSION_DRIVER=file
+FILESYSTEM_DISK=public
 EOF
 
 echo "[*] Limpiando cache..."
 php artisan config:clear
+
+echo "[*] Sincronizando esquema de base de datos..."
+php /app/docker/sync_schema.php
+
+echo "[*] Configurando almacenamiento de archivos..."
+php artisan storage:link --force 2>/dev/null || true
+chmod -R 775 /app/storage /app/bootstrap/cache 2>/dev/null || true
 
 echo "================================================"
 echo "  Backend listo en http://localhost:8000"

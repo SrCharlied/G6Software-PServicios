@@ -18,11 +18,13 @@ class AuthController extends Controller
             'role'     => 'required|in:cliente,proveedor',
         ]);
 
-        $user = User::create($validated);
+        $user  = User::create($validated);
+        $token = $user->createToken('auth-token')->plainTextToken;
 
         return response()->json([
             'message' => 'Usuario registrado exitosamente',
             'user'    => $user,
+            'token'   => $token,
         ], 201);
     }
 
@@ -41,9 +43,30 @@ class AuthController extends Controller
             ], 401);
         }
 
+        // Revocar tokens anteriores y crear uno nuevo
+        $user->tokens()->delete();
+        $token = $user->createToken('auth-token')->plainTextToken;
+
         return response()->json([
             'message' => 'Login exitoso',
             'user'    => $user,
+            'token'   => $token,
+        ]);
+    }
+
+    public function logout(Request $request): JsonResponse
+    {
+        $request->user()->currentAccessToken()->delete();
+
+        return response()->json([
+            'message' => 'Sesion cerrada correctamente',
+        ]);
+    }
+
+    public function me(Request $request): JsonResponse
+    {
+        return response()->json([
+            'user' => $request->user(),
         ]);
     }
 }

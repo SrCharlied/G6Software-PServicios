@@ -4,7 +4,6 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Mensaje extends Model
 {
@@ -13,9 +12,9 @@ class Mensaje extends Model
     protected $table = 'mensajes';
 
     protected $fillable = [
-        'cliente_id',
-        'proveedor_id',
-        'remitente',
+        'emisor_id',
+        'receptor_id',
+        'servicio_id',
         'contenido',
         'leido',
     ];
@@ -24,13 +23,18 @@ class Mensaje extends Model
         'leido' => 'boolean',
     ];
 
-    public function cliente(): BelongsTo
+    public function emisor()
     {
-        return $this->belongsTo(User::class, 'cliente_id');
+        return $this->belongsTo(User::class, 'emisor_id');
     }
 
-    public function proveedor(): BelongsTo
+    public function receptor()
     {
-        return $this->belongsTo(Proveedor::class, 'proveedor_id');
+        return $this->belongsTo(User::class, 'receptor_id');
+    }
+
+    public function servicio()
+    {
+        return $this->belongsTo(Servicio::class);
     }
 }

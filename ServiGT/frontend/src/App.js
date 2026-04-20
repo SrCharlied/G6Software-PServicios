@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   SafeAreaView,
@@ -14,7 +14,18 @@ import { registerRootComponent } from 'expo';
 import { mockProviders } from './data/mockProviders';
 import LoginScreen from './screens/LoginScreen';
 import RegisterScreen from './screens/RegisterScreen';
-import { getProviders } from './services/api';
+import ProviderDashboardScreen from './screens/ProviderDashboardScreen';
+import ProviderDetailScreen from './screens/ProviderDetailScreen';
+import ProviderEditProfileScreen from './screens/ProviderEditProfileScreen';
+import SolicitudFormScreen from './screens/SolicitudFormScreen';
+import ChatScreen from './screens/ChatScreen';
+import {
+  clearSession,
+  getProviderByUser,
+  getProviders,
+  loadStoredSession,
+  logout,
+} from './services/api';
 
 const normalizeText = (value) =>
   (value || '')
@@ -25,43 +36,111 @@ const normalizeText = (value) =>
 
 export default function App() {
   const [screen, setScreen] = useState('home');
+  const [user, setUser] = useState(null);
+  const [providerProfile, setProviderProfile] = useState(null);
+  const [sessionLoading, setSessionLoading] = useState(true);
   const [proveedores, setProveedores] = useState([]);
   const [loading, setLoading] = useState(true);
   const [notice, setNotice] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedProvider, setSelectedProvider] = useState(null);
+  const [chatWithUserId, setChatWithUserId] = useState(null);
+  const [chatWithName, setChatWithName] = useState('');
 
   useEffect(() => {
+    restoreSession();
     loadProviders();
   }, []);
+
+  const restoreSession = async () => {
+    const stored = loadStoredSession();
+    if (!stored) {
+      setSessionLoading(false);
+      return;
+    }
+
+    try {
+      setUser(stored.user);
+      if (stored.user.role === 'proveedor') {
+        const data = await getProviderByUser(stored.user.id);
+        setProviderProfile(data.proveedor);
+      }
+    } catch {
+      clearSession();
+      setUser(null);
+      setProviderProfile(null);
+    }
+
+    setSessionLoading(false);
+  };
 
   const loadProviders = async () => {
     setLoading(true);
     setNotice('');
-
     try {
       const data = await getProviders();
       setProveedores(data.proveedores || []);
     } catch (error) {
       setProveedores(mockProviders);
-      setNotice('Modo demo activo: mostrando proveedores de ejemplo mientras se define el backend y la base de datos.');
+      setNotice('Modo demo activo: mostrando proveedores de ejemplo.');
       console.error(error);
     } finally {
       setLoading(false);
     }
   };
 
-  const navigation = {
-    navigate: (name) => setScreen(name.toLowerCase()),
+  const handleLogin = (loggedUser, profile = null) => {
+    setUser(loggedUser);
+    setProviderProfile(profile);
+    setSelectedProvider(null);
+    setChatWithUserId(null);
+    setChatWithName('');
+    setScreen('home');
+    loadProviders();
   };
 
-  const normalizedQuery = normalizeText(searchQuery.trim());
+  const handleLogout = async () => {
+    await logout();
+    setUser(null);
+    setProviderProfile(null);
+    setSelectedProvider(null);
+    setChatWithUserId(null);
+    setChatWithName('');
+    setScreen('home');
+  };
 
-  const filteredProviders = proveedores.filter((prov) => {
-    if (!normalizedQuery) {
-      return true;
+  const handleRegisterSuccess = (loggedUser, profile = null) => {
+    setUser(loggedUser);
+    setProviderProfile(profile);
+    setSelectedProvider(null);
+    setChatWithUserId(null);
+    setChatWithName('');
+    setScreen('home');
+    loadProviders();
+  };
+
+  const navigate = (name, params = {}) => {
+    if (params.profile) {
+      setProviderProfile(params.profile);
     }
+    if (params.provider || params.selectedProvider) {
+      setSelectedProvider(params.provider || params.selectedProvider);
+    }
+    if (Object.prototype.hasOwnProperty.call(params, 'chatWithUserId')) {
+      setChatWithUserId(params.chatWithUserId);
+    }
+    if (Object.prototype.hasOwnProperty.call(params, 'chatWithName')) {
+      setChatWithName(params.chatWithName || '');
+    }
+    setScreen(name.toLowerCase());
+  };
 
-    const searchableFields = [
+  const navigation = { navigate };
+
+  const normalizedQuery = normalizeText(searchQuery.trim());
+  const filteredProviders = proveedores.filter((prov) => {
+    if (!normalizedQuery) return true;
+    const fields = [
       prov.nombre,
       prov.descripcion,
       prov.departamento,
@@ -69,16 +148,83 @@ export default function App() {
       prov.telefono,
       prov.categoria?.nombre,
     ];
-
-    return searchableFields.some((field) => normalizeText(field).includes(normalizedQuery));
+    return fields.some((field) => normalizeText(field).includes(normalizedQuery));
   });
 
+  if (sessionLoading) {
+    return (
+      <View style={styles.splashContainer}>
+        <Text style={styles.splashTitle}>PServicios</Text>
+        <ActivityIndicator size="large" color="#1a73e8" style={styles.splashLoader} />
+      </View>
+    );
+  }
+
   if (screen === 'login') {
-    return <LoginScreen navigation={{ ...navigation, navigate: (name) => setScreen(name.toLowerCase()) }} />;
+    return <LoginScreen navigation={navigation} onLogin={handleLogin} />;
   }
 
   if (screen === 'register') {
-    return <RegisterScreen navigation={{ ...navigation, navigate: (name) => setScreen(name.toLowerCase()) }} />;
+    return <RegisterScreen navigation={navigation} onRegisterSuccess={handleRegisterSuccess} />;
+  }
+
+  if (screen === 'providerdashboard') {
+    return (
+      <ProviderDashboardScreen
+        navigation={navigation}
+        user={user}
+        providerProfile={providerProfile}
+        setProviderProfile={setProviderProfile}
+        onLogout={handleLogout}
+      />
+    );
+  }
+
+  if (screen === 'providereditprofile') {
+    return (
+      <ProviderEditProfileScreen
+        navigation={navigation}
+        user={user}
+        providerProfile={providerProfile}
+        onProfileUpdated={(updated) => {
+          setProviderProfile(updated);
+          setScreen('providerdashboard');
+          loadProviders();
+        }}
+      />
+    );
+  }
+
+  if (screen === 'providerdetail') {
+    return (
+      <ProviderDetailScreen
+        navigation={navigation}
+        user={user}
+        providerProfile={providerProfile}
+        selectedProvider={selectedProvider}
+      />
+    );
+  }
+
+  if (screen === 'solicitudform') {
+    return (
+      <SolicitudFormScreen
+        navigation={navigation}
+        user={user}
+        selectedProvider={selectedProvider}
+      />
+    );
+  }
+
+  if (screen === 'chat') {
+    return (
+      <ChatScreen
+        navigation={navigation}
+        user={user}
+        chatWithUserId={chatWithUserId}
+        chatWithName={chatWithName}
+      />
+    );
   }
 
   return (
@@ -86,15 +232,39 @@ export default function App() {
       <StatusBar style="light" />
 
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>PServicios</Text>
-        <Text style={styles.headerSubtitle}>Conectando servicios en Guatemala</Text>
-        <View style={styles.headerButtons}>
-          <TouchableOpacity style={styles.headerBtn} onPress={() => setScreen('login')}>
-            <Text style={styles.headerBtnText}>Login</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={[styles.headerBtn, styles.headerBtnOutline]} onPress={() => setScreen('register')}>
-            <Text style={[styles.headerBtnText, styles.headerBtnOutlineText]}>Registro</Text>
-          </TouchableOpacity>
+        <View style={styles.headerTop}>
+          <View>
+            <Text style={styles.headerTitle}>PServicios</Text>
+            <Text style={styles.headerSubtitle}>Conectando servicios en Guatemala</Text>
+          </View>
+          {user ? (
+            <View style={styles.headerUserRow}>
+              <Text style={styles.headerUserName}>{user.name}</Text>
+              {user.role === 'proveedor' ? (
+                <TouchableOpacity
+                  style={styles.headerBtn}
+                  onPress={() => setScreen('providerdashboard')}
+                >
+                  <Text style={styles.headerBtnText}>Mi panel</Text>
+                </TouchableOpacity>
+              ) : null}
+              <TouchableOpacity style={styles.headerBtnSmall} onPress={handleLogout}>
+                <Text style={styles.headerBtnSmallText}>Salir</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <View style={styles.headerButtons}>
+              <TouchableOpacity style={styles.headerBtn} onPress={() => setScreen('login')}>
+                <Text style={styles.headerBtnText}>Login</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.headerBtn, styles.headerBtnOutline]}
+                onPress={() => setScreen('register')}
+              >
+                <Text style={[styles.headerBtnText, styles.headerBtnOutlineText]}>Registro</Text>
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
       </View>
 
@@ -157,11 +327,18 @@ export default function App() {
               </View>
             ) : (
               filteredProviders.map((prov) => (
-                <View key={prov.id} style={styles.provCard}>
+                <TouchableOpacity
+                  key={prov.id}
+                  style={styles.provCard}
+                  activeOpacity={0.9}
+                  onPress={() => navigation.navigate('ProviderDetail', { provider: prov })}
+                >
                   <View style={styles.provHeader}>
                     <Text style={styles.provName}>{prov.nombre}</Text>
                     <View style={styles.provBadge}>
-                      <Text style={styles.provBadgeText}>{prov.categoria?.nombre || 'Sin categoria'}</Text>
+                      <Text style={styles.provBadgeText}>
+                        {prov.categoria?.nombre || 'Sin categoria'}
+                      </Text>
                     </View>
                   </View>
                   <Text style={styles.provDesc}>{prov.descripcion}</Text>
@@ -171,14 +348,19 @@ export default function App() {
                     </Text>
                     <Text style={styles.provPhone}>{prov.telefono}</Text>
                   </View>
-                </View>
+                  <View style={styles.cardFooter}>
+                    <Text style={styles.cardFooterText}>Ver perfil y disponibilidad</Text>
+                  </View>
+                </TouchableOpacity>
               ))
             )}
           </>
         )}
 
         <View style={styles.footer}>
-          <Text style={styles.footerText}>PServicios Guatemala - Grupo 6 - Ingenieria de Software</Text>
+          <Text style={styles.footerText}>
+            PServicios Guatemala - Grupo 6 - Ingenieria de Software
+          </Text>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -186,25 +368,18 @@ export default function App() {
 }
 
 const styles = StyleSheet.create({
-  container: {
+  splashContainer: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
-  },
-  center: {
-    padding: 40,
+    justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: '#fff',
   },
-  loadingText: {
-    marginTop: 16,
-    fontSize: 16,
-    color: '#666',
-  },
-  emptyText: {
-    fontSize: 16,
-    color: '#666',
-    textAlign: 'center',
-    marginBottom: 20,
-  },
+  splashTitle: { fontSize: 36, fontWeight: 'bold', color: '#1a73e8' },
+  splashLoader: { marginTop: 20 },
+  container: { flex: 1, backgroundColor: '#f5f5f5' },
+  center: { padding: 40, alignItems: 'center' },
+  loadingText: { marginTop: 16, fontSize: 16, color: '#666' },
+  emptyText: { fontSize: 16, color: '#666', textAlign: 'center', marginBottom: 20 },
   noticeBox: {
     backgroundColor: '#fff7e6',
     borderWidth: 1,
@@ -213,66 +388,39 @@ const styles = StyleSheet.create({
     padding: 12,
     marginBottom: 16,
   },
-  noticeText: {
-    color: '#8a5a00',
-    fontSize: 14,
-    lineHeight: 20,
-  },
+  noticeText: { color: '#8a5a00', fontSize: 14, lineHeight: 20 },
   retryBtn: {
     backgroundColor: '#1a73e8',
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 8,
   },
-  retryText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  header: {
-    backgroundColor: '#1a73e8',
-    paddingTop: 20,
-    paddingBottom: 20,
-    paddingHorizontal: 20,
-  },
-  headerTitle: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#fff',
-  },
-  headerSubtitle: {
-    fontSize: 14,
-    color: 'rgba(255,255,255,0.8)',
-    marginTop: 4,
-  },
-  headerButtons: {
+  retryText: { color: '#fff', fontSize: 16, fontWeight: '600' },
+  header: { backgroundColor: '#1a73e8', paddingTop: 20, paddingBottom: 20, paddingHorizontal: 20 },
+  headerTop: {
     flexDirection: 'row',
-    gap: 10,
-    marginTop: 12,
+    justifyContent: 'space-between',
+    alignItems: 'flex-end',
+    flexWrap: 'wrap',
+    gap: 12,
   },
-  headerBtn: {
-    backgroundColor: '#fff',
-    paddingHorizontal: 20,
-    paddingVertical: 8,
+  headerTitle: { fontSize: 28, fontWeight: 'bold', color: '#fff' },
+  headerSubtitle: { fontSize: 14, color: 'rgba(255,255,255,0.8)', marginTop: 4 },
+  headerButtons: { flexDirection: 'row', gap: 10 },
+  headerBtn: { backgroundColor: '#fff', paddingHorizontal: 20, paddingVertical: 8, borderRadius: 6 },
+  headerBtnText: { color: '#1a73e8', fontWeight: '600', fontSize: 14 },
+  headerBtnOutline: { backgroundColor: 'transparent', borderWidth: 1, borderColor: '#fff' },
+  headerBtnOutlineText: { color: '#fff' },
+  headerUserRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  headerUserName: { color: '#fff', fontWeight: '600', fontSize: 14 },
+  headerBtnSmall: {
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
     borderRadius: 6,
   },
-  headerBtnText: {
-    color: '#1a73e8',
-    fontWeight: '600',
-    fontSize: 14,
-  },
-  headerBtnOutline: {
-    backgroundColor: 'transparent',
-    borderWidth: 1,
-    borderColor: '#fff',
-  },
-  headerBtnOutlineText: {
-    color: '#fff',
-  },
-  content: {
-    flex: 1,
-    padding: 16,
-  },
+  headerBtnSmallText: { color: '#fff', fontSize: 13 },
+  content: { flex: 1, padding: 16 },
   searchCard: {
     backgroundColor: '#fff',
     borderRadius: 12,
@@ -284,12 +432,7 @@ const styles = StyleSheet.create({
     shadowRadius: 3,
     elevation: 2,
   },
-  searchLabel: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#333',
-    marginBottom: 10,
-  },
+  searchLabel: { fontSize: 15, fontWeight: '700', color: '#333', marginBottom: 10 },
   searchInput: {
     backgroundColor: '#f7f9fc',
     borderWidth: 1,
@@ -306,21 +449,9 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  searchMetaText: {
-    fontSize: 13,
-    color: '#667085',
-  },
-  clearSearchText: {
-    fontSize: 13,
-    color: '#1a73e8',
-    fontWeight: '700',
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#333',
-    marginBottom: 12,
-  },
+  searchMetaText: { fontSize: 13, color: '#667085' },
+  clearSearchText: { fontSize: 13, color: '#1a73e8', fontWeight: '700' },
+  sectionTitle: { fontSize: 18, fontWeight: '700', color: '#333', marginBottom: 12 },
   provCard: {
     backgroundColor: '#fff',
     borderRadius: 12,
@@ -337,51 +468,24 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 8,
+    gap: 8,
   },
-  provName: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#333',
-    flex: 1,
+  provName: { fontSize: 16, fontWeight: '700', color: '#333', flex: 1 },
+  provBadge: { backgroundColor: '#e3f2fd', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
+  provBadgeText: { fontSize: 12, color: '#1a73e8', fontWeight: '600' },
+  provDesc: { fontSize: 14, color: '#666', lineHeight: 20, marginBottom: 8 },
+  provMeta: { flexDirection: 'row', justifyContent: 'space-between', gap: 8 },
+  provLocation: { fontSize: 13, color: '#999', flex: 1 },
+  provPhone: { fontSize: 13, color: '#1a73e8', fontWeight: '600' },
+  cardFooter: {
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#eef2f7',
   },
-  provBadge: {
-    backgroundColor: '#e3f2fd',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  provBadgeText: {
-    fontSize: 12,
-    color: '#1a73e8',
-    fontWeight: '600',
-  },
-  provDesc: {
-    fontSize: 14,
-    color: '#666',
-    lineHeight: 20,
-    marginBottom: 8,
-  },
-  provMeta: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  provLocation: {
-    fontSize: 13,
-    color: '#999',
-  },
-  provPhone: {
-    fontSize: 13,
-    color: '#1a73e8',
-    fontWeight: '600',
-  },
-  footer: {
-    paddingVertical: 24,
-    alignItems: 'center',
-  },
-  footerText: {
-    fontSize: 12,
-    color: '#999',
-  },
+  cardFooterText: { fontSize: 13, color: '#1a73e8', fontWeight: '700' },
+  footer: { paddingVertical: 24, alignItems: 'center' },
+  footerText: { fontSize: 12, color: '#999' },
 });
 
 registerRootComponent(App);

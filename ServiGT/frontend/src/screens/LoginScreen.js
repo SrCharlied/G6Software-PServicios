@@ -1,78 +1,101 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
-import { login } from '../services/api';
+import { login, getProviderByUser } from '../services/api';
 
-export default function LoginScreen({ navigation }) {
+export default function LoginScreen({ navigation, onLogin }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
 
   const handleLogin = async () => {
-    if (!email || !password) {
-      Alert.alert('Error', 'Completa todos los campos');
+    if (!email.trim() || !password) {
+      Alert.alert('Campos incompletos', 'Ingresa tu correo y contrasena.');
       return;
     }
 
     setLoading(true);
     try {
-      const data = await login(email, password);
-      console.log('Login exitoso:', data);
-      Alert.alert('Bienvenido', `Hola ${data.user.name}`);
+      const data = await login(email.trim(), password);
+      const user = data.user;
+
+      let providerProfile = null;
+      if (user.role === 'proveedor') {
+        try {
+          const profileData = await getProviderByUser(user.id);
+          providerProfile = profileData.proveedor;
+        } catch {
+          // Aun no tiene perfil de proveedor creado
+        }
+      }
+
+      if (onLogin) onLogin(user, providerProfile);
     } catch (error) {
-      console.log('Error login:', error.message);
-      Alert.alert('Acceso no disponible', error.message);
+      Alert.alert('Error al iniciar sesion', error.message);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <View style={styles.container}>
+    <ScrollView contentContainerStyle={styles.container}>
       <Text style={styles.title}>PServicios</Text>
       <Text style={styles.subtitle}>Iniciar sesion</Text>
-      <Text style={styles.helperText}>
-        Mientras se define la base de datos, este acceso puede estar deshabilitado.
-      </Text>
 
-      <TextInput
-        style={styles.input}
-        placeholder="Correo electronico"
-        value={email}
-        onChangeText={setEmail}
-        keyboardType="email-address"
-        autoCapitalize="none"
-      />
+      <View style={styles.form}>
+        <Text style={styles.label}>Correo electronico</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="correo@ejemplo.com"
+          value={email}
+          onChangeText={setEmail}
+          keyboardType="email-address"
+          autoCapitalize="none"
+          autoCorrect={false}
+        />
 
-      <TextInput
-        style={styles.input}
-        placeholder="Contrasena"
-        value={password}
-        onChangeText={setPassword}
-        secureTextEntry
-      />
+        <Text style={styles.label}>Contrasena</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="••••••••"
+          value={password}
+          onChangeText={setPassword}
+          secureTextEntry
+        />
 
-      <TouchableOpacity style={styles.button} onPress={handleLogin} disabled={loading}>
-        {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Ingresar</Text>}
-      </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.button, loading && styles.buttonDisabled]}
+          onPress={handleLogin}
+          disabled={loading}
+        >
+          {loading
+            ? <ActivityIndicator color="#fff" />
+            : <Text style={styles.buttonText}>Ingresar</Text>}
+        </TouchableOpacity>
+      </View>
 
       <TouchableOpacity onPress={() => navigation?.navigate('Register')}>
         <Text style={styles.link}>No tienes cuenta? Registrate</Text>
       </TouchableOpacity>
-    </View>
+
+      <TouchableOpacity onPress={() => navigation?.navigate('Home')}>
+        <Text style={styles.linkSecondary}>Volver al inicio</Text>
+      </TouchableOpacity>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
+    flexGrow: 1,
     justifyContent: 'center',
     padding: 24,
     backgroundColor: '#f5f5f5',
@@ -87,31 +110,46 @@ const styles = StyleSheet.create({
     fontSize: 18,
     color: '#666',
     textAlign: 'center',
-    marginBottom: 12,
+    marginTop: 4,
+    marginBottom: 32,
+  },
+  form: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 20,
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  label: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#444',
+    marginBottom: 6,
     marginTop: 4,
   },
-  helperText: {
-    fontSize: 13,
-    color: '#666',
-    textAlign: 'center',
-    marginBottom: 24,
-    lineHeight: 18,
-  },
   input: {
-    backgroundColor: '#fff',
+    backgroundColor: '#f7f9fc',
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: '#d9e2ef',
     borderRadius: 8,
-    padding: 14,
-    fontSize: 16,
-    marginBottom: 12,
+    padding: 13,
+    fontSize: 15,
+    marginBottom: 14,
+    color: '#333',
   },
   button: {
     backgroundColor: '#1a73e8',
-    padding: 16,
+    padding: 15,
     borderRadius: 8,
     alignItems: 'center',
-    marginTop: 8,
+    marginTop: 4,
+  },
+  buttonDisabled: {
+    backgroundColor: '#91b8f3',
   },
   buttonText: {
     color: '#fff',
@@ -121,7 +159,12 @@ const styles = StyleSheet.create({
   link: {
     color: '#1a73e8',
     textAlign: 'center',
-    marginTop: 16,
+    marginBottom: 10,
+    fontSize: 14,
+  },
+  linkSecondary: {
+    color: '#999',
+    textAlign: 'center',
     fontSize: 14,
   },
 });

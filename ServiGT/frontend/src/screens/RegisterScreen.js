@@ -29,6 +29,9 @@ const TIPOS_DOCUMENTO = [
   'Otro',
 ];
 
+const webHover = (onEnter, onLeave) =>
+  Platform.OS === 'web' ? { onMouseEnter: onEnter, onMouseLeave: onLeave } : {};
+
 // ── Componente Dropdown reutilizable ──────────────────────────────────────
 function Dropdown({ label, value, options, onSelect, placeholder = 'Selecciona...' }) {
   const [open, setOpen] = useState(false);
@@ -45,7 +48,7 @@ function Dropdown({ label, value, options, onSelect, placeholder = 'Selecciona..
         <View style={dd.list}>
           {options.map((opt) => {
             const label2 = typeof opt === 'string' ? opt : opt.label;
-            const val2   = typeof opt === 'string' ? opt : opt.value;
+            const val2 = typeof opt === 'string' ? opt : opt.value;
             return (
               <TouchableOpacity
                 key={val2}
@@ -69,19 +72,21 @@ const dd = StyleSheet.create({
   label: { fontSize: 13, fontWeight: '600', color: '#444', marginBottom: 6 },
   selector: {
     flexDirection: 'row', alignItems: 'center',
-    backgroundColor: '#f7f9fc', borderWidth: 1, borderColor: '#d9e2ef',
+    backgroundColor: '#fff', borderWidth: 1, borderColor: '#d9e2ef',
     borderRadius: 8, paddingHorizontal: 13, paddingVertical: 13,
   },
-  selectorText: { flex: 1, fontSize: 15, color: '#333' },
-  selectorPlaceholder: { flex: 1, fontSize: 15, color: '#aaa' },
-  arrow: { fontSize: 12, color: '#999', marginLeft: 8 },
+  selectorText: { flex: 1, fontSize: 14, color: '#333' },
+  selectorPlaceholder: { flex: 1, fontSize: 14, color: '#adb5bd' },
+  arrow: { fontSize: 11, color: '#999', marginLeft: 8 },
   list: {
-    backgroundColor: '#fff', borderWidth: 1, borderColor: '#e0e0e0',
+    backgroundColor: '#fff', borderWidth: 1, borderColor: '#d9e2ef',
     borderRadius: 8, maxHeight: 220, overflow: 'hidden',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08, shadowRadius: 8, elevation: 4,
   },
   option: { paddingHorizontal: 14, paddingVertical: 11, borderBottomWidth: 1, borderBottomColor: '#f5f5f5' },
   optionActive: { backgroundColor: '#e3f2fd' },
-  optionText: { fontSize: 14, color: '#555' },
+  optionText: { fontSize: 14, color: '#444' },
   optionTextActive: { color: '#1a73e8', fontWeight: '600' },
 });
 
@@ -90,27 +95,45 @@ export default function RegisterScreen({ navigation, onRegisterSuccess }) {
   const [step, setStep] = useState(1);
 
   // Paso 1
-  const [name, setName]       = useState('');
-  const [email, setEmail]     = useState('');
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [role, setRole]       = useState('cliente');
+  const [role, setRole] = useState('cliente');
+  const [showPassword, setShowPassword] = useState(false);
+  const [passwordFocused, setPasswordFocused] = useState(false);
+  const [nameFocused, setNameFocused] = useState(false);
+  const [emailFocused, setEmailFocused] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
+
+  // Hover states paso 1
+  const [btnClienteHovered, setBtnClienteHovered] = useState(false);
+  const [btnProveedorHovered, setBtnProveedorHovered] = useState(false);
+  const [btnContinuarHovered, setBtnContinuarHovered] = useState(false);
+  const [btnLoginHovered, setBtnLoginHovered] = useState(false);
+
+  // Hover states paso 2
+  const [btnContinuar2Hovered, setBtnContinuar2Hovered] = useState(false);
+
+  // Hover states paso 3
+  const [btnFinishHovered, setBtnFinishHovered] = useState(false);
+  const [btnUploadHovered, setBtnUploadHovered] = useState(false);
 
   // Paso 2
-  const [telefono, setTelefono]       = useState('');
+  const [telefono, setTelefono] = useState('');
   const [descripcion, setDescripcion] = useState('');
   const [departamento, setDepartamento] = useState('');
-  const [municipio, setMunicipio]     = useState('');
+  const [municipio, setMunicipio] = useState('');
   const [categoriaId, setCategoriaId] = useState('');
-  const [categorias, setCategorias]   = useState([]);
+  const [categorias, setCategorias] = useState([]);
   const [loadingCats, setLoadingCats] = useState(false);
 
   // Paso 3
-  const [documentos, setDocumentos]       = useState([]);
+  const [documentos, setDocumentos] = useState([]);
   const [tipoDocumento, setTipoDocumento] = useState(TIPOS_DOCUMENTO[0]);
-  const [uploading, setUploading]         = useState(false);
+  const [uploading, setUploading] = useState(false);
 
   // Compartido
-  const [loading, setLoading]             = useState(false);
+  const [loading, setLoading] = useState(false);
   const [registeredUser, setRegisteredUser] = useState(null);
   const [providerProfile, setProviderProfile] = useState(null);
   const fileInputRef = useRef(null);
@@ -135,12 +158,13 @@ export default function RegisterScreen({ navigation, onRegisterSuccess }) {
 
   // ── Paso 1: registrar usuario ─────────────────────────────────────────
   const handleStep1 = async () => {
+    setErrorMsg('');
     if (!name.trim() || !email.trim() || !password.trim()) {
-      Alert.alert('Campos incompletos', 'Completa nombre, correo y contrasena.');
+      setErrorMsg('Completa nombre, correo y contrasena.');
       return;
     }
     if (password.length < 6) {
-      Alert.alert('Contrasena muy corta', 'Debe tener al menos 6 caracteres.');
+      setErrorMsg('La contrasena debe tener al menos 6 caracteres.');
       return;
     }
     setLoading(true);
@@ -150,11 +174,10 @@ export default function RegisterScreen({ navigation, onRegisterSuccess }) {
       if (role === 'proveedor') {
         setStep(2);
       } else {
-        // Cliente → directo al main
         onRegisterSuccess && onRegisterSuccess(data.user, null);
       }
     } catch (error) {
-      Alert.alert('Error en el registro', error.message);
+      setErrorMsg(error.message);
     } finally {
       setLoading(false);
     }
@@ -181,13 +204,13 @@ export default function RegisterScreen({ navigation, onRegisterSuccess }) {
     setLoading(true);
     try {
       const data = await createProvider({
-        user_id:      registeredUser.id,
-        nombre:       registeredUser.name,
-        email:        registeredUser.email,
-        telefono:     telefono.trim(),
-        descripcion:  descripcion.trim(),
+        user_id: registeredUser.id,
+        nombre: registeredUser.name,
+        email: registeredUser.email,
+        telefono: telefono.trim(),
+        descripcion: descripcion.trim(),
         departamento,
-        municipio:    municipio.trim() || null,
+        municipio: municipio.trim() || null,
         categoria_id: parseInt(categoriaId, 10),
       });
       setProviderProfile(data.proveedor);
@@ -231,7 +254,11 @@ export default function RegisterScreen({ navigation, onRegisterSuccess }) {
         const current = step === n;
         return (
           <View key={n} style={styles.stepItem}>
-            <View style={[styles.stepCircle, active && styles.stepCircleActive, current && styles.stepCircleCurrent]}>
+            <View style={[
+              styles.stepCircle,
+              active && styles.stepCircleActive,
+              current && styles.stepCircleCurrent,
+            ]}>
               {step > n
                 ? <Text style={styles.stepCheck}>✓</Text>
                 : <Text style={[styles.stepNum, active && styles.stepNumActive]}>{n}</Text>}
@@ -240,7 +267,6 @@ export default function RegisterScreen({ navigation, onRegisterSuccess }) {
           </View>
         );
       })}
-      {/* Lineas entre pasos */}
       <View style={[styles.stepLine, styles.stepLine1, step >= 2 && styles.stepLineActive]} />
       <View style={[styles.stepLine, styles.stepLine2, step >= 3 && styles.stepLineActive]} />
     </View>
@@ -249,55 +275,115 @@ export default function RegisterScreen({ navigation, onRegisterSuccess }) {
   // ── Render paso 1 ─────────────────────────────────────────────────────
   const renderStep1 = () => (
     <View style={styles.card}>
-      <Text style={styles.cardTitle}>Datos de la cuenta</Text>
+      <Text style={styles.title}>PServicios</Text>
+      <Text style={styles.subtitle}>Crear cuenta</Text>
 
-      <Text style={styles.inputLabel}>Nombre completo</Text>
-      <TextInput style={styles.input} placeholder="Tu nombre" value={name} onChangeText={setName} />
+      {errorMsg ? (
+        <View style={styles.errorBox}>
+          <Text style={styles.errorText}>⚠ {errorMsg}</Text>
+        </View>
+      ) : null}
 
-      <Text style={styles.inputLabel}>Correo electronico</Text>
+      <Text style={styles.label}>Nombre completo</Text>
       <TextInput
-        style={styles.input} placeholder="correo@ejemplo.com"
-        value={email} onChangeText={setEmail}
-        keyboardType="email-address" autoCapitalize="none"
+        style={[styles.input, nameFocused && styles.inputFocused]}
+        placeholder="Tu nombre"
+        placeholderTextColor="#adb5bd"
+        value={name}
+        onChangeText={(t) => { setName(t); setErrorMsg(''); }}
+        onFocus={() => setNameFocused(true)}
+        onBlur={() => setNameFocused(false)}
       />
 
-      <Text style={styles.inputLabel}>Contrasena</Text>
+      <Text style={styles.label}>Correo electronico</Text>
       <TextInput
-        style={styles.input} placeholder="Minimo 6 caracteres"
-        value={password} onChangeText={setPassword} secureTextEntry
+        style={[styles.input, emailFocused && styles.inputFocused]}
+        placeholder="correo@ejemplo.com"
+        placeholderTextColor="#adb5bd"
+        value={email}
+        onChangeText={(t) => { setEmail(t); setErrorMsg(''); }}
+        keyboardType="email-address"
+        autoCapitalize="none"
+        onFocus={() => setEmailFocused(true)}
+        onBlur={() => setEmailFocused(false)}
       />
 
-      <Text style={styles.inputLabel}>Tipo de cuenta</Text>
+      <Text style={styles.label}>Contrasena</Text>
+      <View style={[styles.passwordWrap, passwordFocused && styles.inputFocused]}>
+        <TextInput
+          style={styles.passwordInput}
+          placeholder="Minimo 6 caracteres"
+          placeholderTextColor="#adb5bd"
+          value={password}
+          onChangeText={(t) => { setPassword(t); setErrorMsg(''); }}
+          secureTextEntry={!showPassword}
+          onFocus={() => setPasswordFocused(true)}
+          onBlur={() => setPasswordFocused(false)}
+        />
+        <TouchableOpacity
+          onPress={() => setShowPassword(!showPassword)}
+          style={styles.eyeBtn}
+        >
+          <Text style={styles.eyeIcon}>{showPassword ? '( )' : '( • )'}</Text>
+        </TouchableOpacity>
+      </View>
+
+      <Text style={styles.label}>Tipo de cuenta</Text>
       <View style={styles.roleRow}>
-        {[
-          { val: 'cliente',   label: 'Cliente',    sub: 'Busco servicios' },
-          { val: 'proveedor', label: 'Proveedor',  sub: 'Ofrezco servicios' },
-        ].map((r) => (
-          <TouchableOpacity
-            key={r.val}
-            style={[styles.roleBtn, role === r.val && styles.roleBtnActive]}
-            onPress={() => setRole(r.val)}
-          >
-            <Text style={[styles.roleText, role === r.val && styles.roleTextActive]}>{r.label}</Text>
-            <Text style={[styles.roleSub, role === r.val && styles.roleSubActive]}>{r.sub}</Text>
-          </TouchableOpacity>
-        ))}
+        <TouchableOpacity
+          style={[
+            styles.roleBtn,
+            role === 'cliente' && styles.roleBtnActive,
+            role !== 'cliente' && btnClienteHovered && styles.roleBtnHovered,
+          ]}
+          onPress={() => setRole('cliente')}
+          {...webHover(() => setBtnClienteHovered(true), () => setBtnClienteHovered(false))}
+        >
+          <Text style={[styles.roleText, role === 'cliente' && styles.roleTextActive]}>Cliente</Text>
+          <Text style={[styles.roleSub, role === 'cliente' && styles.roleSubActive]}>Busco servicios</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[
+            styles.roleBtn,
+            role === 'proveedor' && styles.roleBtnActive,
+            role !== 'proveedor' && btnProveedorHovered && styles.roleBtnHovered,
+          ]}
+          onPress={() => setRole('proveedor')}
+          {...webHover(() => setBtnProveedorHovered(true), () => setBtnProveedorHovered(false))}
+        >
+          <Text style={[styles.roleText, role === 'proveedor' && styles.roleTextActive]}>Proveedor</Text>
+          <Text style={[styles.roleSub, role === 'proveedor' && styles.roleSubActive]}>Ofrezco servicios</Text>
+        </TouchableOpacity>
       </View>
 
       <TouchableOpacity
-        style={[styles.btnPrimary, loading && styles.btnDisabled]}
+        style={[styles.btnPrimary, loading && styles.btnDisabled, btnContinuarHovered && !loading && styles.btnPrimaryHovered]}
         onPress={handleStep1}
         disabled={loading}
+        activeOpacity={0.82}
+        {...webHover(() => setBtnContinuarHovered(true), () => setBtnContinuarHovered(false))}
       >
         {loading
           ? <ActivityIndicator color="#fff" />
           : <Text style={styles.btnPrimaryText}>
-              {role === 'proveedor' ? 'Continuar →' : 'Crear cuenta'}
-            </Text>}
+            {role === 'proveedor' ? 'Continuar →' : 'Crear cuenta'}
+          </Text>}
       </TouchableOpacity>
 
-      <TouchableOpacity onPress={() => navigation?.navigate('Login')}>
-        <Text style={styles.linkText}>Ya tienes cuenta? Inicia sesion</Text>
+      <View style={styles.divider}>
+        <View style={styles.dividerLine} />
+        <Text style={styles.dividerText}>O</Text>
+        <View style={styles.dividerLine} />
+      </View>
+
+      <TouchableOpacity
+        style={[styles.btnSecondary, btnLoginHovered && styles.btnSecondaryHovered]}
+        onPress={() => navigation?.navigate('Login')}
+        activeOpacity={0.7}
+        {...webHover(() => setBtnLoginHovered(true), () => setBtnLoginHovered(false))}
+      >
+        <Text style={styles.btnSecondaryText}>Ya tienes cuenta? Inicia sesion</Text>
       </TouchableOpacity>
     </View>
   );
@@ -305,23 +391,32 @@ export default function RegisterScreen({ navigation, onRegisterSuccess }) {
   // ── Render paso 2 ─────────────────────────────────────────────────────
   const renderStep2 = () => (
     <View style={styles.card}>
-      <Text style={styles.cardTitle}>Perfil de proveedor</Text>
-      <Text style={styles.cardSub}>
+      <Text style={styles.title}>PServicios</Text>
+      <Text style={styles.subtitle}>Perfil de proveedor</Text>
+
+      <Text style={styles.cardDesc}>
         Esta informacion aparecera en el listado publico de proveedores.
       </Text>
 
-      <Text style={styles.inputLabel}>Telefono *</Text>
+      <Text style={styles.label}>Telefono *</Text>
       <TextInput
-        style={styles.input} placeholder="Ej: 5555-1234"
-        value={telefono} onChangeText={setTelefono} keyboardType="phone-pad"
+        style={styles.input}
+        placeholder="Ej: 5555-1234"
+        placeholderTextColor="#adb5bd"
+        value={telefono}
+        onChangeText={setTelefono}
+        keyboardType="phone-pad"
       />
 
-      <Text style={styles.inputLabel}>Descripcion de tus servicios *</Text>
+      <Text style={styles.label}>Descripcion de tus servicios *</Text>
       <TextInput
         style={[styles.input, styles.textArea]}
         placeholder="Describe que servicios ofreces, tu experiencia y horarios..."
-        value={descripcion} onChangeText={setDescripcion}
-        multiline numberOfLines={4}
+        placeholderTextColor="#adb5bd"
+        value={descripcion}
+        onChangeText={setDescripcion}
+        multiline
+        numberOfLines={4}
       />
 
       <Dropdown
@@ -332,10 +427,13 @@ export default function RegisterScreen({ navigation, onRegisterSuccess }) {
         onSelect={setDepartamento}
       />
 
-      <Text style={styles.inputLabel}>Municipio (opcional)</Text>
+      <Text style={styles.label}>Municipio (opcional)</Text>
       <TextInput
-        style={styles.input} placeholder="Municipio"
-        value={municipio} onChangeText={setMunicipio}
+        style={styles.input}
+        placeholder="Municipio"
+        placeholderTextColor="#adb5bd"
+        value={municipio}
+        onChangeText={setMunicipio}
       />
 
       {loadingCats
@@ -351,9 +449,11 @@ export default function RegisterScreen({ navigation, onRegisterSuccess }) {
         )}
 
       <TouchableOpacity
-        style={[styles.btnPrimary, loading && styles.btnDisabled]}
+        style={[styles.btnPrimary, loading && styles.btnDisabled, btnContinuar2Hovered && !loading && styles.btnPrimaryHovered]}
         onPress={handleStep2}
         disabled={loading}
+        activeOpacity={0.82}
+        {...webHover(() => setBtnContinuar2Hovered(true), () => setBtnContinuar2Hovered(false))}
       >
         {loading
           ? <ActivityIndicator color="#fff" />
@@ -365,8 +465,10 @@ export default function RegisterScreen({ navigation, onRegisterSuccess }) {
   // ── Render paso 3 ─────────────────────────────────────────────────────
   const renderStep3 = () => (
     <View style={styles.card}>
-      <Text style={styles.cardTitle}>Documentos de identidad</Text>
-      <Text style={styles.cardSub}>
+      <Text style={styles.title}>PServicios</Text>
+      <Text style={styles.subtitle}>Documentos de identidad</Text>
+
+      <Text style={styles.cardDesc}>
         Sube tus documentos para validar tu identidad. Puedes omitirlo y hacerlo despues desde tu perfil.
       </Text>
 
@@ -393,9 +495,11 @@ export default function RegisterScreen({ navigation, onRegisterSuccess }) {
             onChange={handleFileSelect}
           />
           <TouchableOpacity
-            style={[styles.btnSecondary, uploading && styles.btnDisabled]}
+            style={[styles.btnSecondary, uploading && styles.btnDisabled, btnUploadHovered && !uploading && styles.btnSecondaryHovered]}
             onPress={() => fileInputRef.current?.click()}
             disabled={uploading}
+            activeOpacity={0.7}
+            {...webHover(() => setBtnUploadHovered(true), () => setBtnUploadHovered(false))}
           >
             {uploading
               ? <ActivityIndicator color="#1a73e8" />
@@ -420,8 +524,12 @@ export default function RegisterScreen({ navigation, onRegisterSuccess }) {
         </View>
       )}
 
-      {/* Boton principal: finalizar y ir al main */}
-      <TouchableOpacity style={styles.btnPrimary} onPress={handleFinish}>
+      <TouchableOpacity
+        style={[styles.btnPrimary, btnFinishHovered && styles.btnPrimaryHovered]}
+        onPress={handleFinish}
+        activeOpacity={0.82}
+        {...webHover(() => setBtnFinishHovered(true), () => setBtnFinishHovered(false))}
+      >
         <Text style={styles.btnPrimaryText}>
           {documentos.length > 0 ? 'Finalizar registro' : 'Ir al inicio →'}
         </Text>
@@ -437,11 +545,14 @@ export default function RegisterScreen({ navigation, onRegisterSuccess }) {
 
   // ── Render principal ──────────────────────────────────────────────────
   return (
-    <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
-      <Text style={styles.appTitle}>PServicios</Text>
-      <Text style={styles.appSubtitle}>Crear cuenta</Text>
-
-      {/* Indicador de pasos solo para proveedor (o si ya paso del paso 1) */}
+    <ScrollView
+      contentContainerStyle={[
+        styles.container,
+        Platform.OS === 'web' && { background: 'linear-gradient(236deg, rgba(26, 115, 232, 1) 0%, rgba(245, 245, 245, 1) 100%)' },
+      ]}
+      keyboardShouldPersistTaps="handled"
+      showsVerticalScrollIndicator={false}
+    >
       {(role === 'proveedor' || step > 1) && <StepIndicator />}
 
       {step === 1 && renderStep1()}
@@ -455,22 +566,12 @@ export default function RegisterScreen({ navigation, onRegisterSuccess }) {
 const styles = StyleSheet.create({
   container: {
     flexGrow: 1,
-    padding: 20,
-    paddingTop: 36,
-    backgroundColor: '#f0f4f8',
-  },
-  appTitle: {
-    fontSize: 30,
-    fontWeight: 'bold',
-    color: '#1a73e8',
-    textAlign: 'center',
-  },
-  appSubtitle: {
-    fontSize: 16,
-    color: '#666',
-    textAlign: 'center',
-    marginTop: 4,
-    marginBottom: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+    paddingTop: 40,
+    paddingBottom: 40,
+    backgroundColor: '#e3f2fd',
   },
 
   // Step indicator
@@ -481,38 +582,24 @@ const styles = StyleSheet.create({
     marginBottom: 24,
     paddingHorizontal: 10,
     position: 'relative',
+    width: '100%',
+    maxWidth: 560,
   },
-  stepItem: {
-    alignItems: 'center',
-    width: 80,
-  },
+  stepItem: { alignItems: 'center', width: 80 },
   stepCircle: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#dde3ea',
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 1,
+    width: 36, height: 36, borderRadius: 18,
+    backgroundColor: '#d9e2ef',
+    alignItems: 'center', justifyContent: 'center', zIndex: 1,
   },
-  stepCircleActive: {
-    backgroundColor: '#1a73e8',
-  },
-  stepCircleCurrent: {
-    borderWidth: 3,
-    borderColor: '#a8c4f5',
-  },
-  stepNum: { fontSize: 15, fontWeight: '700', color: '#999' },
+  stepCircleActive: { backgroundColor: '#1a73e8' },
+  stepCircleCurrent: { borderWidth: 3, borderColor: '#91b8f3' },
+  stepNum: { fontSize: 14, fontWeight: '700', color: '#999' },
   stepNumActive: { color: '#fff' },
-  stepCheck: { fontSize: 14, color: '#fff', fontWeight: '700' },
+  stepCheck: { fontSize: 13, color: '#fff', fontWeight: '700' },
   stepLabel: { fontSize: 11, color: '#999', marginTop: 5, textAlign: 'center' },
-  stepLabelActive: { color: '#1a73e8', fontWeight: '600' },
+  stepLabelActive: { color: '#fff', fontWeight: '600' },
   stepLine: {
-    position: 'absolute',
-    top: 17,
-    height: 2,
-    width: 60,
-    backgroundColor: '#dde3ea',
+    position: 'absolute', top: 17, height: 2, width: 60, backgroundColor: '#d9e2ef',
   },
   stepLine1: { left: '26%' },
   stepLine2: { right: '26%' },
@@ -521,29 +608,52 @@ const styles = StyleSheet.create({
   // Card
   card: {
     backgroundColor: '#fff',
-    borderRadius: 14,
-    padding: 20,
+    borderRadius: 16,
+    padding: 32,
+    width: '100%',
+    maxWidth: 560,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.07,
-    shadowRadius: 6,
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
     elevation: 3,
   },
-  cardTitle: {
-    fontSize: 18,
+  title: {
+    fontSize: 24,
     fontWeight: '700',
-    color: '#222',
+    color: '#1557b0',
+    textAlign: 'center',
     marginBottom: 4,
   },
-  cardSub: {
+  subtitle: {
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
+    marginBottom: 24,
+  },
+  cardDesc: {
     fontSize: 13,
     color: '#777',
     marginBottom: 18,
     lineHeight: 18,
   },
 
+  // Error
+  errorBox: {
+    backgroundColor: '#fff5f5',
+    borderWidth: 1,
+    borderColor: '#fecaca',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 16,
+  },
+  errorText: {
+    fontSize: 13,
+    color: '#dc2626',
+  },
+
   // Inputs
-  inputLabel: {
+  label: {
     fontSize: 13,
     fontWeight: '600',
     color: '#444',
@@ -551,19 +661,51 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   input: {
-    backgroundColor: '#f7f9fc',
+    backgroundColor: '#fff',
     borderWidth: 1,
     borderColor: '#d9e2ef',
     borderRadius: 8,
-    paddingHorizontal: 13,
-    paddingVertical: 13,
-    fontSize: 15,
+    padding: 12,
+    fontSize: 14,
     marginBottom: 14,
     color: '#333',
+    outlineStyle: 'none',
+  },
+  inputFocused: {
+    borderColor: '#111',
+    borderWidth: 1.5,
   },
   textArea: {
     height: 110,
     textAlignVertical: 'top',
+  },
+  passwordWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#d9e2ef',
+    borderRadius: 8,
+    marginBottom: 14,
+    overflow: 'hidden',
+  },
+  passwordInput: {
+    flex: 1,
+    padding: 12,
+    fontSize: 14,
+    color: '#333',
+    outlineStyle: 'none',
+  },
+  eyeBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    borderLeftWidth: 1,
+    borderLeftColor: '#d9e2ef',
+    backgroundColor: '#f7f9fc',
+  },
+  eyeIcon: {
+    fontSize: 12,
+    color: '#888',
   },
 
   // Role selector
@@ -571,6 +713,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 10,
     marginBottom: 18,
+    marginTop: 4,
   },
   roleBtn: {
     flex: 1,
@@ -586,6 +729,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#1a73e8',
     borderColor: '#1a73e8',
   },
+  roleBtnHovered: {
+    backgroundColor: '#e3f2fd',
+    borderColor: '#1a73e8',
+  },
   roleText: { fontSize: 14, fontWeight: '700', color: '#555' },
   roleTextActive: { color: '#fff' },
   roleSub: { fontSize: 11, color: '#999', marginTop: 2 },
@@ -594,46 +741,63 @@ const styles = StyleSheet.create({
   // Botones
   btnPrimary: {
     backgroundColor: '#1a73e8',
-    paddingVertical: 15,
-    borderRadius: 10,
+    paddingVertical: 14,
+    borderRadius: 8,
     alignItems: 'center',
     marginTop: 6,
     marginBottom: 12,
   },
-  btnDisabled: { backgroundColor: '#a0bfef' },
-  btnPrimaryText: { color: '#fff', fontSize: 16, fontWeight: '700' },
-  btnSecondary: {
-    borderWidth: 1.5,
-    borderColor: '#1a73e8',
-    paddingVertical: 13,
-    borderRadius: 10,
-    alignItems: 'center',
-    marginTop: 6,
-    marginBottom: 12,
+  btnPrimaryHovered: {
+    backgroundColor: '#1557b0',
   },
-  btnSecondaryText: { color: '#1a73e8', fontSize: 15, fontWeight: '600' },
+  btnDisabled: { backgroundColor: '#91b8f3' },
+  btnPrimaryText: { color: '#fff', fontSize: 15, fontWeight: '600' },
 
-  linkText: {
-    color: '#1a73e8',
-    textAlign: 'center',
-    fontSize: 14,
-    paddingVertical: 4,
+  btnSecondary: {
+    borderWidth: 1,
+    borderColor: '#d9e2ef',
+    borderRadius: 8,
+    padding: 13,
+    alignItems: 'center',
+    marginBottom: 10,
+    backgroundColor: '#fff',
   },
-  skipText: {
-    color: '#aaa',
-    textAlign: 'center',
-    fontSize: 13,
-    marginTop: 4,
+  btnSecondaryHovered: {
+    backgroundColor: '#e3f2fd',
+    borderColor: '#1a73e8',
+  },
+  btnSecondaryText: {
+    color: '#333',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+
+  // Divider
+  divider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 16,
+    gap: 10,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#e5e7eb',
+  },
+  dividerText: {
+    fontSize: 12,
+    color: '#9ca3af',
+    fontWeight: '500',
   },
 
   // Info box
   infoBox: {
-    backgroundColor: '#e8f4fd',
+    backgroundColor: '#e3f2fd',
     borderRadius: 8,
     padding: 12,
     marginBottom: 16,
   },
-  infoText: { fontSize: 13, color: '#1a5f8c', lineHeight: 18 },
+  infoText: { fontSize: 13, color: '#1a73e8', lineHeight: 18 },
 
   // Upload
   uploadNote: {
@@ -645,27 +809,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 14,
   },
-  uploadNoteText: { fontSize: 13, color: '#aaa' },
+  uploadNoteText: { fontSize: 13, color: '#adb5bd' },
 
   // Docs list
   docsList: {
-    borderWidth: 1,
-    borderColor: '#e8edf3',
-    borderRadius: 10,
-    padding: 12,
-    marginBottom: 16,
+    borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 10,
+    padding: 12, marginBottom: 16,
   },
   docsListTitle: { fontSize: 13, fontWeight: '700', color: '#444', marginBottom: 8 },
   docRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 6,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f5f5f5',
-    gap: 8,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: '#f5f5f5', gap: 8,
   },
   docName: { flex: 1, fontSize: 13, color: '#555' },
   docBadge: { backgroundColor: '#fff3cd', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 },
   docBadgeText: { fontSize: 11, color: '#856404', fontWeight: '600' },
+
+  skipText: { color: '#999', textAlign: 'center', fontSize: 13, marginTop: 4 },
 });

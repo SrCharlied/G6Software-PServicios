@@ -148,9 +148,10 @@ export const getCategorias = async () => {
 
 // ── Proveedores ───────────────────────────────────────────────────────────
 
-export const getProviders = async () => {
+export const getProviders = async (categoria = '') => {
   try {
-    const response = await api.get('/providers');
+    const params = categoria?.trim() ? { categoria: categoria.trim() } : {};
+    const response = await api.get('/providers', { params });
     return response.data;
   } catch (error) {
     throw new Error(getErrorMessage(error, 'No se pudo cargar la lista de proveedores.'));

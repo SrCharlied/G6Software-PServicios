@@ -43,13 +43,15 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [notice, setNotice] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
+  const [categoria, setCategoria] = useState('');
+  const [categoriaAplicada, setCategoriaAplicada] = useState('');
   const [selectedProvider, setSelectedProvider] = useState(null);
   const [chatWithUserId, setChatWithUserId] = useState(null);
   const [chatWithName, setChatWithName] = useState('');
 
   useEffect(() => {
     restoreSession();
-    loadProviders();
+    loadProviders('');
   }, []);
 
   const restoreSession = async () => {
@@ -74,11 +76,11 @@ export default function App() {
     setSessionLoading(false);
   };
 
-  const loadProviders = async () => {
+  const loadProviders = async (categoriaValue = categoriaAplicada) => {
     setLoading(true);
     setNotice('');
     try {
-      const data = await getProviders();
+      const data = await getProviders(categoriaValue);
       setProveedores(data.proveedores || []);
     } catch (error) {
       setProveedores(mockProviders);
@@ -87,6 +89,18 @@ export default function App() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleCategoriaSubmit = () => {
+    const value = categoria.trim();
+    setCategoriaAplicada(value);
+    loadProviders(value);
+  };
+
+  const clearCategoria = () => {
+    setCategoria('');
+    setCategoriaAplicada('');
+    loadProviders('');
   };
 
   const handleLogin = (loggedUser, profile = null) => {
@@ -138,6 +152,8 @@ export default function App() {
   const navigation = { navigate };
 
   const normalizedQuery = normalizeText(searchQuery.trim());
+  const categoriaQuery = categoriaAplicada.trim();
+  const hasActiveFilters = Boolean(normalizedQuery || categoriaQuery);
   const filteredProviders = proveedores.filter((prov) => {
     if (!normalizedQuery) return true;
     const fields = [
@@ -280,10 +296,10 @@ export default function App() {
             <ActivityIndicator size="large" color="#1a73e8" />
             <Text style={styles.loadingText}>Cargando proveedores...</Text>
           </View>
-        ) : proveedores.length === 0 ? (
+        ) : proveedores.length === 0 && !hasActiveFilters ? (
           <View style={styles.center}>
             <Text style={styles.emptyText}>No hay proveedores disponibles todavia.</Text>
-            <TouchableOpacity style={styles.retryBtn} onPress={loadProviders}>
+            <TouchableOpacity style={styles.retryBtn} onPress={() => loadProviders()}>
               <Text style={styles.retryText}>Actualizar</Text>
             </TouchableOpacity>
           </View>
@@ -291,6 +307,17 @@ export default function App() {
           <>
             <View style={styles.searchCard}>
               <Text style={styles.searchLabel}>Buscar proveedores</Text>
+              <Text style={styles.inputLabel}>Categoria</Text>
+              <TextInput
+                style={styles.searchInput}
+                placeholder="Ej. Plomeria, electricidad, limpieza"
+                placeholderTextColor="#8a94a6"
+                value={categoria}
+                onChangeText={setCategoria}
+                onSubmitEditing={handleCategoriaSubmit}
+                returnKeyType="search"
+              />
+              <Text style={[styles.inputLabel, styles.inputLabelSpaced]}>Nombre o texto</Text>
               <TextInput
                 style={styles.searchInput}
                 placeholder="Nombre, categoria, ubicacion o servicio"
@@ -309,11 +336,18 @@ export default function App() {
                     <Text style={styles.clearSearchText}>Limpiar</Text>
                   </TouchableOpacity>
                 ) : null}
+                {categoriaAplicada.trim() ? (
+                  <TouchableOpacity onPress={clearCategoria}>
+                    <Text style={styles.clearSearchText}>Limpiar categoria</Text>
+                  </TouchableOpacity>
+                ) : null}
               </View>
             </View>
 
             <Text style={styles.sectionTitle}>
-              {normalizedQuery
+              {categoriaQuery
+                ? `Categoria: "${categoriaQuery}"`
+                : normalizedQuery
                 ? `Resultados para "${searchQuery.trim()}"`
                 : `Proveedores (${proveedores.length})`}
             </Text>
@@ -321,7 +355,13 @@ export default function App() {
             {filteredProviders.length === 0 ? (
               <View style={styles.center}>
                 <Text style={styles.emptyText}>No encontramos proveedores con esa busqueda.</Text>
-                <TouchableOpacity style={styles.retryBtn} onPress={() => setSearchQuery('')}>
+                <TouchableOpacity
+                  style={styles.retryBtn}
+                  onPress={() => {
+                    setSearchQuery('');
+                    clearCategoria();
+                  }}
+                >
                   <Text style={styles.retryText}>Ver todos</Text>
                 </TouchableOpacity>
               </View>
@@ -433,6 +473,8 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   searchLabel: { fontSize: 15, fontWeight: '700', color: '#333', marginBottom: 10 },
+  inputLabel: { fontSize: 13, fontWeight: '600', color: '#667085', marginBottom: 6 },
+  inputLabelSpaced: { marginTop: 12 },
   searchInput: {
     backgroundColor: '#f7f9fc',
     borderWidth: 1,
@@ -448,6 +490,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 10,
   },
   searchMetaText: { fontSize: 13, color: '#667085' },
   clearSearchText: { fontSize: 13, color: '#1a73e8', fontWeight: '700' },

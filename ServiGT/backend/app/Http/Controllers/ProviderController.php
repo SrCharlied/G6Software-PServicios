@@ -12,13 +12,13 @@ class ProviderController extends Controller
 {
     public function index(Request $request)
     {
-        $categoria = $request->query('categoria');
+        $categoria = trim((string) $request->query('categoria', ''));
 
         $query = Proveedor::with('categoria');
 
         if ($categoria) {
             $query->whereHas('categoria', function ($q) use ($categoria) {
-                $q->where('nombre', 'like', '%' . $categoria . '%');
+                $q->where('nombre', 'ILIKE', '%' . $categoria . '%');
             });
         }
 

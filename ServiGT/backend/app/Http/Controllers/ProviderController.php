@@ -10,13 +10,23 @@ use Illuminate\Support\Facades\Storage;
 
 class ProviderController extends Controller
 {
-    public function index(): JsonResponse
+    public function index(Request $request)
     {
-        $proveedores = Proveedor::with('categoria')
-            ->orderBy('calificacion_promedio', 'desc')
-            ->get();
+        $categoria = $request->query('categoria');
 
-        return response()->json(['proveedores' => $proveedores]);
+        $query = Proveedor::with('categoria');
+
+        if ($categoria) {
+            $query->whereHas('categoria', function ($q) use ($categoria) {
+                $q->where('nombre', 'like', '%' . $categoria . '%');
+            });
+        }
+
+        $proveedores = $query->get();
+
+        return response()->json([
+            'proveedores' => $proveedores
+        ]);
     }
 
     public function show(int $id): JsonResponse

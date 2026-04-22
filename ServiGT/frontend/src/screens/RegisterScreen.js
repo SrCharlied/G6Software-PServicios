@@ -275,7 +275,7 @@ export default function RegisterScreen({ navigation, onRegisterSuccess }) {
   // ── Render paso 1 ─────────────────────────────────────────────────────
   const renderStep1 = () => (
     <View style={styles.card}>
-      <Text style={styles.title}>PServicios</Text>
+      <Text style={styles.title}>ServiGT</Text>
       <Text style={styles.subtitle}>Crear cuenta</Text>
 
       {errorMsg ? (
@@ -391,7 +391,7 @@ export default function RegisterScreen({ navigation, onRegisterSuccess }) {
   // ── Render paso 2 ─────────────────────────────────────────────────────
   const renderStep2 = () => (
     <View style={styles.card}>
-      <Text style={styles.title}>PServicios</Text>
+      <Text style={styles.title}>ServiGT</Text>
       <Text style={styles.subtitle}>Perfil de proveedor</Text>
 
       <Text style={styles.cardDesc}>
@@ -465,7 +465,7 @@ export default function RegisterScreen({ navigation, onRegisterSuccess }) {
   // ── Render paso 3 ─────────────────────────────────────────────────────
   const renderStep3 = () => (
     <View style={styles.card}>
-      <Text style={styles.title}>PServicios</Text>
+      <Text style={styles.title}>ServiGT</Text>
       <Text style={styles.subtitle}>Documentos de identidad</Text>
 
       <Text style={styles.cardDesc}>

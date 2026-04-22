@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "PServicios",
-    "slug": "pservicios",
+    "name": "ServiGT",
+    "slug": "servigt",
     "version": "1.0.0",
     "platforms": ["web"],
     "web": {

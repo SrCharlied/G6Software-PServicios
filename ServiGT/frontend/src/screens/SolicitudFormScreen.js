@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -9,20 +9,63 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { createServicio } from '../services/api';
+import { createServicio, getProvider } from '../services/api';
 
 export default function SolicitudFormScreen({
   navigation,
   user,
   selectedProvider,
+  providerId,
 }) {
+  const matchedSelectedProvider = selectedProvider
+    && (!providerId || Number(selectedProvider.id) === Number(providerId))
+    ? selectedProvider
+    : null;
   const [descripcion, setDescripcion] = useState('');
   const [direccion, setDireccion] = useState('');
   const [fecha, setFecha] = useState('');
   const [monto, setMonto] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [provider, setProvider] = useState(matchedSelectedProvider || null);
+  const [loadingProvider, setLoadingProvider] = useState(Boolean(providerId && !matchedSelectedProvider));
 
-  if (!selectedProvider) {
+  useEffect(() => {
+    if (matchedSelectedProvider) {
+      setProvider(matchedSelectedProvider);
+    }
+  }, [matchedSelectedProvider]);
+
+  useEffect(() => {
+    if (!providerId || matchedSelectedProvider) {
+      setLoadingProvider(false);
+      return;
+    }
+
+    const loadProvider = async () => {
+      setLoadingProvider(true);
+      try {
+        const data = await getProvider(providerId);
+        setProvider(data.proveedor || null);
+      } catch (error) {
+        Alert.alert('Error', error.message);
+      } finally {
+        setLoadingProvider(false);
+      }
+    };
+
+    loadProvider();
+  }, [providerId, matchedSelectedProvider]);
+
+  if (loadingProvider && !provider) {
+    return (
+      <View style={styles.emptyContainer}>
+        <ActivityIndicator size="large" color="#1a73e8" />
+        <Text style={styles.emptyText}>Cargando proveedor...</Text>
+      </View>
+    );
+  }
+
+  if (!provider) {
     return (
       <View style={styles.emptyContainer}>
         <Text style={styles.emptyText}>No se encontro el proveedor para esta solicitud.</Text>
@@ -42,8 +85,8 @@ export default function SolicitudFormScreen({
     setSubmitting(true);
     try {
       await createServicio({
-        proveedor_id: selectedProvider.id,
-        categoria_id: selectedProvider.categoria_id || null,
+        proveedor_id: provider.id,
+        categoria_id: provider.categoria_id || null,
         descripcion: descripcion.trim(),
         direccion: direccion.trim() || null,
         fecha_agendada: fecha.trim() || null,
@@ -52,8 +95,8 @@ export default function SolicitudFormScreen({
 
       Alert.alert(
         'Solicitud enviada',
-        `Tu solicitud fue enviada a ${selectedProvider.nombre}. Te notificaremos cuando responda.`,
-        [{ text: 'OK', onPress: () => navigation.navigate('Home') }]
+        `Tu solicitud fue enviada a ${provider.nombre}. Te notificaremos cuando responda.`,
+        [{ text: 'Aceptar', onPress: () => navigation.navigate('Home') }]
       );
     } catch (error) {
       Alert.alert('Error', error.message);
@@ -66,7 +109,7 @@ export default function SolicitudFormScreen({
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <TouchableOpacity
         style={styles.backRow}
-        onPress={() => navigation.navigate('ProviderDetail', { provider: selectedProvider })}
+        onPress={() => navigation.navigate('ProviderDetail', { provider })}
       >
         <Text style={styles.backText}>← Volver al perfil</Text>
       </TouchableOpacity>
@@ -75,7 +118,7 @@ export default function SolicitudFormScreen({
         <Text style={styles.cardTitle}>Solicitar servicio</Text>
         <Text style={styles.cardSubtitle}>
           Enviando solicitud a:{' '}
-          <Text style={styles.provName}>{selectedProvider?.nombre}</Text>
+          <Text style={styles.provName}>{provider.nombre}</Text>
         </Text>
 
         <Text style={styles.label}>Descripcion del servicio *</Text>
@@ -127,7 +170,7 @@ export default function SolicitudFormScreen({
 
         <TouchableOpacity
           style={styles.cancelBtn}
-          onPress={() => navigation.navigate('ProviderDetail', { provider: selectedProvider })}
+          onPress={() => navigation.navigate('ProviderDetail', { provider })}
         >
           <Text style={styles.cancelBtnText}>Cancelar</Text>
         </TouchableOpacity>

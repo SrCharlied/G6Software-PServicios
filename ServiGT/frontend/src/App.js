@@ -1,24 +1,28 @@
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  SafeAreaView,
-  ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
-import { StatusBar } from 'expo-status-bar';
 import { registerRootComponent } from 'expo';
 import { mockProviders } from './data/mockProviders';
+import {
+  buildAppPath,
+  getBasePath,
+  getCurrentRoute,
+  parseRouteFromPath,
+} from './router/routes';
+import AdminDashboardScreen from './screens/AdminDashboardScreen';
+import ChatScreen from './screens/ChatScreen';
+import HomeScreen from './screens/HomeScreen';
 import LoginScreen from './screens/LoginScreen';
-import RegisterScreen from './screens/RegisterScreen';
 import ProviderDashboardScreen from './screens/ProviderDashboardScreen';
 import ProviderDetailScreen from './screens/ProviderDetailScreen';
 import ProviderEditProfileScreen from './screens/ProviderEditProfileScreen';
+import RegisterScreen from './screens/RegisterScreen';
 import SolicitudFormScreen from './screens/SolicitudFormScreen';
-import ChatScreen from './screens/ChatScreen';
 import {
   clearSession,
   getProviderByUser,
@@ -34,8 +38,18 @@ const normalizeText = (value) =>
     .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase();
 
+const homeForRole = (role) => {
+  if (role === 'admin') return 'AdminDashboard';
+  if (role === 'proveedor') return 'ProviderDashboard';
+  return 'Home';
+};
+
 export default function App() {
-  const [screen, setScreen] = useState('home');
+  const [basePath] = useState(() => {
+    if (typeof window === 'undefined') return '';
+    return getBasePath(window.location.pathname);
+  });
+  const [route, setRoute] = useState(() => getCurrentRoute(basePath));
   const [user, setUser] = useState(null);
   const [providerProfile, setProviderProfile] = useState(null);
   const [sessionLoading, setSessionLoading] = useState(true);
@@ -50,9 +64,90 @@ export default function App() {
   const [chatWithName, setChatWithName] = useState('');
 
   useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+
+    const handlePopState = () => {
+      setRoute(getCurrentRoute(basePath));
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [basePath]);
+
+  useEffect(() => {
     restoreSession();
     loadProviders('');
   }, []);
+
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+
+    const titles = {
+      home: 'ServiGT | Inicio',
+      login: 'ServiGT | Login',
+      register: 'ServiGT | Registro',
+      providerdashboard: 'ServiGT | Panel del proveedor',
+      providereditprofile: 'ServiGT | Editar perfil',
+      admindashboard: 'ServiGT | Panel de administrador',
+      providerdetail: 'ServiGT | Perfil del proveedor',
+      solicitudform: 'ServiGT | Solicitar servicio',
+      chat: 'ServiGT | Chat',
+      notfound: 'ServiGT | Pagina no encontrada',
+    };
+
+    document.title = titles[route.name] || 'ServiGT';
+  }, [route.name]);
+
+  useEffect(() => {
+    if (sessionLoading) return;
+
+    if (route.name === 'root') {
+      navigate(user ? homeForRole(user.role) : 'Login', {}, { replace: true });
+      return;
+    }
+
+    if (!user && route.name === 'home') {
+      navigate('Login', {}, { replace: true });
+      return;
+    }
+
+    const providerOnlyRoutes = ['providerdashboard', 'providereditprofile'];
+    if (providerOnlyRoutes.includes(route.name) && (!user || user.role !== 'proveedor')) {
+      navigate('Login', {}, { replace: true });
+      return;
+    }
+
+    if (route.name === 'admindashboard' && (!user || user.role !== 'admin')) {
+      navigate('Login', {}, { replace: true });
+      return;
+    }
+
+    const authRequiredRoutes = ['solicitudform', 'chat'];
+    if (authRequiredRoutes.includes(route.name) && !user) {
+      navigate('Login', {}, { replace: true });
+      return;
+    }
+
+    if (user && ['login', 'register'].includes(route.name)) {
+      navigate(homeForRole(user.role), {}, { replace: true });
+      return;
+    }
+
+    if (!user && route.name === 'providerdetail') {
+      navigate('Login', {}, { replace: true });
+    }
+  }, [route.name, sessionLoading, user]);
+
+  const syncRoute = (path, { replace = false } = {}) => {
+    if (typeof window !== 'undefined') {
+      const currentPath = `${window.location.pathname}${window.location.search}`;
+      if (currentPath !== path) {
+        window.history[replace ? 'replaceState' : 'pushState']({}, '', path);
+      }
+    }
+
+    setRoute(parseRouteFromPath(path, basePath));
+  };
 
   const restoreSession = async () => {
     const stored = loadStoredSession();
@@ -109,8 +204,8 @@ export default function App() {
     setSelectedProvider(null);
     setChatWithUserId(null);
     setChatWithName('');
-    setScreen('home');
     loadProviders();
+    navigate(homeForRole(loggedUser.role), {}, { replace: true });
   };
 
   const handleLogout = async () => {
@@ -120,7 +215,7 @@ export default function App() {
     setSelectedProvider(null);
     setChatWithUserId(null);
     setChatWithName('');
-    setScreen('home');
+    navigate('Home', {}, { replace: true });
   };
 
   const handleRegisterSuccess = (loggedUser, profile = null) => {
@@ -129,11 +224,13 @@ export default function App() {
     setSelectedProvider(null);
     setChatWithUserId(null);
     setChatWithName('');
-    setScreen('home');
     loadProviders();
+    navigate(homeForRole(loggedUser.role), {}, { replace: true });
   };
 
-  const navigate = (name, params = {}) => {
+  const navigate = (name, params = {}, options = {}) => {
+    const routeName = String(name || 'Home').toLowerCase();
+
     if (params.profile) {
       setProviderProfile(params.profile);
     }
@@ -146,7 +243,17 @@ export default function App() {
     if (Object.prototype.hasOwnProperty.call(params, 'chatWithName')) {
       setChatWithName(params.chatWithName || '');
     }
-    setScreen(name.toLowerCase());
+
+    if (!['providerdetail', 'solicitudform'].includes(routeName)) {
+      setSelectedProvider(null);
+    }
+
+    if (routeName !== 'chat' && !Object.prototype.hasOwnProperty.call(params, 'chatWithUserId')) {
+      setChatWithUserId(null);
+      setChatWithName('');
+    }
+
+    syncRoute(buildAppPath(routeName, params, basePath), options);
   };
 
   const navigation = { navigate };
@@ -170,21 +277,31 @@ export default function App() {
   if (sessionLoading) {
     return (
       <View style={styles.splashContainer}>
-        <Text style={styles.splashTitle}>PServicios</Text>
+        <Text style={styles.splashTitle}>ServiGT</Text>
         <ActivityIndicator size="large" color="#1a73e8" style={styles.splashLoader} />
       </View>
     );
   }
 
-  if (screen === 'login') {
+  if (route.name === 'login') {
     return <LoginScreen navigation={navigation} onLogin={handleLogin} />;
   }
 
-  if (screen === 'register') {
+  if (route.name === 'register') {
     return <RegisterScreen navigation={navigation} onRegisterSuccess={handleRegisterSuccess} />;
   }
 
-  if (screen === 'providerdashboard') {
+  if (route.name === 'admindashboard') {
+    return (
+      <AdminDashboardScreen
+        navigation={navigation}
+        user={user}
+        onLogout={handleLogout}
+      />
+    );
+  }
+
+  if (route.name === 'providerdashboard') {
     return (
       <ProviderDashboardScreen
         navigation={navigation}
@@ -196,7 +313,7 @@ export default function App() {
     );
   }
 
-  if (screen === 'providereditprofile') {
+  if (route.name === 'providereditprofile') {
     return (
       <ProviderEditProfileScreen
         navigation={navigation}
@@ -204,206 +321,80 @@ export default function App() {
         providerProfile={providerProfile}
         onProfileUpdated={(updated) => {
           setProviderProfile(updated);
-          setScreen('providerdashboard');
           loadProviders();
+          navigate('ProviderDashboard', {}, { replace: true });
         }}
       />
     );
   }
 
-  if (screen === 'providerdetail') {
+  if (route.name === 'providerdetail') {
     return (
       <ProviderDetailScreen
         navigation={navigation}
         user={user}
         providerProfile={providerProfile}
         selectedProvider={selectedProvider}
+        providerId={route.providerId}
       />
     );
   }
 
-  if (screen === 'solicitudform') {
+  if (route.name === 'solicitudform') {
     return (
       <SolicitudFormScreen
         navigation={navigation}
         user={user}
         selectedProvider={selectedProvider}
+        providerId={route.providerId}
       />
     );
   }
 
-  if (screen === 'chat') {
+  if (route.name === 'chat') {
     return (
       <ChatScreen
         navigation={navigation}
         user={user}
-        chatWithUserId={chatWithUserId}
-        chatWithName={chatWithName}
+        chatWithUserId={route.chatWithUserId || chatWithUserId}
+        chatWithName={route.chatWithName || chatWithName}
       />
     );
   }
 
-  return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar style="light" />
-
-      <View style={styles.header}>
-        <View style={styles.headerTop}>
-          <View>
-            <Text style={styles.headerTitle}>PServicios</Text>
-            <Text style={styles.headerSubtitle}>Conectando servicios en Guatemala</Text>
-          </View>
-          {user ? (
-            <View style={styles.headerUserRow}>
-              <Text style={styles.headerUserName}>{user.name}</Text>
-              {user.role === 'proveedor' ? (
-                <TouchableOpacity
-                  style={styles.headerBtn}
-                  onPress={() => setScreen('providerdashboard')}
-                >
-                  <Text style={styles.headerBtnText}>Mi panel</Text>
-                </TouchableOpacity>
-              ) : null}
-              <TouchableOpacity style={styles.headerBtnSmall} onPress={handleLogout}>
-                <Text style={styles.headerBtnSmallText}>Salir</Text>
-              </TouchableOpacity>
-            </View>
-          ) : (
-            <View style={styles.headerButtons}>
-              <TouchableOpacity style={styles.headerBtn} onPress={() => setScreen('login')}>
-                <Text style={styles.headerBtnText}>Login</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.headerBtn, styles.headerBtnOutline]}
-                onPress={() => setScreen('register')}
-              >
-                <Text style={[styles.headerBtnText, styles.headerBtnOutlineText]}>Registro</Text>
-              </TouchableOpacity>
-            </View>
-          )}
-        </View>
+  if (route.name === 'notfound') {
+    return (
+      <View style={styles.splashContainer}>
+        <Text style={styles.splashTitle}>ServiGT</Text>
+        <Text style={styles.notFoundText}>La pagina que buscas no existe.</Text>
+        <TouchableOpacity style={styles.retryBtn} onPress={() => navigation.navigate('Home')}>
+          <Text style={styles.retryText}>Ir al inicio</Text>
+        </TouchableOpacity>
       </View>
+    );
+  }
 
-      <ScrollView style={styles.content}>
-        {notice ? (
-          <View style={styles.noticeBox}>
-            <Text style={styles.noticeText}>{notice}</Text>
-          </View>
-        ) : null}
-
-        {loading ? (
-          <View style={styles.center}>
-            <ActivityIndicator size="large" color="#1a73e8" />
-            <Text style={styles.loadingText}>Cargando proveedores...</Text>
-          </View>
-        ) : proveedores.length === 0 && !hasActiveFilters ? (
-          <View style={styles.center}>
-            <Text style={styles.emptyText}>No hay proveedores disponibles todavia.</Text>
-            <TouchableOpacity style={styles.retryBtn} onPress={() => loadProviders()}>
-              <Text style={styles.retryText}>Actualizar</Text>
-            </TouchableOpacity>
-          </View>
-        ) : (
-          <>
-            <View style={styles.searchCard}>
-              <Text style={styles.searchLabel}>Buscar proveedores</Text>
-              <Text style={styles.inputLabel}>Categoria</Text>
-              <TextInput
-                style={styles.searchInput}
-                placeholder="Ej. Plomeria, electricidad, limpieza"
-                placeholderTextColor="#8a94a6"
-                value={categoria}
-                onChangeText={setCategoria}
-                onSubmitEditing={handleCategoriaSubmit}
-                returnKeyType="search"
-              />
-              <Text style={[styles.inputLabel, styles.inputLabelSpaced]}>Nombre o texto</Text>
-              <TextInput
-                style={styles.searchInput}
-                placeholder="Nombre, categoria, ubicacion o servicio"
-                placeholderTextColor="#8a94a6"
-                value={searchQuery}
-                onChangeText={setSearchQuery}
-              />
-              <View style={styles.searchMetaRow}>
-                <Text style={styles.searchMetaText}>
-                  {normalizedQuery
-                    ? `${filteredProviders.length} resultado(s) de ${proveedores.length}`
-                    : `${proveedores.length} proveedor(es) disponibles`}
-                </Text>
-                {searchQuery.trim() ? (
-                  <TouchableOpacity onPress={() => setSearchQuery('')}>
-                    <Text style={styles.clearSearchText}>Limpiar</Text>
-                  </TouchableOpacity>
-                ) : null}
-                {categoriaAplicada.trim() ? (
-                  <TouchableOpacity onPress={clearCategoria}>
-                    <Text style={styles.clearSearchText}>Limpiar categoria</Text>
-                  </TouchableOpacity>
-                ) : null}
-              </View>
-            </View>
-
-            <Text style={styles.sectionTitle}>
-              {categoriaQuery
-                ? `Categoria: "${categoriaQuery}"`
-                : normalizedQuery
-                ? `Resultados para "${searchQuery.trim()}"`
-                : `Proveedores (${proveedores.length})`}
-            </Text>
-
-            {filteredProviders.length === 0 ? (
-              <View style={styles.center}>
-                <Text style={styles.emptyText}>No encontramos proveedores con esa busqueda.</Text>
-                <TouchableOpacity
-                  style={styles.retryBtn}
-                  onPress={() => {
-                    setSearchQuery('');
-                    clearCategoria();
-                  }}
-                >
-                  <Text style={styles.retryText}>Ver todos</Text>
-                </TouchableOpacity>
-              </View>
-            ) : (
-              filteredProviders.map((prov) => (
-                <TouchableOpacity
-                  key={prov.id}
-                  style={styles.provCard}
-                  activeOpacity={0.9}
-                  onPress={() => navigation.navigate('ProviderDetail', { provider: prov })}
-                >
-                  <View style={styles.provHeader}>
-                    <Text style={styles.provName}>{prov.nombre}</Text>
-                    <View style={styles.provBadge}>
-                      <Text style={styles.provBadgeText}>
-                        {prov.categoria?.nombre || 'Sin categoria'}
-                      </Text>
-                    </View>
-                  </View>
-                  <Text style={styles.provDesc}>{prov.descripcion}</Text>
-                  <View style={styles.provMeta}>
-                    <Text style={styles.provLocation}>
-                      {prov.municipio}, {prov.departamento}
-                    </Text>
-                    <Text style={styles.provPhone}>{prov.telefono}</Text>
-                  </View>
-                  <View style={styles.cardFooter}>
-                    <Text style={styles.cardFooterText}>Ver perfil y disponibilidad</Text>
-                  </View>
-                </TouchableOpacity>
-              ))
-            )}
-          </>
-        )}
-
-        <View style={styles.footer}>
-          <Text style={styles.footerText}>
-            PServicios Guatemala - Grupo 6 - Ingenieria de Software
-          </Text>
-        </View>
-      </ScrollView>
-    </SafeAreaView>
+  return (
+    <HomeScreen
+      user={user}
+      providers={proveedores}
+      loading={loading}
+      notice={notice}
+      categoria={categoria}
+      categoriaAplicada={categoriaAplicada}
+      searchQuery={searchQuery}
+      hasActiveFilters={hasActiveFilters}
+      onCategoriaChange={setCategoria}
+      onCategoriaSubmit={handleCategoriaSubmit}
+      onCategoriaClear={clearCategoria}
+      onSearchChange={setSearchQuery}
+      onRetry={loadProviders}
+      onLogout={handleLogout}
+      onNavigate={navigate}
+      categoriaQuery={categoriaQuery}
+      normalizedQuery={normalizedQuery}
+      filteredProviders={filteredProviders}
+    />
   );
 }
 
@@ -416,19 +407,7 @@ const styles = StyleSheet.create({
   },
   splashTitle: { fontSize: 36, fontWeight: 'bold', color: '#1a73e8' },
   splashLoader: { marginTop: 20 },
-  container: { flex: 1, backgroundColor: '#f5f5f5' },
-  center: { padding: 40, alignItems: 'center' },
-  loadingText: { marginTop: 16, fontSize: 16, color: '#666' },
-  emptyText: { fontSize: 16, color: '#666', textAlign: 'center', marginBottom: 20 },
-  noticeBox: {
-    backgroundColor: '#fff7e6',
-    borderWidth: 1,
-    borderColor: '#f0c36d',
-    borderRadius: 10,
-    padding: 12,
-    marginBottom: 16,
-  },
-  noticeText: { color: '#8a5a00', fontSize: 14, lineHeight: 20 },
+  notFoundText: { marginTop: 12, marginBottom: 20, fontSize: 16, color: '#667085' },
   retryBtn: {
     backgroundColor: '#1a73e8',
     paddingHorizontal: 24,
@@ -436,100 +415,6 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   retryText: { color: '#fff', fontSize: 16, fontWeight: '600' },
-  header: { backgroundColor: '#1a73e8', paddingTop: 20, paddingBottom: 20, paddingHorizontal: 20 },
-  headerTop: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-end',
-    flexWrap: 'wrap',
-    gap: 12,
-  },
-  headerTitle: { fontSize: 28, fontWeight: 'bold', color: '#fff' },
-  headerSubtitle: { fontSize: 14, color: 'rgba(255,255,255,0.8)', marginTop: 4 },
-  headerButtons: { flexDirection: 'row', gap: 10 },
-  headerBtn: { backgroundColor: '#fff', paddingHorizontal: 20, paddingVertical: 8, borderRadius: 6 },
-  headerBtnText: { color: '#1a73e8', fontWeight: '600', fontSize: 14 },
-  headerBtnOutline: { backgroundColor: 'transparent', borderWidth: 1, borderColor: '#fff' },
-  headerBtnOutlineText: { color: '#fff' },
-  headerUserRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  headerUserName: { color: '#fff', fontWeight: '600', fontSize: 14 },
-  headerBtnSmall: {
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 6,
-  },
-  headerBtnSmallText: { color: '#fff', fontSize: 13 },
-  content: { flex: 1, padding: 16 },
-  searchCard: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 3,
-    elevation: 2,
-  },
-  searchLabel: { fontSize: 15, fontWeight: '700', color: '#333', marginBottom: 10 },
-  inputLabel: { fontSize: 13, fontWeight: '600', color: '#667085', marginBottom: 6 },
-  inputLabelSpaced: { marginTop: 12 },
-  searchInput: {
-    backgroundColor: '#f7f9fc',
-    borderWidth: 1,
-    borderColor: '#d9e2ef',
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    fontSize: 15,
-    color: '#333',
-  },
-  searchMetaRow: {
-    marginTop: 10,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    flexWrap: 'wrap',
-    gap: 10,
-  },
-  searchMetaText: { fontSize: 13, color: '#667085' },
-  clearSearchText: { fontSize: 13, color: '#1a73e8', fontWeight: '700' },
-  sectionTitle: { fontSize: 18, fontWeight: '700', color: '#333', marginBottom: 12 },
-  provCard: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.08,
-    shadowRadius: 3,
-    elevation: 2,
-  },
-  provHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-    gap: 8,
-  },
-  provName: { fontSize: 16, fontWeight: '700', color: '#333', flex: 1 },
-  provBadge: { backgroundColor: '#e3f2fd', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
-  provBadgeText: { fontSize: 12, color: '#1a73e8', fontWeight: '600' },
-  provDesc: { fontSize: 14, color: '#666', lineHeight: 20, marginBottom: 8 },
-  provMeta: { flexDirection: 'row', justifyContent: 'space-between', gap: 8 },
-  provLocation: { fontSize: 13, color: '#999', flex: 1 },
-  provPhone: { fontSize: 13, color: '#1a73e8', fontWeight: '600' },
-  cardFooter: {
-    marginTop: 12,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#eef2f7',
-  },
-  cardFooterText: { fontSize: 13, color: '#1a73e8', fontWeight: '700' },
-  footer: { paddingVertical: 24, alignItems: 'center' },
-  footerText: { fontSize: 12, color: '#999' },
 });
 
 registerRootComponent(App);

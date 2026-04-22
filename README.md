@@ -1,4 +1,4 @@
-# G6Software-PServicios
+# G6Software-ServiGT
 Proyecto de servicios.
 Ingeniería de Sofwtare I
 Ing. Erick Marroquín
@@ -21,4 +21,3 @@ Contenido de Cada Carpeta
 - Corte 1: Archivos pdf y docx de los archivos hechos en la fase 1 y pdf de la presentación
 - Corte 2: Placeholder (no olvidar editar)
 - Scrum: Placeholder (no olvidar editar)
-

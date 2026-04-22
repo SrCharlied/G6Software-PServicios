@@ -1,6 +1,7 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\AdminController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CategoriaController;
 use App\Http\Controllers\ProviderController;
@@ -13,7 +14,7 @@ use App\Http\Controllers\NotificacionController;
 
 /*
 |--------------------------------------------------------------------------
-| API Routes - PServicios Guatemala
+| API Routes - ServiGT Guatemala
 |--------------------------------------------------------------------------
 |
 | Rutas publicas: health, login, register, listado de proveedores/categorias
@@ -93,4 +94,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/notificaciones',                [NotificacionController::class, 'index']);
     Route::put('/notificaciones/{id}/leer',      [NotificacionController::class, 'marcarLeida'])->where('id', '[0-9]+');
     Route::put('/notificaciones/leer-todas',     [NotificacionController::class, 'marcarTodasLeidas']);
+
+    // ── Admin (requiere rol admin) ──────────────────────────────────────────
+    Route::middleware('admin')->prefix('admin')->group(function () {
+        Route::get('/stats',       [AdminController::class, 'stats']);
+        Route::get('/usuarios',    [AdminController::class, 'listUsers']);
+        Route::get('/proveedores', [AdminController::class, 'listProviders']);
+    });
 });

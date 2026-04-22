@@ -19,6 +19,7 @@ export default function ChatScreen({
   chatWithUserId,
   chatWithName,
 }) {
+  const displayName = chatWithName || `Usuario ${chatWithUserId || ''}`.trim();
   const [mensajes, setMensajes] = useState([]);
   const [texto, setTexto] = useState('');
   const [loading, setLoading] = useState(true);
@@ -136,11 +137,11 @@ export default function ChatScreen({
         <View style={styles.headerInfo}>
           <View style={styles.avatarSmall}>
             <Text style={styles.avatarSmallText}>
-              {(chatWithName || '?')[0].toUpperCase()}
+              {(displayName || '?')[0].toUpperCase()}
             </Text>
           </View>
           <View>
-            <Text style={styles.headerName}>{chatWithName}</Text>
+            <Text style={styles.headerName}>{displayName}</Text>
             <Text style={styles.headerStatus}>En linea</Text>
           </View>
         </View>
@@ -162,7 +163,7 @@ export default function ChatScreen({
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
               <Text style={styles.emptyText}>
-                Inicia la conversacion con {chatWithName}.
+                Inicia la conversacion con {displayName}.
               </Text>
             </View>
           }

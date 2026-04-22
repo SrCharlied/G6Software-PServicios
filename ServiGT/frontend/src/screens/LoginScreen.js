@@ -66,7 +66,7 @@ export default function LoginScreen({ navigation, onLogin }) {
 
   return (
     <ScrollView contentContainerStyle={[styles.container, Platform.OS === 'web' && { background: 'linear-gradient(236deg, rgba(26, 115, 232, 1) 0%, rgba(245, 245, 245, 1) 100%)' }]}>      <View style={styles.card}>
-      <Text style={styles.title}>PServicios</Text>
+      <Text style={styles.title}>ServiGT</Text>
       <Text style={styles.subtitle}>Iniciar sesion</Text>
 
       {errorMsg ? (

@@ -1,10 +1,14 @@
 import axios from 'axios';
 
-const DEFAULT_API_URL = 'http://localhost:8080/api';
+const shouldUseRelativeApi =
+  typeof window !== 'undefined'
+  && ['', '80', '443', '8081', '8082'].includes(window.location.port);
+
+const DEFAULT_API_URL = shouldUseRelativeApi ? '/api' : 'http://localhost:8180/api';
 const BASE_URL = process.env.EXPO_PUBLIC_API_URL || DEFAULT_API_URL;
 
-const TOKEN_KEY = 'pservicios_token';
-const USER_KEY  = 'pservicios_user';
+const TOKEN_KEY = 'servigt_token';
+const USER_KEY  = 'servigt_user';
 
 // ── Persistencia en localStorage (solo web) ───────────────────────────────
 
@@ -393,6 +397,36 @@ export const marcarTodasLeidas = async () => {
     return response.data;
   } catch (error) {
     throw new Error(getErrorMessage(error, 'No se pudo actualizar las notificaciones.'));
+  }
+};
+
+// ── Admin ─────────────────────────────────────────────────────────────────
+
+export const getAdminStats = async () => {
+  try {
+    const response = await api.get('/admin/stats');
+    return response.data;
+  } catch (error) {
+    throw new Error(getErrorMessage(error, 'No se pudieron cargar las metricas.'));
+  }
+};
+
+export const getAdminUsers = async (role = '') => {
+  try {
+    const params = role ? { role } : {};
+    const response = await api.get('/admin/usuarios', { params });
+    return response.data;
+  } catch (error) {
+    throw new Error(getErrorMessage(error, 'No se pudieron cargar los usuarios.'));
+  }
+};
+
+export const getAdminProviders = async () => {
+  try {
+    const response = await api.get('/admin/proveedores');
+    return response.data;
+  } catch (error) {
+    throw new Error(getErrorMessage(error, 'No se pudieron cargar los proveedores.'));
   }
 };
 

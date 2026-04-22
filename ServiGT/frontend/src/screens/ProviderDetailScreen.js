@@ -29,31 +29,36 @@ export default function ProviderDetailScreen({
   user,
   providerProfile,
   selectedProvider,
+  providerId,
 }) {
-  const [proveedor, setProveedor] = useState(selectedProvider || null);
+  const matchedSelectedProvider = selectedProvider
+    && (!providerId || Number(selectedProvider.id) === Number(providerId))
+    ? selectedProvider
+    : null;
+  const [proveedor, setProveedor] = useState(matchedSelectedProvider || null);
   const [calificaciones, setCalificaciones] = useState([]);
   const [disponibilidad, setDisponibilidad] = useState([]);
-  const [loading, setLoading] = useState(!selectedProvider);
+  const [loading, setLoading] = useState(Boolean(providerId || matchedSelectedProvider));
+
+  const resolvedProviderId = providerId || matchedSelectedProvider?.id || proveedor?.id || null;
 
   const esCliente = user && user.role !== 'proveedor';
   const esMiPerfil = user && providerProfile?.id === proveedor?.id;
 
   useEffect(() => {
-    if (selectedProvider) {
-      loadExtras(selectedProvider.id);
+    if (matchedSelectedProvider) {
+      setProveedor(matchedSelectedProvider);
     }
-  }, [selectedProvider]);
+  }, [matchedSelectedProvider]);
 
-  if (!selectedProvider && !proveedor) {
-    return (
-      <View style={styles.loadingContainer}>
-        <Text style={styles.loadingText}>No se encontro el proveedor seleccionado.</Text>
-        <TouchableOpacity style={styles.backFallbackBtn} onPress={() => navigation.navigate('Home')}>
-          <Text style={styles.backFallbackBtnText}>Volver al listado</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
+  useEffect(() => {
+    if (!resolvedProviderId) {
+      setLoading(false);
+      return;
+    }
+
+    loadExtras(resolvedProviderId);
+  }, [resolvedProviderId]);
 
   const loadExtras = async (id) => {
     setLoading(true);
@@ -72,6 +77,17 @@ export default function ProviderDetailScreen({
       setLoading(false);
     }
   };
+
+  if (!resolvedProviderId && !proveedor) {
+    return (
+      <View style={styles.loadingContainer}>
+        <Text style={styles.loadingText}>No se encontro el proveedor seleccionado.</Text>
+        <TouchableOpacity style={styles.backFallbackBtn} onPress={() => navigation.navigate('Home')}>
+          <Text style={styles.backFallbackBtnText}>Volver al listado</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
 
   if (loading || !proveedor) {
     return (

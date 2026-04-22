@@ -18,7 +18,7 @@ class HealthController extends Controller
 
         return response()->json([
             'status'   => 'ok',
-            'app'      => 'PServicios Guatemala',
+            'app'      => 'ServiGT Guatemala',
             'backend'  => 'Laravel PHP',
             'database' => [
                 'driver' => config('database.default'),

@@ -1,0 +1,9 @@
+Scrum/frontend/node_modules/
+Scrum/frontend/.expo/
+Scrum/frontend/web-build/
+Scrum/backend/vendor/
+ServiGT/frontend/dist/
+ServiGT/frontend/.expo/
+ServiGT/frontend/node_modules/
+.env
+*.log

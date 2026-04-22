@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -11,14 +11,33 @@ import {
 } from 'react-native';
 import { login, getProviderByUser } from '../services/api';
 
+const webHover = (onEnter, onLeave) =>
+  Platform.OS === 'web' ? { onMouseEnter: onEnter, onMouseLeave: onLeave } : {};
+
 export default function LoginScreen({ navigation, onLogin }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
+  const [emailFocused, setEmailFocused] = useState(false);
+  const [passwordFocused, setPasswordFocused] = useState(false);
+  const [btnHovered, setBtnHovered] = useState(false);
+  const [btn2Hovered, setBtn2Hovered] = useState(false);
+  const [btn3Hovered, setBtn3Hovered] = useState(false);
 
   const handleLogin = async () => {
-    if (!email.trim() || !password) {
-      Alert.alert('Campos incompletos', 'Ingresa tu correo y contrasena.');
+    setErrorMsg('');
+    if (!email.trim() && !password) {
+      setErrorMsg('Ingresa tu correo y contrasena.');
+      return;
+    }
+    if (!email.trim()) {
+      setErrorMsg('Ingresa tu correo electronico.');
+      return;
+    }
+    if (!password) {
+      setErrorMsg('Ingresa tu contrasena.');
       return;
     }
 
@@ -39,56 +58,95 @@ export default function LoginScreen({ navigation, onLogin }) {
 
       if (onLogin) onLogin(user, providerProfile);
     } catch (error) {
-      Alert.alert('Error al iniciar sesion', error.message);
+      setErrorMsg(error.message);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
+    <ScrollView contentContainerStyle={[styles.container, Platform.OS === 'web' && { background: 'linear-gradient(236deg, rgba(26, 115, 232, 1) 0%, rgba(245, 245, 245, 1) 100%)' }]}>      <View style={styles.card}>
       <Text style={styles.title}>PServicios</Text>
       <Text style={styles.subtitle}>Iniciar sesion</Text>
 
-      <View style={styles.form}>
-        <Text style={styles.label}>Correo electronico</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="correo@ejemplo.com"
-          value={email}
-          onChangeText={setEmail}
-          keyboardType="email-address"
-          autoCapitalize="none"
-          autoCorrect={false}
-        />
+      {errorMsg ? (
+        <View style={styles.errorBox}>
+          <Text style={styles.errorText}>⚠ {errorMsg}</Text>
+        </View>
+      ) : null}
 
-        <Text style={styles.label}>Contrasena</Text>
+      <Text style={styles.label}>Correo electronico</Text>
+      <TextInput
+        style={[styles.input, emailFocused && styles.inputFocused]}
+        placeholder="correo@ejemplo.com"
+        placeholderTextColor="#adb5bd"
+        value={email}
+        onChangeText={(t) => { setEmail(t); setErrorMsg(''); }}
+        keyboardType="email-address"
+        autoCapitalize="none"
+        autoCorrect={false}
+        onFocus={() => setEmailFocused(true)}
+        onBlur={() => setEmailFocused(false)}
+      />
+
+      <Text style={styles.label}>Contrasena</Text>
+      <View style={[styles.passwordWrap, passwordFocused && styles.inputFocused]}>
         <TextInput
-          style={styles.input}
-          placeholder="••••••••"
+          style={styles.passwordInput}
+          placeholder="Ingresa tu contrasena"
+          placeholderTextColor="#adb5bd"
           value={password}
-          onChangeText={setPassword}
-          secureTextEntry
+          onChangeText={(t) => { setPassword(t); setErrorMsg(''); }}
+          secureTextEntry={!showPassword}
+          onFocus={() => setPasswordFocused(true)}
+          onBlur={() => setPasswordFocused(false)}
         />
-
         <TouchableOpacity
-          style={[styles.button, loading && styles.buttonDisabled]}
-          onPress={handleLogin}
-          disabled={loading}
+          onPress={() => setShowPassword(!showPassword)}
+          style={styles.eyeBtn}
         >
-          {loading
-            ? <ActivityIndicator color="#fff" />
-            : <Text style={styles.buttonText}>Ingresar</Text>}
+          <Text style={styles.eyeIcon}>{showPassword ? '( )' : '( • )'}</Text>
         </TouchableOpacity>
       </View>
 
-      <TouchableOpacity onPress={() => navigation?.navigate('Register')}>
-        <Text style={styles.link}>No tienes cuenta? Registrate</Text>
+      <TouchableOpacity
+        style={[styles.button, btnHovered && styles.buttonHovered, loading && styles.buttonDisabled]}
+        onPress={handleLogin}
+        disabled={loading}
+        activeOpacity={0.82}
+        {...webHover(() => setBtnHovered(true), () => setBtnHovered(false))}
+      >
+        {loading
+          ? <ActivityIndicator color="#fff" />
+          : <Text style={styles.buttonText}>Ingresar</Text>}
       </TouchableOpacity>
 
-      <TouchableOpacity onPress={() => navigation?.navigate('Home')}>
-        <Text style={styles.linkSecondary}>Volver al inicio</Text>
+      <View style={styles.divider}>
+        <View style={styles.dividerLine} />
+        <Text style={styles.dividerText}>O</Text>
+        <View style={styles.dividerLine} />
+      </View>
+
+      <TouchableOpacity
+        style={[styles.btnSecondary, btn2Hovered && styles.btnSecondaryHovered]}
+        onPress={() => navigation?.navigate('Register')}
+        activeOpacity={0.7}
+        {...webHover(() => setBtn2Hovered(true), () => setBtn2Hovered(false))}
+      >
+        <Text style={styles.btnSecondaryText}>No tienes cuenta? Registrate</Text>
       </TouchableOpacity>
+
+      <TouchableOpacity
+        style={styles.btnTertiary}
+        onPress={() => navigation?.navigate('Home')}
+        activeOpacity={0.7}
+        {...webHover(() => setBtn3Hovered(true), () => setBtn3Hovered(false))}
+      >
+        <Text style={[styles.btnTertiaryText, btn3Hovered && styles.btnTertiaryTextHovered]}>
+          Volver al inicio
+        </Text>
+      </TouchableOpacity>
+    </View>
     </ScrollView>
   );
 }
@@ -97,32 +155,46 @@ const styles = StyleSheet.create({
   container: {
     flexGrow: 1,
     justifyContent: 'center',
+    alignItems: 'center',
     padding: 24,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#e3f2fd',
+  },
+  card: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 32,
+    width: '100%',
+    maxWidth: 420,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 3,
   },
   title: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: '#1a73e8',
+    fontSize: 30,
+    fontWeight: '700',
+    color: '#111',
     textAlign: 'center',
+    marginBottom: 4,
   },
   subtitle: {
-    fontSize: 18,
+    fontSize: 14,
     color: '#666',
     textAlign: 'center',
-    marginTop: 4,
-    marginBottom: 32,
+    marginBottom: 24,
   },
-  form: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 20,
-    marginBottom: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 4,
-    elevation: 2,
+  errorBox: {
+    backgroundColor: '#fff5f5',
+    borderWidth: 1,
+    borderColor: '#fecaca',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 16,
+  },
+  errorText: {
+    fontSize: 13,
+    color: '#dc2626',
   },
   label: {
     fontSize: 13,
@@ -132,39 +204,109 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   input: {
-    backgroundColor: '#f7f9fc',
+    backgroundColor: '#fff',
     borderWidth: 1,
     borderColor: '#d9e2ef',
     borderRadius: 8,
-    padding: 13,
-    fontSize: 15,
+    padding: 12,
+    fontSize: 14,
     marginBottom: 14,
     color: '#333',
+    outlineStyle: 'none',
+  },
+  inputFocused: {
+    borderColor: '#111',
+    borderWidth: 1.5,
+  },
+  passwordWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#d9e2ef',
+    borderRadius: 8,
+    marginBottom: 20,
+    overflow: 'hidden',
+  },
+  passwordInput: {
+    flex: 1,
+    padding: 12,
+    fontSize: 14,
+    color: '#333',
+    outlineStyle: 'none',
+
+  },
+  eyeBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    borderLeftWidth: 1,
+    borderLeftColor: '#d9e2ef',
+    backgroundColor: '#f7f9fc',
+  },
+  eyeIcon: {
+    fontSize: 12,
+    color: '#888',
   },
   button: {
     backgroundColor: '#1a73e8',
-    padding: 15,
+    padding: 14,
     borderRadius: 8,
     alignItems: 'center',
-    marginTop: 4,
+  },
+  buttonHovered: {
+    backgroundColor: '#1557b0',
   },
   buttonDisabled: {
     backgroundColor: '#91b8f3',
   },
   buttonText: {
     color: '#fff',
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
   },
-  link: {
-    color: '#1a73e8',
-    textAlign: 'center',
-    marginBottom: 10,
-    fontSize: 14,
+  divider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 20,
+    gap: 10,
   },
-  linkSecondary: {
-    color: '#999',
-    textAlign: 'center',
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#e5e7eb',
+  },
+  dividerText: {
+    fontSize: 12,
+    color: '#9ca3af',
+    fontWeight: '500',
+  },
+  btnSecondary: {
+    borderWidth: 1,
+    borderColor: '#d9e2ef',
+    borderRadius: 8,
+    padding: 13,
+    alignItems: 'center',
+    marginBottom: 10,
+    backgroundColor: '#fff',
+  },
+  btnSecondaryHovered: {
+    backgroundColor: '#e3f2fd',
+    borderColor: '#1a73e8',
+  },
+  btnSecondaryText: {
+    color: '#333',
     fontSize: 14,
+    fontWeight: '500',
+  },
+  btnTertiary: {
+    padding: 8,
+    alignItems: 'center',
+  },
+  btnTertiaryText: {
+    color: '#999',
+    fontSize: 13,
+  },
+  btnTertiaryTextHovered: {
+    color: '#1a73e8',
   },
 });

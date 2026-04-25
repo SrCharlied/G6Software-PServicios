@@ -50,21 +50,38 @@ class ProviderController extends Controller
     public function store(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'user_id'          => 'nullable|exists:users,id',
-            'nombre'           => 'required|string|max:255',
-            'email'            => 'required|email|unique:proveedores,email',
-            'telefono'         => 'nullable|string|max:20',
-            'descripcion'      => 'nullable|string',
-            'departamento'     => 'required|string|max:100',
-            'municipio'        => 'nullable|string|max:100',
-            'categoria_id'     => 'required|exists:categorias,id',
-            'tarifa_hora'      => 'nullable|numeric|min:0',
-            'tarifa_proyecto'  => 'nullable|numeric|min:0',
-            'nivel'            => 'nullable|in:novato,intermedio,experto',
+            'user_id'           => 'nullable|exists:users,id',
+            'nombre'            => 'required|string|max:255',
+            'email'             => 'required|email|unique:proveedores,email',
+            'telefono'          => 'nullable|string|max:20',
+            'descripcion'       => 'nullable|string',
+            'departamento'      => 'required|string|max:100',
+            'municipio'         => 'nullable|string|max:100',
+            'categoria_id'      => 'nullable|exists:categorias,id',
+            'categoria_ids'     => 'sometimes|array|min:1',
+            'categoria_ids.*'   => 'exists:categorias,id',
+            'tarifa_hora'       => 'nullable|numeric|min:0',
+            'tarifa_proyecto'   => 'nullable|numeric|min:0',
+            'nivel'             => 'nullable|in:novato,intermedio,experto',
         ]);
 
+        $categoriaIds = $validated['categoria_ids'] ?? [];
+        unset($validated['categoria_ids']);
+
+        // Derive primary categoria_id from first selection when not explicitly set
+        if (empty($validated['categoria_id']) && !empty($categoriaIds)) {
+            $validated['categoria_id'] = $categoriaIds[0];
+        }
+
         $proveedor = Proveedor::create($validated);
-        $proveedor->load('categoria');
+
+        if (!empty($categoriaIds)) {
+            $proveedor->categorias()->sync($categoriaIds);
+        } elseif (!empty($validated['categoria_id'])) {
+            $proveedor->categorias()->sync([$validated['categoria_id']]);
+        }
+
+        $proveedor->load(['categoria', 'categorias']);
 
         return $this->success('Proveedor creado exitosamente', ['proveedor' => $proveedor], 201);
     }
@@ -81,19 +98,29 @@ class ProviderController extends Controller
         }
 
         $validated = $request->validate([
-            'nombre'           => 'sometimes|required|string|max:255',
-            'telefono'         => 'nullable|string|max:20',
-            'descripcion'      => 'nullable|string',
-            'departamento'     => 'sometimes|required|string|max:100',
-            'municipio'        => 'nullable|string|max:100',
-            'categoria_id'     => 'sometimes|required|exists:categorias,id',
-            'tarifa_hora'      => 'nullable|numeric|min:0',
-            'tarifa_proyecto'  => 'nullable|numeric|min:0',
-            'nivel'            => 'nullable|in:novato,intermedio,experto',
+            'nombre'            => 'sometimes|required|string|max:255',
+            'telefono'          => 'nullable|string|max:20',
+            'descripcion'       => 'nullable|string',
+            'departamento'      => 'sometimes|required|string|max:100',
+            'municipio'         => 'nullable|string|max:100',
+            'categoria_id'      => 'sometimes|nullable|exists:categorias,id',
+            'categoria_ids'     => 'sometimes|array|min:1',
+            'categoria_ids.*'   => 'exists:categorias,id',
+            'tarifa_hora'       => 'nullable|numeric|min:0',
+            'tarifa_proyecto'   => 'nullable|numeric|min:0',
+            'nivel'             => 'nullable|in:novato,intermedio,experto',
         ]);
 
+        $categoriaIds = $validated['categoria_ids'] ?? null;
+        unset($validated['categoria_ids']);
+
+        if ($categoriaIds !== null) {
+            $validated['categoria_id'] = $categoriaIds[0];
+            $proveedor->categorias()->sync($categoriaIds);
+        }
+
         $proveedor->update($validated);
-        $proveedor->load(['categoria', 'documentos', 'disponibilidad']);
+        $proveedor->load(['categoria', 'categorias', 'documentos', 'disponibilidad']);
 
         return $this->success('Perfil actualizado correctamente', ['proveedor' => $proveedor]);
     }

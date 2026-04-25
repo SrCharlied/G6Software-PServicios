@@ -105,9 +105,9 @@ export default function RegisterScreen({ navigation, onRegisterSuccess }) {
   const [descripcion, setDescripcion] = useState('');
   const [departamento, setDepartamento] = useState('');
   const [municipio, setMunicipio]     = useState('');
-  const [categoriaId, setCategoriaId] = useState('');
-  const [categorias, setCategorias]   = useState([]);
-  const [loadingCats, setLoadingCats] = useState(false);
+  const [categoriaIds, setCategoriaIds] = useState([]);
+  const [categorias, setCategorias]     = useState([]);
+  const [loadingCats, setLoadingCats]   = useState(false);
 
   // Paso 3
   const [documentos, setDocumentos]       = useState([]);
@@ -132,7 +132,6 @@ export default function RegisterScreen({ navigation, onRegisterSuccess }) {
       const data = await getCategorias();
       const cats = data.categorias || [];
       setCategorias(cats);
-      if (cats.length > 0) setCategoriaId(String(cats[0].id));
     } catch {
       toast('No se pudieron cargar las categorias.', 'warning');
     } finally {
@@ -174,21 +173,22 @@ export default function RegisterScreen({ navigation, onRegisterSuccess }) {
     if (!validateRequired(descripcion)) errs.descripcion = 'Describe los servicios que ofreces.';
     else if (descripcion.trim().length < 20) errs.descripcion = 'La descripcion debe tener al menos 20 caracteres.';
     if (!departamento) errs.departamento = 'Selecciona tu departamento.';
-    if (!categoriaId) errs.categoriaId = 'Selecciona una categoria de servicio.';
+    if (categoriaIds.length === 0) errs.categoriaIds = 'Selecciona al menos una categoría.';
     if (Object.keys(errs).length) { setErrors(errs); return; }
     setErrors({});
 
     setLoading(true);
     try {
       const data = await createProvider({
-        user_id:      registeredUser.id,
-        nombre:       registeredUser.name,
-        email:        registeredUser.email,
-        telefono:     telefono.trim(),
-        descripcion:  descripcion.trim(),
+        user_id:       registeredUser.id,
+        nombre:        registeredUser.name,
+        email:         registeredUser.email,
+        telefono:      telefono.trim(),
+        descripcion:   descripcion.trim(),
         departamento,
-        municipio:    municipio.trim() || null,
-        categoria_id: parseInt(categoriaId, 10),
+        municipio:     municipio.trim() || null,
+        categoria_id:  parseInt(categoriaIds[0], 10),
+        categoria_ids: categoriaIds.map((id) => parseInt(id, 10)),
       });
       setProviderProfile(data.proveedor);
       setStep(3);
@@ -366,20 +366,41 @@ export default function RegisterScreen({ navigation, onRegisterSuccess }) {
         value={municipio} onChangeText={setMunicipio}
       />
 
-      {loadingCats
-        ? <ActivityIndicator color="#4589d4" style={{ marginVertical: 12 }} />
-        : (
-          <>
-            <Dropdown
-              label="Categoria de servicio *"
-              value={categorias.find((c) => String(c.id) === categoriaId)?.nombre || ''}
-              placeholder="Selecciona una categoria"
-              options={categorias.map((c) => ({ label: c.nombre, value: String(c.id) }))}
-              onSelect={(v) => { setCategoriaId(v); clearError('categoriaId'); }}
-            />
-            {errors.categoriaId ? <Text style={styles.fieldError}>{errors.categoriaId}</Text> : null}
-          </>
-        )}
+      <Text style={styles.inputLabel}>
+        Categorías de servicio * — selecciona todas las que apliquen
+      </Text>
+      {loadingCats ? (
+        <ActivityIndicator color="#4589d4" style={{ marginVertical: 12 }} />
+      ) : (
+        <View style={styles.chipGrid}>
+          {categorias.map((c) => {
+            const selected = categoriaIds.includes(String(c.id));
+            return (
+              <TouchableOpacity
+                key={c.id}
+                style={[styles.chip, selected && styles.chipSelected]}
+                onPress={() => {
+                  setCategoriaIds((prev) =>
+                    prev.includes(String(c.id))
+                      ? prev.filter((x) => x !== String(c.id))
+                      : [...prev, String(c.id)]
+                  );
+                  clearError('categoriaIds');
+                }}
+                activeOpacity={0.8}
+              >
+                {selected && <Text style={styles.chipCheck}>✓ </Text>}
+                <Text style={[styles.chipText, selected && styles.chipTextSelected]}>
+                  {c.nombre}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      )}
+      {errors.categoriaIds
+        ? <Text style={styles.fieldError}>{errors.categoriaIds}</Text>
+        : null}
 
       <TouchableOpacity
         style={[styles.btnPrimary, loading && styles.btnDisabled]}
@@ -591,6 +612,42 @@ const styles = StyleSheet.create({
   textArea: {
     height: 110,
     textAlignVertical: 'top',
+  },
+
+  // Category multi-select chips
+  chipGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 4,
+  },
+  chip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 13,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1.5,
+    borderColor: T.inputBorder,
+    backgroundColor: T.white,
+  },
+  chipSelected: {
+    backgroundColor: T.blue,
+    borderColor: T.blue,
+  },
+  chipCheck: {
+    fontSize: 11,
+    color: T.paper,
+    fontWeight: '700',
+  },
+  chipText: {
+    fontSize: 13,
+    color: '#555',
+    fontWeight: '500',
+  },
+  chipTextSelected: {
+    color: T.paper,
+    fontWeight: '600',
   },
 
   // Role selector

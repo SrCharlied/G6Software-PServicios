@@ -120,11 +120,15 @@ export default function ProviderDetailScreen({
 
         <Text style={styles.provName}>{proveedor.nombre}</Text>
 
-        {proveedor.categoria && (
-          <View style={styles.badge}>
-            <Text style={styles.badgeText}>{proveedor.categoria.nombre}</Text>
-          </View>
-        )}
+        {/* Mostrar todas las categorías; fallback a categoria principal */}
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, justifyContent: 'center' }}>
+          {(proveedor.categorias?.length > 0 ? proveedor.categorias : proveedor.categoria ? [proveedor.categoria] : [])
+            .map((cat) => (
+              <View key={cat.id} style={styles.badge}>
+                <Text style={styles.badgeText}>{cat.nombre}</Text>
+              </View>
+            ))}
+        </View>
 
         {proveedor.nivel && (
           <View style={[styles.badge, { backgroundColor: nivelColor.bg, marginTop: 4 }]}>

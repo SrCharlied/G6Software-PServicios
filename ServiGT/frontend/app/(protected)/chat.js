@@ -1,15 +1,18 @@
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import ChatScreen from '../../src/screens/ChatScreen';
 import { useSession } from '../../src/context/SessionContext';
 
 export default function ChatRoute() {
   const router = useRouter();
-  const { user, chatParams } = useSession();
+  const { user } = useSession();
+  // userId y name vienen de la URL: /chat?userId=5&name=Juan
+  // Esto hace que la conversación persista en recargas de página.
+  const { userId, name } = useLocalSearchParams();
 
   const navigation = {
-    navigate: (name) => {
+    navigate: (screen) => {
       const map = { home: '/home', providerdashboard: '/dashboard' };
-      router.push(map[name.toLowerCase()] ?? '/home');
+      router.push(map[screen.toLowerCase()] ?? '/home');
     },
     goBack: () => router.back(),
   };
@@ -18,8 +21,8 @@ export default function ChatRoute() {
     <ChatScreen
       navigation={navigation}
       user={user}
-      chatWithUserId={chatParams.userId}
-      chatWithName={chatParams.name}
+      chatWithUserId={userId ? Number(userId) : null}
+      chatWithName={name ? decodeURIComponent(String(name)) : ''}
     />
   );
 }

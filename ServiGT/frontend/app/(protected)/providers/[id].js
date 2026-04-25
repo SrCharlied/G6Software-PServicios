@@ -5,7 +5,7 @@ import { useSession } from '../../../src/context/SessionContext';
 export default function ProviderDetailRoute() {
   const router = useRouter();
   const { id } = useLocalSearchParams();
-  const { user, providerProfile, selectedProvider, setSelectedProvider, setChatParams } = useSession();
+  const { user, providerProfile, selectedProvider, setSelectedProvider } = useSession();
 
   const navigation = {
     navigate: (name, params = {}) => {
@@ -17,8 +17,7 @@ export default function ProviderDetailRoute() {
         return;
       }
       if (key === 'chat') {
-        setChatParams({ userId: params.chatWithUserId ?? null, name: params.chatWithName ?? '' });
-        router.push('/chat');
+        router.push(`/chat?userId=${params.chatWithUserId}&name=${encodeURIComponent(params.chatWithName ?? '')}`);
         return;
       }
       if (key === 'providereditprofile') { router.push('/profile/edit'); return; }

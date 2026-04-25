@@ -267,7 +267,7 @@ export default function LandingScreen({ navigation }) {
       <View style={s.footer}>
         <ServiGTLogo size={18} mode="light" />
         <Text style={s.footerText}>
-          © 2025 ServiGT · Guatemala · Todos los derechos reservados
+          © 2026 ServiGT · Guatemala · Todos los derechos reservados
         </Text>
       </View>
 

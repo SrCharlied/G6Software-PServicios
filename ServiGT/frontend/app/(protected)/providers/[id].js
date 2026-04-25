@@ -1,6 +1,6 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import ProviderDetailScreen from '../../src/screens/ProviderDetailScreen';
-import { useSession } from '../../src/context/SessionContext';
+import ProviderDetailScreen from '../../../src/screens/ProviderDetailScreen';
+import { useSession } from '../../../src/context/SessionContext';
 
 export default function ProviderDetailRoute() {
   const router = useRouter();
@@ -29,7 +29,6 @@ export default function ProviderDetailRoute() {
     goBack: () => router.back(),
   };
 
-  // Usa el provider del contexto si el ID coincide; si no, ProviderDetailScreen fetcha por id
   const preloaded = selectedProvider && String(selectedProvider.id) === String(id)
     ? selectedProvider
     : null;

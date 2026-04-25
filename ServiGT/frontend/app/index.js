@@ -3,7 +3,7 @@ import { Redirect } from 'expo-router';
 import { useSession } from '../src/context/SessionContext';
 
 export default function Index() {
-  const { sessionLoading } = useSession();
+  const { user, sessionLoading } = useSession();
 
   if (sessionLoading) {
     return (
@@ -13,5 +13,5 @@ export default function Index() {
     );
   }
 
-  return <Redirect href="/home" />;
+  return <Redirect href={user ? '/home' : '/landing'} />;
 }

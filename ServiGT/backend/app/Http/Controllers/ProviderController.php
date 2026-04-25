@@ -157,11 +157,14 @@ class ProviderController extends Controller
         $file   = $request->file('foto');
         $nombre = time() . '_' . $file->getClientOriginalName();
         $ruta   = $file->storeAs('fotos/' . $id, $nombre, 'public');
-        $url    = Storage::url($ruta);
 
-        $proveedor->update(['foto_perfil' => $url]);
+        // Guardar ruta relativa (sin dominio) para que funcione en cualquier entorno.
+        // El frontend prefija con la URL base del API.
+        $relativePath = '/storage/' . $ruta;
 
-        return $this->success('Foto de perfil actualizada', ['foto_perfil' => $url]);
+        $proveedor->update(['foto_perfil' => $relativePath]);
+
+        return $this->success('Foto de perfil actualizada', ['foto_perfil' => $relativePath]);
     }
 
     public function uploadDocumento(Request $request, int $id): JsonResponse

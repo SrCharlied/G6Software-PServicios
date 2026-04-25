@@ -1,14 +1,15 @@
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
+  Image,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
-import { getProvider, getCalificacionesProveedor, getDisponibilidadProveedor } from '../services/api';
+import { getProvider, getCalificacionesProveedor, getDisponibilidadProveedor, storageUrl } from '../services/api';
+import { useToast } from '../context/ToastContext';
 
 const DIAS = ['Dom', 'Lun', 'Mar', 'Mie', 'Jue', 'Vie', 'Sab'];
 
@@ -31,6 +32,7 @@ export default function ProviderDetailScreen({
   selectedProvider,
   providerId,
 }) {
+  const toast = useToast();
   const [proveedor, setProveedor] = useState(selectedProvider || null);
   const [calificaciones, setCalificaciones] = useState([]);
   const [disponibilidad, setDisponibilidad] = useState([]);
@@ -83,7 +85,7 @@ export default function ProviderDetailScreen({
       setCalificaciones(calData.calificaciones || []);
       setDisponibilidad(dispData.disponibilidad || []);
     } catch (error) {
-      Alert.alert('Error', error.message);
+      toast(error.message, 'error');
     } finally {
       setLoading(false);
     }
@@ -114,9 +116,16 @@ export default function ProviderDetailScreen({
 
       {/* Header card */}
       <View style={styles.profileCard}>
-        <View style={styles.avatarPlaceholder}>
-          <Text style={styles.avatarInitial}>{(proveedor.nombre || '?')[0].toUpperCase()}</Text>
-        </View>
+        {storageUrl(proveedor.foto_perfil) ? (
+          <Image
+            source={{ uri: storageUrl(proveedor.foto_perfil) }}
+            style={styles.avatarPlaceholder}
+          />
+        ) : (
+          <View style={styles.avatarPlaceholder}>
+            <Text style={styles.avatarInitial}>{(proveedor.nombre || '?')[0].toUpperCase()}</Text>
+          </View>
+        )}
 
         <Text style={styles.provName}>{proveedor.nombre}</Text>
 

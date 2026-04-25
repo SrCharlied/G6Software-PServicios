@@ -14,9 +14,10 @@ import { StatusBar } from 'expo-status-bar';
 import { useSession } from '../context/SessionContext';
 import Drawer from '../components/Drawer';
 import ServiGTLogo from '../components/ServiGTLogo';
-import { getProviders } from '../services/api';
+import { getProviders, storageUrl } from '../services/api';
 import { mockProviders } from '../data/mockProviders';
 import { T } from '../theme';
+import { Image } from 'react-native';
 
 const normalizeText = (value) =>
   (value || '').toString().normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
@@ -38,10 +39,22 @@ function TopBar({ onMenuPress }) {
 }
 
 function ProviderCard({ prov, onPress }) {
+  const photoUri = storageUrl(prov.foto_perfil);
+  const initial = (prov.nombre || '?')[0].toUpperCase();
+
   return (
     <TouchableOpacity style={styles.provCard} activeOpacity={0.88} onPress={onPress}>
       <View style={styles.provHeader}>
-        <Text style={styles.provName} numberOfLines={1}>{prov.nombre}</Text>
+        <View style={styles.provHeaderLeft}>
+          {photoUri ? (
+            <Image source={{ uri: photoUri }} style={styles.provAvatarImg} />
+          ) : (
+            <View style={styles.provAvatar}>
+              <Text style={styles.provAvatarInitial}>{initial}</Text>
+            </View>
+          )}
+          <Text style={styles.provName} numberOfLines={1}>{prov.nombre}</Text>
+        </View>
         <View style={styles.provBadge}>
           <Text style={styles.provBadgeText} numberOfLines={1}>
             {prov.categoria?.nombre || 'Sin categoria'}
@@ -236,6 +249,10 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.07, shadowRadius: 4, elevation: 2,
   },
   provHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: 6 },
+  provHeaderLeft: { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 },
+  provAvatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#4589d4', justifyContent: 'center', alignItems: 'center' },
+  provAvatarImg: { width: 40, height: 40, borderRadius: 20 },
+  provAvatarInitial: { fontSize: 16, fontWeight: '700', color: '#fff' },
   provName: { fontSize: 16, fontWeight: '700', color: T.ink, flex: 1 },
   provBadge: { backgroundColor: '#eef4ff', paddingHorizontal: 9, paddingVertical: 3, borderRadius: 10, maxWidth: 120 },
   provBadgeText: { fontSize: 11, color: '#4589d4', fontWeight: '600' },

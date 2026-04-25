@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Platform,
   ScrollView,
   StyleSheet,
@@ -22,6 +21,7 @@ import {
   saveDisponibilidad,
   uploadDocumento,
 } from '../services/api';
+import { useToast } from '../context/ToastContext';
 
 const TIPOS_DOCUMENTO = [
   'DPI (Documento Personal de Identificacion)',
@@ -191,6 +191,7 @@ export default function ProviderDashboardScreen({
   setProviderProfile,
   onLogout,
 }) {
+  const toast = useToast();
   const [profile, setProfile] = useState(providerProfile);
   const [documentos, setDocumentos] = useState([]);
   const [solicitudes, setSolicitudes] = useState([]);
@@ -272,7 +273,7 @@ export default function ProviderDashboardScreen({
       setCalificaciones(calificacionesData.calificaciones || []);
       setDisponibilidad(buildDisponibilidad(disponibilidadData.disponibilidad || []));
     } catch (error) {
-      Alert.alert('Error', error.message);
+      toast(error.message, 'error');
     } finally {
       setLoadingDocs(false);
       setLoadingSolicitudes(false);
@@ -287,7 +288,7 @@ export default function ProviderDashboardScreen({
       const data = await getSolicitudesProveedor();
       setSolicitudes(data.servicios || []);
     } catch (error) {
-      Alert.alert('Error', error.message);
+      toast(error.message, 'error');
     } finally {
       setLoadingSolicitudes(false);
     }
@@ -300,7 +301,7 @@ export default function ProviderDashboardScreen({
       const data = await getCalificacionesProveedor(profile.id);
       setCalificaciones(data.calificaciones || []);
     } catch (error) {
-      Alert.alert('Error', error.message);
+      toast(error.message, 'error');
     } finally {
       setLoadingCalificaciones(false);
     }
@@ -318,9 +319,9 @@ export default function ProviderDashboardScreen({
     try {
       const data = await uploadDocumento(profile.id, file, tipoDocumento);
       setDocumentos((prev) => [data.documento, ...prev]);
-      Alert.alert('Documento subido', `"${file.name}" subido correctamente.`);
+      toast(`"${file.name}" subido correctamente.`, 'success');
     } catch (error) {
-      Alert.alert('Error', error.message);
+      toast(error.message, 'error');
     } finally {
       setUploading(false);
     }
@@ -330,9 +331,10 @@ export default function ProviderDashboardScreen({
     setMutatingServiceId(id);
     try {
       await aceptarServicio(id);
+      toast('Solicitud aceptada.', 'success');
       await refreshSolicitudes();
     } catch (error) {
-      Alert.alert('Error', error.message);
+      toast(error.message, 'error');
     } finally {
       setMutatingServiceId(null);
     }
@@ -342,9 +344,10 @@ export default function ProviderDashboardScreen({
     setMutatingServiceId(id);
     try {
       await rechazarServicio(id);
+      toast('Solicitud rechazada.', 'info');
       await refreshSolicitudes();
     } catch (error) {
-      Alert.alert('Error', error.message);
+      toast(error.message, 'error');
     } finally {
       setMutatingServiceId(null);
     }
@@ -352,14 +355,18 @@ export default function ProviderDashboardScreen({
 
   const handleAdvanceStatus = async (id, estado) => {
     setMutatingServiceId(id);
+    const labels = {
+      en_camino:   'En camino.',
+      en_progreso: 'Servicio en progreso.',
+      completado:  'Servicio marcado como completado.',
+    };
     try {
       await actualizarEstadoServicio(id, estado);
+      toast(labels[estado] ?? 'Estado actualizado.', 'success');
       await refreshSolicitudes();
-      if (estado === 'completado') {
-        await refreshCalificaciones();
-      }
+      if (estado === 'completado') await refreshCalificaciones();
     } catch (error) {
-      Alert.alert('Error', error.message);
+      toast(error.message, 'error');
     } finally {
       setMutatingServiceId(null);
     }
@@ -379,9 +386,9 @@ export default function ProviderDashboardScreen({
     setSavingDisponibilidad(true);
     try {
       await saveDisponibilidad(disponibilidad);
-      Alert.alert('Disponibilidad guardada', 'Tu horario semanal fue actualizado.');
+      toast('Horario semanal guardado correctamente.', 'success');
     } catch (error) {
-      Alert.alert('Error', error.message);
+      toast(error.message, 'error');
     } finally {
       setSavingDisponibilidad(false);
     }

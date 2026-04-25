@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   FlatList,
   KeyboardAvoidingView,
   Platform,
@@ -12,6 +11,7 @@ import {
   View,
 } from 'react-native';
 import { getConversacion, sendMensaje } from '../services/api';
+import { useToast } from '../context/ToastContext';
 
 export default function ChatScreen({
   navigation,
@@ -19,6 +19,7 @@ export default function ChatScreen({
   chatWithUserId,
   chatWithName,
 }) {
+  const toast = useToast();
   const [mensajes, setMensajes] = useState([]);
   const [texto, setTexto] = useState('');
   const [loading, setLoading] = useState(true);
@@ -51,7 +52,7 @@ export default function ChatScreen({
       const data = await getConversacion(chatWithUserId);
       setMensajes(data.mensajes || []);
     } catch (error) {
-      Alert.alert('Error', error.message);
+      toast(error.message, 'error');
     } finally {
       setLoading(false);
     }
@@ -91,7 +92,7 @@ export default function ChatScreen({
     } catch (error) {
       // Revertir mensaje temporal en caso de error
       setMensajes((prev) => prev.filter((m) => m.id !== tempMsg.id));
-      Alert.alert('Error', error.message);
+      toast(error.message, 'error');
     } finally {
       setSending(false);
     }

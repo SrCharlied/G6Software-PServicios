@@ -93,6 +93,14 @@ export const loadStoredSession = () => {
   }
 };
 
+// Convierte una ruta relativa de storage (/storage/fotos/...) a URL completa.
+// Necesario porque APP_URL del contenedor difiere del puerto expuesto al host.
+export const storageUrl = (path) => {
+  if (!path) return null;
+  if (path.startsWith('http')) return path;
+  return BASE_URL.replace('/api', '') + path;
+};
+
 // ── Autenticacion ─────────────────────────────────────────────────────────
 
 export const login = async (email, password) => {

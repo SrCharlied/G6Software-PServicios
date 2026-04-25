@@ -10,7 +10,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { getCategorias, updateProvider, createProvider, uploadFotoPerfil } from '../services/api';
+import { getCategorias, updateProvider, createProvider, uploadFotoPerfil, storageUrl } from '../services/api';
 import { useToast } from '../context/ToastContext';
 import { validateRequired, validatePhone, validateNumeric } from '../utils/validation';
 import { T } from '../theme';
@@ -152,7 +152,7 @@ export default function ProviderEditProfileScreen({
   };
 
   // ── Render ────────────────────────────────────────────────────────────────
-  const currentPhoto = localPhotoUri || providerProfile?.foto_perfil;
+  const currentPhoto = localPhotoUri || storageUrl(providerProfile?.foto_perfil);
   const initial      = nombre.charAt(0).toUpperCase() || '?';
 
   return (

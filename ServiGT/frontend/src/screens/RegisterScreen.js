@@ -233,22 +233,29 @@ export default function RegisterScreen({ navigation, onRegisterSuccess }) {
     <View style={styles.stepRow}>
       {['Cuenta', 'Perfil', 'Documentos'].map((label, i) => {
         const n = i + 1;
-        const active = step >= n;
+        const done    = step > n;
+        const active  = step >= n;
         const current = step === n;
         return (
-          <View key={n} style={styles.stepItem}>
-            <View style={[styles.stepCircle, active && styles.stepCircleActive, current && styles.stepCircleCurrent]}>
-              {step > n
-                ? <Text style={styles.stepCheck}>✓</Text>
-                : <Text style={[styles.stepNum, active && styles.stepNumActive]}>{n}</Text>}
+          <React.Fragment key={n}>
+            {i > 0 && (
+              <View style={[styles.stepConnector, step >= n && styles.stepConnectorActive]} />
+            )}
+            <View style={styles.stepItem}>
+              <View style={[
+                styles.stepCircle,
+                active  && styles.stepCircleActive,
+                current && styles.stepCircleCurrent,
+              ]}>
+                {done
+                  ? <Text style={styles.stepCheck}>✓</Text>
+                  : <Text style={[styles.stepNum, active && styles.stepNumActive]}>{n}</Text>}
+              </View>
+              <Text style={[styles.stepLabel, active && styles.stepLabelActive]}>{label}</Text>
             </View>
-            <Text style={[styles.stepLabel, active && styles.stepLabelActive]}>{label}</Text>
-          </View>
+          </React.Fragment>
         );
       })}
-      {/* Lineas entre pasos */}
-      <View style={[styles.stepLine, styles.stepLine1, step >= 2 && styles.stepLineActive]} />
-      <View style={[styles.stepLine, styles.stepLine2, step >= 3 && styles.stepLineActive]} />
     </View>
   );
 
@@ -495,47 +502,38 @@ const styles = StyleSheet.create({
   // Step indicator
   stepRow: {
     flexDirection: 'row',
-    justifyContent: 'center',
     alignItems: 'flex-start',
-    marginBottom: 24,
-    paddingHorizontal: 10,
-    position: 'relative',
+    marginBottom: 28,
+    paddingHorizontal: 8,
   },
   stepItem: {
     alignItems: 'center',
-    width: 80,
+    width: 76,
   },
   stepCircle: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: '#dde3ea',
+    backgroundColor: '#e2e8f0',
     alignItems: 'center',
     justifyContent: 'center',
-    zIndex: 1,
   },
-  stepCircleActive: {
-    backgroundColor: '#4589d4',
-  },
-  stepCircleCurrent: {
-    borderWidth: 3,
-    borderColor: '#a8c4f5',
-  },
-  stepNum: { fontSize: 15, fontWeight: '700', color: '#999' },
+  stepCircleActive: { backgroundColor: T.blue },
+  stepCircleCurrent: { borderWidth: 3, borderColor: T.soft },
+  stepNum: { fontSize: 14, fontWeight: '700', color: '#94a3b8' },
   stepNumActive: { color: '#fff' },
-  stepCheck: { fontSize: 14, color: '#fff', fontWeight: '700' },
-  stepLabel: { fontSize: 11, color: '#999', marginTop: 5, textAlign: 'center' },
-  stepLabelActive: { color: '#4589d4', fontWeight: '600' },
-  stepLine: {
-    position: 'absolute',
-    top: 17,
+  stepCheck: { fontSize: 13, color: '#fff', fontWeight: '700' },
+  stepLabel: { fontSize: 11, color: '#94a3b8', marginTop: 6, textAlign: 'center' },
+  stepLabelActive: { color: T.blue, fontWeight: '600' },
+  // Line sits between items; marginTop centers it on the 36px circle
+  stepConnector: {
+    flex: 1,
     height: 2,
-    width: 60,
-    backgroundColor: '#dde3ea',
+    backgroundColor: '#e2e8f0',
+    marginTop: 17,
+    alignSelf: 'flex-start',
   },
-  stepLine1: { left: '26%' },
-  stepLine2: { right: '26%' },
-  stepLineActive: { backgroundColor: '#4589d4' },
+  stepConnectorActive: { backgroundColor: T.blue },
 
   // Card
   card: {

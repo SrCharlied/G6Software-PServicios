@@ -1,6 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Image,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -8,17 +10,19 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { getCategorias, updateProvider, createProvider } from '../services/api';
+import { getCategorias, updateProvider, createProvider, uploadFotoPerfil } from '../services/api';
 import { useToast } from '../context/ToastContext';
 import { validateRequired, validatePhone, validateNumeric } from '../utils/validation';
+import { T } from '../theme';
 
 const DEPARTAMENTOS = [
   'Alta Verapaz', 'Baja Verapaz', 'Chimaltenango', 'Chiquimula', 'El Progreso',
   'Escuintla', 'Guatemala', 'Huehuetenango', 'Izabal', 'Jalapa', 'Jutiapa',
   'Peten', 'Quetzaltenango', 'Quiche', 'Retalhuleu', 'Sacatepequez',
-  'San Marcos', 'Santa Rosa', 'Solola', 'Suchitepequez', 'Totonicapan',
-  'Zacapa',
+  'San Marcos', 'Santa Rosa', 'Solola', 'Suchitepequez', 'Totonicapan', 'Zacapa',
 ];
+
+const NIVELES = ['novato', 'intermedio', 'experto'];
 
 export default function ProviderEditProfileScreen({
   navigation,
@@ -26,78 +30,108 @@ export default function ProviderEditProfileScreen({
   providerProfile,
   onProfileUpdated,
 }) {
-  const toast = useToast();
-  const isEditing = !!providerProfile;
+  const toast       = useToast();
+  const fileInputRef = useRef(null);
+  const isEditing   = !!providerProfile;
 
-  const [nombre, setNombre] = useState(providerProfile?.nombre || user?.name || '');
-  const [telefono, setTelefono] = useState(providerProfile?.telefono || '');
+  const [nombre, setNombre]         = useState(providerProfile?.nombre || user?.name || '');
+  const [telefono, setTelefono]     = useState(providerProfile?.telefono || '');
   const [descripcion, setDescripcion] = useState(providerProfile?.descripcion || '');
   const [departamento, setDepartamento] = useState(providerProfile?.departamento || '');
-  const [municipio, setMunicipio] = useState(providerProfile?.municipio || '');
-  const [categoriaId, setCategoriaId] = useState(
-    providerProfile?.categoria_id ? String(providerProfile.categoria_id) : ''
-  );
+  const [municipio, setMunicipio]   = useState(providerProfile?.municipio || '');
   const [tarifaHora, setTarifaHora] = useState(
     providerProfile?.tarifa_hora ? String(providerProfile.tarifa_hora) : ''
   );
   const [tarifaProyecto, setTarifaProyecto] = useState(
     providerProfile?.tarifa_proyecto ? String(providerProfile.tarifa_proyecto) : ''
   );
-  const [nivel, setNivel] = useState(providerProfile?.nivel || 'novato');
+  const [nivel, setNivel]           = useState(providerProfile?.nivel || 'novato');
   const [categorias, setCategorias] = useState([]);
   const [loadingCats, setLoadingCats] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [errors, setErrors] = useState({});
+  const [saving, setSaving]         = useState(false);
+  const [errors, setErrors]         = useState({});
+
+  // Multi-category state — init from existing profile
+  const [categoriaIds, setCategoriaIds] = useState(() => {
+    if (providerProfile?.categorias?.length > 0) {
+      return providerProfile.categorias.map((c) => String(c.id));
+    }
+    if (providerProfile?.categoria_id) {
+      return [String(providerProfile.categoria_id)];
+    }
+    return [];
+  });
+
+  // Photo state
+  const [localPhotoUri, setLocalPhotoUri] = useState(null);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
 
   const [showDepartamentos, setShowDepartamentos] = useState(false);
   const [showNivelSelector, setShowNivelSelector] = useState(false);
-  const NIVELES = ['novato', 'intermedio', 'experto'];
 
   const clearError = (field) => setErrors((e) => ({ ...e, [field]: null }));
 
-  useEffect(() => {
-    loadCategorias();
-  }, []);
+  useEffect(() => { loadCategorias(); }, []);
 
   const loadCategorias = async () => {
     setLoadingCats(true);
     try {
       const data = await getCategorias();
       setCategorias(data.categorias || []);
-      if (!categoriaId && data.categorias?.length > 0) {
-        setCategoriaId(String(data.categorias[0].id));
-      }
     } catch {
-      toast('No se pudieron cargar las categorias.', 'warning');
+      toast('No se pudieron cargar las categorías.', 'warning');
     } finally {
       setLoadingCats(false);
     }
   };
 
+  // ── Photo handling ────────────────────────────────────────────────────────
+  const handlePhotoSelect = async (event) => {
+    const file = event.target?.files?.[0];
+    if (!file || !providerProfile?.id) return;
+
+    const previewUrl = URL.createObjectURL(file);
+    setLocalPhotoUri(previewUrl);
+
+    setUploadingPhoto(true);
+    try {
+      const data = await uploadFotoPerfil(providerProfile.id, file);
+      toast('Foto de perfil actualizada.', 'success');
+      onProfileUpdated && onProfileUpdated({ ...providerProfile, foto_perfil: data.foto_perfil });
+    } catch (error) {
+      toast(error.message, 'error');
+      setLocalPhotoUri(null);
+    } finally {
+      setUploadingPhoto(false);
+    }
+  };
+
+  // ── Save profile ──────────────────────────────────────────────────────────
   const handleSave = async () => {
     const errs = {};
-    if (!validateRequired(nombre)) errs.nombre = 'El nombre es requerido.';
-    if (telefono && !validatePhone(telefono)) errs.telefono = 'Ingresa un numero de telefono valido.';
-    if (!validateRequired(descripcion)) errs.descripcion = 'La descripcion es requerida.';
-    else if (descripcion.trim().length < 20) errs.descripcion = 'La descripcion debe tener al menos 20 caracteres.';
+    if (!validateRequired(nombre))     errs.nombre      = 'El nombre es requerido.';
+    if (telefono && !validatePhone(telefono)) errs.telefono = 'Ingresa un número de teléfono válido.';
+    if (!validateRequired(descripcion)) errs.descripcion = 'La descripción es requerida.';
+    else if (descripcion.trim().length < 20) errs.descripcion = 'La descripción debe tener al menos 20 caracteres.';
     if (!departamento) errs.departamento = 'Selecciona tu departamento.';
-    if (!categoriaId) errs.categoriaId = 'Selecciona una categoria.';
-    if (tarifaHora && !validateNumeric(tarifaHora)) errs.tarifaHora = 'Ingresa una tarifa valida.';
-    if (tarifaProyecto && !validateNumeric(tarifaProyecto)) errs.tarifaProyecto = 'Ingresa una tarifa valida.';
+    if (categoriaIds.length === 0) errs.categoriaIds = 'Selecciona al menos una categoría.';
+    if (tarifaHora && !validateNumeric(tarifaHora)) errs.tarifaHora = 'Ingresa una tarifa válida.';
+    if (tarifaProyecto && !validateNumeric(tarifaProyecto)) errs.tarifaProyecto = 'Ingresa una tarifa válida.';
     if (Object.keys(errs).length) { setErrors(errs); return; }
     setErrors({});
 
     setSaving(true);
     try {
       const payload = {
-        nombre: nombre.trim(),
-        telefono: telefono.trim() || null,
-        descripcion: descripcion.trim(),
+        nombre:           nombre.trim(),
+        telefono:         telefono.trim() || null,
+        descripcion:      descripcion.trim(),
         departamento,
-        municipio: municipio.trim() || null,
-        categoria_id: parseInt(categoriaId, 10),
-        tarifa_hora: tarifaHora ? parseFloat(tarifaHora) : null,
-        tarifa_proyecto: tarifaProyecto ? parseFloat(tarifaProyecto) : null,
+        municipio:        municipio.trim() || null,
+        categoria_id:     parseInt(categoriaIds[0], 10),
+        categoria_ids:    categoriaIds.map((id) => parseInt(id, 10)),
+        tarifa_hora:      tarifaHora     ? parseFloat(tarifaHora)     : null,
+        tarifa_proyecto:  tarifaProyecto ? parseFloat(tarifaProyecto) : null,
         nivel,
       };
 
@@ -117,75 +151,115 @@ export default function ProviderEditProfileScreen({
     }
   };
 
+  // ── Render ────────────────────────────────────────────────────────────────
+  const currentPhoto = localPhotoUri || providerProfile?.foto_perfil;
+  const initial      = nombre.charAt(0).toUpperCase() || '?';
+
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation?.navigate('ProviderDashboard')} style={styles.backBtn}>
-          <Text style={styles.backBtnText}>← Volver</Text>
+    <ScrollView style={s.container} contentContainerStyle={s.content}>
+      {/* Header */}
+      <View style={s.header}>
+        <TouchableOpacity onPress={() => navigation?.navigate('ProviderDashboard')} style={s.backBtn}>
+          <Text style={s.backText}>← Volver</Text>
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>
+        <Text style={s.headerTitle}>
           {isEditing ? 'Editar perfil' : 'Crear perfil'}
         </Text>
       </View>
 
-      <View style={styles.card}>
-        <Text style={styles.sectionTitle}>Datos del proveedor</Text>
+      {/* ── Photo section (only when editing) ── */}
+      {isEditing && (
+        <View style={s.photoSection}>
+          <TouchableOpacity
+            style={s.avatarWrap}
+            onPress={() => fileInputRef.current?.click()}
+            activeOpacity={0.85}
+            disabled={uploadingPhoto}
+          >
+            {currentPhoto ? (
+              <Image source={{ uri: currentPhoto }} style={s.avatar} />
+            ) : (
+              <View style={s.avatarPlaceholder}>
+                <Text style={s.avatarInitial}>{initial}</Text>
+              </View>
+            )}
+            <View style={s.avatarBadge}>
+              {uploadingPhoto
+                ? <ActivityIndicator size="small" color={T.paper} />
+                : <Text style={s.avatarBadgeIcon}>📷</Text>}
+            </View>
+          </TouchableOpacity>
 
-        <Text style={styles.label}>Nombre *</Text>
+          <Text style={s.photoHint}>
+            {uploadingPhoto ? 'Subiendo...' : 'Toca la foto para cambiarla'}
+          </Text>
+
+          {Platform.OS === 'web' && (
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              style={{ display: 'none' }}
+              onChange={handlePhotoSelect}
+            />
+          )}
+        </View>
+      )}
+
+      <View style={s.card}>
+        <Text style={s.sectionTitle}>Datos del proveedor</Text>
+
+        <Text style={s.label}>Nombre *</Text>
         <TextInput
-          style={[styles.input, errors.nombre && styles.inputError]}
+          style={[s.input, errors.nombre && s.inputError]}
           placeholder="Nombre completo o nombre del negocio"
           value={nombre}
           onChangeText={(v) => { setNombre(v); clearError('nombre'); }}
         />
-        {errors.nombre ? <Text style={styles.fieldError}>{errors.nombre}</Text> : null}
+        {errors.nombre ? <Text style={s.fieldError}>{errors.nombre}</Text> : null}
 
-        <Text style={styles.label}>Telefono</Text>
+        <Text style={s.label}>Teléfono</Text>
         <TextInput
-          style={[styles.input, errors.telefono && styles.inputError]}
+          style={[s.input, errors.telefono && s.inputError]}
           placeholder="Ej: 5555-1234"
           value={telefono}
           onChangeText={(v) => { setTelefono(v); clearError('telefono'); }}
           keyboardType="phone-pad"
         />
-        {errors.telefono ? <Text style={styles.fieldError}>{errors.telefono}</Text> : null}
+        {errors.telefono ? <Text style={s.fieldError}>{errors.telefono}</Text> : null}
 
-        <Text style={styles.label}>Descripcion de servicios *</Text>
+        <Text style={s.label}>Descripción de servicios *</Text>
         <TextInput
-          style={[styles.input, styles.textArea, errors.descripcion && styles.inputError]}
-          placeholder="Describe los servicios que ofreces, tu experiencia, horarios de atencion..."
+          style={[s.input, s.textArea, errors.descripcion && s.inputError]}
+          placeholder="Describe los servicios que ofreces, tu experiencia, horarios..."
           value={descripcion}
           onChangeText={(v) => { setDescripcion(v); clearError('descripcion'); }}
           multiline
           numberOfLines={5}
         />
-        {errors.descripcion ? <Text style={styles.fieldError}>{errors.descripcion}</Text> : null}
+        {errors.descripcion ? <Text style={s.fieldError}>{errors.descripcion}</Text> : null}
 
-        <Text style={styles.label}>Departamento *</Text>
+        {/* Departamento */}
+        <Text style={s.label}>Departamento *</Text>
         <TouchableOpacity
-          style={[styles.selectBtn, errors.departamento && styles.inputError]}
-          onPress={() => setShowDepartamentos(!showDepartamentos)}
+          style={[s.selectBtn, errors.departamento && s.inputError]}
+          onPress={() => setShowDepartamentos((v) => !v)}
         >
-          <Text style={departamento ? styles.selectBtnText : styles.selectBtnPlaceholder}>
+          <Text style={departamento ? s.selectBtnText : s.selectBtnPlaceholder}>
             {departamento || 'Selecciona un departamento'}
           </Text>
-          <Text style={styles.selectArrow}>{showDepartamentos ? '▲' : '▼'}</Text>
+          <Text style={s.selectArrow}>{showDepartamentos ? '▲' : '▼'}</Text>
         </TouchableOpacity>
-        {errors.departamento ? <Text style={styles.fieldError}>{errors.departamento}</Text> : null}
-
+        {errors.departamento ? <Text style={s.fieldError}>{errors.departamento}</Text> : null}
         {showDepartamentos && (
-          <ScrollView style={styles.dropdownList} nestedScrollEnabled>
+          <ScrollView style={s.dropdownList} nestedScrollEnabled>
             {DEPARTAMENTOS.map((dep) => (
               <TouchableOpacity
                 key={dep}
-                style={[styles.dropdownOption, departamento === dep && styles.dropdownOptionActive]}
-                onPress={() => {
-                  setDepartamento(dep);
-                  clearError('departamento');
-                  setShowDepartamentos(false);
-                }}
+                style={[s.dropdownOption, departamento === dep && s.dropdownOptionActive]}
+                onPress={() => { setDepartamento(dep); clearError('departamento'); setShowDepartamentos(false); }}
               >
-                <Text style={[styles.dropdownOptionText, departamento === dep && styles.dropdownOptionTextActive]}>
+                <Text style={[s.dropdownOptionText, departamento === dep && s.dropdownOptionTextActive]}>
                   {dep}
                 </Text>
               </TouchableOpacity>
@@ -193,51 +267,50 @@ export default function ProviderEditProfileScreen({
           </ScrollView>
         )}
 
-        <Text style={styles.label}>Municipio</Text>
+        <Text style={s.label}>Municipio</Text>
         <TextInput
-          style={styles.input}
+          style={s.input}
           placeholder="Municipio (opcional)"
           value={municipio}
           onChangeText={setMunicipio}
         />
 
-        <Text style={styles.label}>Tarifa por hora (Q)</Text>
+        {/* Tarifas */}
+        <Text style={s.label}>Tarifa por hora (Q)</Text>
         <TextInput
-          style={[styles.input, errors.tarifaHora && styles.inputError]}
+          style={[s.input, errors.tarifaHora && s.inputError]}
           placeholder="Ej: 75.00"
           value={tarifaHora}
           onChangeText={(v) => { setTarifaHora(v); clearError('tarifaHora'); }}
           keyboardType="decimal-pad"
         />
-        {errors.tarifaHora ? <Text style={styles.fieldError}>{errors.tarifaHora}</Text> : null}
+        {errors.tarifaHora ? <Text style={s.fieldError}>{errors.tarifaHora}</Text> : null}
 
-        <Text style={styles.label}>Tarifa por proyecto (Q)</Text>
+        <Text style={s.label}>Tarifa por proyecto (Q)</Text>
         <TextInput
-          style={[styles.input, errors.tarifaProyecto && styles.inputError]}
+          style={[s.input, errors.tarifaProyecto && s.inputError]}
           placeholder="Ej: 500.00"
           value={tarifaProyecto}
           onChangeText={(v) => { setTarifaProyecto(v); clearError('tarifaProyecto'); }}
           keyboardType="decimal-pad"
         />
-        {errors.tarifaProyecto ? <Text style={styles.fieldError}>{errors.tarifaProyecto}</Text> : null}
+        {errors.tarifaProyecto ? <Text style={s.fieldError}>{errors.tarifaProyecto}</Text> : null}
 
-        <Text style={styles.label}>Nivel de experiencia</Text>
-        <TouchableOpacity
-          style={styles.selectBtn}
-          onPress={() => setShowNivelSelector(!showNivelSelector)}
-        >
-          <Text style={styles.selectBtnText}>{nivel}</Text>
-          <Text style={styles.selectArrow}>{showNivelSelector ? '▲' : '▼'}</Text>
+        {/* Nivel */}
+        <Text style={s.label}>Nivel de experiencia</Text>
+        <TouchableOpacity style={s.selectBtn} onPress={() => setShowNivelSelector((v) => !v)}>
+          <Text style={s.selectBtnText}>{nivel.charAt(0).toUpperCase() + nivel.slice(1)}</Text>
+          <Text style={s.selectArrow}>{showNivelSelector ? '▲' : '▼'}</Text>
         </TouchableOpacity>
         {showNivelSelector && (
-          <View style={styles.dropdownList}>
+          <View style={s.dropdownList}>
             {NIVELES.map((n) => (
               <TouchableOpacity
                 key={n}
-                style={[styles.dropdownOption, nivel === n && styles.dropdownOptionActive]}
+                style={[s.dropdownOption, nivel === n && s.dropdownOptionActive]}
                 onPress={() => { setNivel(n); setShowNivelSelector(false); }}
               >
-                <Text style={[styles.dropdownOptionText, nivel === n && styles.dropdownOptionTextActive]}>
+                <Text style={[s.dropdownOptionText, nivel === n && s.dropdownOptionTextActive]}>
                   {n.charAt(0).toUpperCase() + n.slice(1)}
                 </Text>
               </TouchableOpacity>
@@ -245,170 +318,194 @@ export default function ProviderEditProfileScreen({
           </View>
         )}
 
-        <Text style={styles.label}>Categoria de servicio *</Text>
+        {/* Multi-category chips */}
+        <Text style={s.label}>
+          Categorías de servicio * — selecciona todas las que apliquen
+        </Text>
         {loadingCats ? (
-          <ActivityIndicator color="#1a73e8" style={{ marginVertical: 10 }} />
+          <ActivityIndicator color={T.blue} style={{ marginVertical: 10 }} />
         ) : (
-          <>
-            <View style={styles.categoriaGrid}>
-              {categorias.map((cat) => (
+          <View style={s.chipGrid}>
+            {categorias.map((cat) => {
+              const selected = categoriaIds.includes(String(cat.id));
+              return (
                 <TouchableOpacity
                   key={cat.id}
-                  style={[styles.categoriaOption, categoriaId === String(cat.id) && styles.categoriaOptionActive]}
-                  onPress={() => { setCategoriaId(String(cat.id)); clearError('categoriaId'); }}
+                  style={[s.chip, selected && s.chipSelected]}
+                  onPress={() => {
+                    setCategoriaIds((prev) =>
+                      prev.includes(String(cat.id))
+                        ? prev.filter((x) => x !== String(cat.id))
+                        : [...prev, String(cat.id)]
+                    );
+                    clearError('categoriaIds');
+                  }}
+                  activeOpacity={0.8}
                 >
-                  <Text style={[styles.categoriaOptionText, categoriaId === String(cat.id) && styles.categoriaOptionTextActive]}>
-                    {cat.nombre}
-                  </Text>
+                  {selected && <Text style={s.chipCheck}>✓ </Text>}
+                  <Text style={[s.chipText, selected && s.chipTextSelected]}>{cat.nombre}</Text>
                 </TouchableOpacity>
-              ))}
-            </View>
-            {errors.categoriaId ? <Text style={styles.fieldError}>{errors.categoriaId}</Text> : null}
-          </>
+              );
+            })}
+          </View>
         )}
+        {errors.categoriaIds ? <Text style={s.fieldError}>{errors.categoriaIds}</Text> : null}
 
-        <TouchableOpacity style={styles.saveBtn} onPress={handleSave} disabled={saving}>
-          {saving ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={styles.saveBtnText}>{isEditing ? 'Guardar cambios' : 'Crear perfil'}</Text>
-          )}
+        {/* Save */}
+        <TouchableOpacity
+          style={[s.saveBtn, saving && { opacity: 0.65 }]}
+          onPress={handleSave}
+          disabled={saving}
+        >
+          {saving
+            ? <ActivityIndicator color={T.paper} />
+            : <Text style={s.saveBtnText}>{isEditing ? 'Guardar cambios' : 'Crear perfil'}</Text>}
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={styles.cancelBtn}
+          style={s.cancelBtn}
           onPress={() => navigation?.navigate('ProviderDashboard')}
         >
-          <Text style={styles.cancelBtnText}>Cancelar</Text>
+          <Text style={s.cancelBtnText}>Cancelar</Text>
         </TouchableOpacity>
       </View>
     </ScrollView>
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f5f5f5' },
-  content: { padding: 16, paddingBottom: 40 },
+const s = StyleSheet.create({
+  container: { flex: 1, backgroundColor: T.canvas },
+  content:   { padding: 16, paddingBottom: 40 },
 
-  header: {
-    flexDirection: 'row',
+  header: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 16 },
+  backBtn: { paddingVertical: 8, paddingHorizontal: 4 },
+  backText: { color: T.blue, fontSize: 15, fontWeight: '600' },
+  headerTitle: { fontSize: 22, fontWeight: '700', color: T.ink },
+
+  // Photo section
+  photoSection: {
     alignItems: 'center',
-    gap: 12,
     marginBottom: 20,
   },
-  backBtn: {
-    paddingVertical: 8,
-    paddingHorizontal: 4,
+  avatarWrap: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    marginBottom: 10,
+    position: 'relative',
   },
-  backBtnText: { color: '#1a73e8', fontSize: 15, fontWeight: '600' },
-  headerTitle: { fontSize: 22, fontWeight: '700', color: '#333' },
+  avatar: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    backgroundColor: T.soft,
+  },
+  avatarPlaceholder: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    backgroundColor: T.blue,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  avatarInitial: { color: T.paper, fontSize: 36, fontWeight: '800' },
+  avatarBadge: {
+    position: 'absolute',
+    bottom: 2,
+    right: 2,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: T.ink,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: T.canvas,
+  },
+  avatarBadgeIcon: { fontSize: 13 },
+  photoHint: { fontSize: 12, color: T.muted },
 
+  // Card
   card: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
+    backgroundColor: T.paper,
+    borderRadius: 14,
     padding: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 3,
+    shadowColor: T.ink,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.07,
+    shadowRadius: 6,
     elevation: 2,
   },
-  sectionTitle: { fontSize: 16, fontWeight: '700', color: '#333', marginBottom: 16 },
+  sectionTitle: { fontSize: 16, fontWeight: '700', color: T.ink, marginBottom: 16 },
 
-  label: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#444',
-    marginBottom: 6,
-    marginTop: 4,
-  },
+  label: { fontSize: 13, fontWeight: '600', color: T.ink, marginBottom: 6, marginTop: 4 },
   input: {
-    backgroundColor: '#f7f9fc',
+    backgroundColor: T.white,
     borderWidth: 1,
-    borderColor: '#d9e2ef',
+    borderColor: T.inputBorder,
     borderRadius: 8,
     padding: 13,
     fontSize: 15,
     marginBottom: 4,
-    color: '#333',
+    color: T.text,
   },
-  inputError: {
-    borderColor: '#c0392b',
-    backgroundColor: '#fff5f5',
-  },
-  fieldError: {
-    fontSize: 12,
-    color: '#c0392b',
-    marginBottom: 10,
-    marginLeft: 2,
-  },
-  textArea: {
-    height: 120,
-    textAlignVertical: 'top',
-  },
+  inputError: { borderColor: T.danger, backgroundColor: '#fff5f5' },
+  fieldError:  { fontSize: 12, color: T.danger, marginBottom: 10, marginLeft: 2 },
+  textArea:    { height: 120, textAlignVertical: 'top' },
 
   selectBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#f7f9fc',
+    backgroundColor: T.white,
     borderWidth: 1,
-    borderColor: '#d9e2ef',
+    borderColor: T.inputBorder,
     borderRadius: 8,
     padding: 13,
     marginBottom: 4,
   },
-  selectBtnText: { flex: 1, fontSize: 15, color: '#333' },
-  selectBtnPlaceholder: { flex: 1, fontSize: 15, color: '#aaa' },
-  selectArrow: { fontSize: 12, color: '#999' },
+  selectBtnText:        { flex: 1, fontSize: 15, color: T.text },
+  selectBtnPlaceholder: { flex: 1, fontSize: 15, color: T.faint },
+  selectArrow:          { fontSize: 12, color: T.muted },
 
   dropdownList: {
     maxHeight: 200,
-    backgroundColor: '#fff',
+    backgroundColor: T.white,
     borderWidth: 1,
-    borderColor: '#e0e0e0',
+    borderColor: T.border,
     borderRadius: 8,
     marginBottom: 12,
   },
   dropdownOption: { paddingHorizontal: 14, paddingVertical: 10 },
-  dropdownOptionActive: { backgroundColor: '#e3f2fd' },
+  dropdownOptionActive: { backgroundColor: '#e8f0fd' },
   dropdownOptionText: { fontSize: 14, color: '#555' },
-  dropdownOptionTextActive: { color: '#1a73e8', fontWeight: '600' },
+  dropdownOptionTextActive: { color: T.blue, fontWeight: '600' },
 
-  categoriaGrid: {
+  // Multi-select chips
+  chipGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 4 },
+  chip: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: 4,
-  },
-  categoriaOption: {
-    backgroundColor: '#f7f9fc',
-    borderWidth: 1,
-    borderColor: '#d9e2ef',
+    alignItems: 'center',
+    paddingHorizontal: 13,
+    paddingVertical: 8,
     borderRadius: 20,
-    paddingHorizontal: 14,
-    paddingVertical: 7,
+    borderWidth: 1.5,
+    borderColor: T.inputBorder,
+    backgroundColor: T.white,
   },
-  categoriaOptionActive: {
-    backgroundColor: '#1a73e8',
-    borderColor: '#1a73e8',
-  },
-  categoriaOptionText: { fontSize: 13, color: '#555' },
-  categoriaOptionTextActive: { color: '#fff', fontWeight: '600' },
+  chipSelected:     { backgroundColor: T.blue, borderColor: T.blue },
+  chipCheck:        { fontSize: 11, color: T.paper, fontWeight: '700' },
+  chipText:         { fontSize: 13, color: '#555', fontWeight: '500' },
+  chipTextSelected: { color: T.paper, fontWeight: '600' },
 
   saveBtn: {
-    backgroundColor: '#1a73e8',
+    backgroundColor: T.blue,
     padding: 16,
     borderRadius: 8,
     alignItems: 'center',
     marginTop: 8,
   },
-  saveBtnText: { color: '#fff', fontSize: 16, fontWeight: '600' },
+  saveBtnText: { color: T.paper, fontSize: 16, fontWeight: '600' },
 
-  cancelBtn: {
-    padding: 14,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginTop: 8,
-  },
-  cancelBtnText: { color: '#999', fontSize: 15 },
+  cancelBtn: { padding: 14, borderRadius: 8, alignItems: 'center', marginTop: 4 },
+  cancelBtnText: { color: T.muted, fontSize: 15 },
 });

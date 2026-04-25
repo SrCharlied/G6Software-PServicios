@@ -139,6 +139,31 @@ class ProviderController extends Controller
         ]);
     }
 
+    public function uploadFoto(Request $request, int $id): JsonResponse
+    {
+        $proveedor = Proveedor::find($id);
+        if (!$proveedor) {
+            return $this->error('Proveedor no encontrado', 404);
+        }
+
+        if ($proveedor->user_id !== $request->user()->id) {
+            return $this->error('No tienes permiso para modificar este perfil', 403);
+        }
+
+        $request->validate([
+            'foto' => 'required|image|mimes:jpg,jpeg,png,webp|max:3072',
+        ]);
+
+        $file   = $request->file('foto');
+        $nombre = time() . '_' . $file->getClientOriginalName();
+        $ruta   = $file->storeAs('fotos/' . $id, $nombre, 'public');
+        $url    = Storage::url($ruta);
+
+        $proveedor->update(['foto_perfil' => $url]);
+
+        return $this->success('Foto de perfil actualizada', ['foto_perfil' => $url]);
+    }
+
     public function uploadDocumento(Request $request, int $id): JsonResponse
     {
         $proveedor = Proveedor::find($id);

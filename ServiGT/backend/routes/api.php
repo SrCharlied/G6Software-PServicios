@@ -53,6 +53,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/providers',              [ProviderController::class, 'store']);
     Route::put('/providers/{id}',          [ProviderController::class, 'update'])->where('id', '[0-9]+');
 
+    // Foto de perfil del proveedor
+    Route::post('/providers/{id}/foto', [ProviderController::class, 'uploadFoto'])->where('id', '[0-9]+');
+
     // Documentos del proveedor
     Route::get('/providers/{id}/documentos',  [ProviderController::class, 'getDocumentos']);
     Route::post('/providers/{id}/documentos', [ProviderController::class, 'uploadDocumento']);

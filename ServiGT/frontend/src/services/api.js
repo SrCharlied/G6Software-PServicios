@@ -204,6 +204,19 @@ export const getDocumentos = async (proveedorId) => {
   }
 };
 
+export const uploadFotoPerfil = async (proveedorId, file) => {
+  try {
+    const formData = new FormData();
+    formData.append('foto', file);
+    const response = await api.post(`/providers/${proveedorId}/foto`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response.data;
+  } catch (error) {
+    throw new Error(getErrorMessage(error, 'No se pudo subir la foto de perfil.'));
+  }
+};
+
 export const uploadDocumento = async (proveedorId, file, tipoDocumento) => {
   try {
     const formData = new FormData();

@@ -4,18 +4,24 @@ import { useSession } from '../../src/context/SessionContext';
 
 export default function DashboardRoute() {
   const router = useRouter();
-  const { user, providerProfile, setProviderProfile, signOut } = useSession();
+  const { user, providerProfile, setProviderProfile, signOut, setChatParams } = useSession();
 
   if (user?.role !== 'proveedor') return <Redirect href="/home" />;
 
   const navigation = {
     navigate: (name, params = {}) => {
+      const key = name.toLowerCase();
+      if (key === 'chat') {
+        setChatParams({ userId: params.chatWithUserId ?? null, name: params.chatWithName ?? '' });
+        router.push('/chat');
+        return;
+      }
       const map = {
         home: '/home',
         providereditprofile: '/profile/edit',
         login: '/login',
       };
-      router.push(map[name.toLowerCase()] ?? '/home');
+      router.push(map[key] ?? '/home');
     },
   };
 

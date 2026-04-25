@@ -44,10 +44,11 @@ const DIAS = [
 ];
 
 const TABS = [
-  { key: 'solicitudes', label: 'Solicitudes' },
-  { key: 'historial', label: 'Historial' },
-  { key: 'calificaciones', label: 'Calificaciones' },
-  { key: 'disponibilidad', label: 'Disponibilidad' },
+  { key: 'solicitudes',   label: 'Solicitudes' },
+  { key: 'mensajes',      label: 'Mensajes' },
+  { key: 'historial',     label: 'Historial' },
+  { key: 'calificaciones',label: 'Calificaciones' },
+  { key: 'disponibilidad',label: 'Disponibilidad' },
 ];
 
 const ESTADO_COLORES = {
@@ -386,10 +387,58 @@ export default function ProviderDashboardScreen({
     }
   };
 
+  const renderMensajes = () => {
+    // Deduplica clientes por cliente_id a partir de todas las solicitudes
+    const seen = {};
+    solicitudes.forEach((s) => {
+      if (s.cliente_id && s.cliente && !seen[s.cliente_id]) {
+        seen[s.cliente_id] = { userId: s.cliente_id, name: s.cliente.name || 'Cliente' };
+      }
+    });
+    const clientes = Object.values(seen);
+
+    return (
+      <View style={styles.sectionStack}>
+        <Text style={styles.sectionTitle}>Conversaciones con clientes</Text>
+        {loadingSolicitudes && clientes.length === 0 ? (
+          <ActivityIndicator color="#4589d4" style={styles.sectionLoader} />
+        ) : clientes.length === 0 ? (
+          <View style={styles.emptyState}>
+            <Text style={styles.emptyStateText}>
+              Aún no tienes conversaciones. Aparecerán aquí cuando tengas solicitudes de clientes.
+            </Text>
+          </View>
+        ) : (
+          clientes.map((c) => (
+            <TouchableOpacity
+              key={c.userId}
+              style={styles.chatClientRow}
+              activeOpacity={0.82}
+              onPress={() =>
+                navigation.navigate('Chat', {
+                  chatWithUserId: c.userId,
+                  chatWithName: c.name,
+                })
+              }
+            >
+              <View style={styles.chatClientAvatar}>
+                <Text style={styles.chatClientAvatarText}>
+                  {c.name.charAt(0).toUpperCase()}
+                </Text>
+              </View>
+              <Text style={styles.chatClientName}>{c.name}</Text>
+              <Text style={styles.chatArrow}>→</Text>
+            </TouchableOpacity>
+          ))
+        )}
+      </View>
+    );
+  };
+
   if (loadingProfile) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#1a73e8" />
+        <ActivityIndicator size="large" color="#4589d4" />
         <Text style={styles.loadingText}>Cargando panel...</Text>
       </View>
     );
@@ -426,7 +475,7 @@ export default function ProviderDashboardScreen({
 
   const renderSolicitudes = () => {
     if (loadingSolicitudes && solicitudes.length === 0) {
-      return <ActivityIndicator color="#1a73e8" style={styles.sectionLoader} />;
+      return <ActivityIndicator color="#4589d4" style={styles.sectionLoader} />;
     }
 
     return (
@@ -483,7 +532,7 @@ export default function ProviderDashboardScreen({
         <Text style={styles.historyCounter}>{historial.length} registro(s)</Text>
       </View>
       {loadingSolicitudes && historial.length === 0 ? (
-        <ActivityIndicator color="#1a73e8" style={styles.sectionLoader} />
+        <ActivityIndicator color="#4589d4" style={styles.sectionLoader} />
       ) : historial.length === 0 ? (
         <View style={styles.emptyState}>
           <Text style={styles.emptyStateText}>Aun no hay servicios finalizados o rechazados.</Text>
@@ -525,7 +574,7 @@ export default function ProviderDashboardScreen({
       </View>
 
       {loadingCalificaciones && calificaciones.length === 0 ? (
-        <ActivityIndicator color="#1a73e8" style={styles.sectionLoader} />
+        <ActivityIndicator color="#4589d4" style={styles.sectionLoader} />
       ) : calificaciones.length === 0 ? (
         <View style={styles.emptyState}>
           <Text style={styles.emptyStateText}>Aun no recibes calificaciones.</Text>
@@ -552,7 +601,7 @@ export default function ProviderDashboardScreen({
     <View style={styles.sectionStack}>
       <View style={styles.sectionHeaderRow}>
         <Text style={styles.sectionTitle}>Disponibilidad semanal</Text>
-        {loadingDisponibilidad ? <ActivityIndicator color="#1a73e8" size="small" /> : null}
+        {loadingDisponibilidad ? <ActivityIndicator color="#4589d4" size="small" /> : null}
       </View>
 
       {disponibilidad.map((item) => {
@@ -714,7 +763,7 @@ export default function ProviderDashboardScreen({
         )}
 
         {loadingDocs ? (
-          <ActivityIndicator color="#1a73e8" style={styles.sectionLoader} />
+          <ActivityIndicator color="#4589d4" style={styles.sectionLoader} />
         ) : documentos.length === 0 ? (
           <Text style={styles.emptyInlineText}>Aun no has subido documentos.</Text>
         ) : (
@@ -749,8 +798,9 @@ export default function ProviderDashboardScreen({
       </ScrollView>
 
       <View style={styles.card}>
-        {activeTab === 'solicitudes' && renderSolicitudes()}
-        {activeTab === 'historial' && renderHistorial()}
+        {activeTab === 'solicitudes'    && renderSolicitudes()}
+        {activeTab === 'mensajes'       && renderMensajes()}
+        {activeTab === 'historial'      && renderHistorial()}
         {activeTab === 'calificaciones' && renderCalificaciones()}
         {activeTab === 'disponibilidad' && renderDisponibilidad()}
       </View>
@@ -763,12 +813,12 @@ export default function ProviderDashboardScreen({
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f5f5f5' },
+  container: { flex: 1, backgroundColor: '#f0eee9' },
   content: { padding: 16, paddingBottom: 40 },
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   loadingText: { marginTop: 12, fontSize: 16, color: '#666' },
   header: {
-    backgroundColor: '#1a73e8',
+    backgroundColor: '#0e1424',
     borderRadius: 16,
     padding: 18,
     marginBottom: 16,
@@ -794,7 +844,7 @@ const styles = StyleSheet.create({
     paddingVertical: 7,
     borderRadius: 8,
   },
-  logoutBtnText: { color: '#1a73e8', fontWeight: '700', fontSize: 13 },
+  logoutBtnText: { color: '#0e1424', fontWeight: '700', fontSize: 13 },
   emptyCard: {
     backgroundColor: '#fff',
     borderRadius: 12,
@@ -806,7 +856,7 @@ const styles = StyleSheet.create({
   summaryRow: { flexDirection: 'row', gap: 12, marginBottom: 16 },
   summaryCard: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: '#f6f4ee',
     borderRadius: 12,
     padding: 14,
     alignItems: 'center',
@@ -816,10 +866,10 @@ const styles = StyleSheet.create({
     shadowRadius: 3,
     elevation: 2,
   },
-  summaryNumber: { fontSize: 24, fontWeight: '800', color: '#1a73e8' },
+  summaryNumber: { fontSize: 24, fontWeight: '800', color: '#4589d4' },
   summaryLabel: { marginTop: 4, fontSize: 12, color: '#666' },
   card: {
-    backgroundColor: '#fff',
+    backgroundColor: '#f6f4ee',
     borderRadius: 12,
     padding: 16,
     marginBottom: 16,
@@ -838,7 +888,7 @@ const styles = StyleSheet.create({
   },
   cardTitle: { fontSize: 17, fontWeight: '700', color: '#333' },
   cardSubtitle: { fontSize: 13, color: '#666', marginBottom: 12, lineHeight: 18 },
-  linkText: { color: '#1a73e8', fontWeight: '700', fontSize: 13 },
+  linkText: { color: '#4589d4', fontWeight: '700', fontSize: 13 },
   profileName: { fontSize: 18, fontWeight: '700', color: '#222', marginBottom: 8 },
   profileDescription: { fontSize: 14, color: '#555', lineHeight: 20 },
   profileMetaWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 12 },
@@ -877,9 +927,9 @@ const styles = StyleSheet.create({
   tipoOption: { paddingHorizontal: 14, paddingVertical: 10 },
   tipoOptionActive: { backgroundColor: '#e3f2fd' },
   tipoOptionText: { fontSize: 13, color: '#555' },
-  tipoOptionTextActive: { color: '#1a73e8', fontWeight: '600' },
+  tipoOptionTextActive: { color: '#4589d4', fontWeight: '600' },
   uploadBtn: {
-    backgroundColor: '#1a73e8',
+    backgroundColor: '#4589d4',
     padding: 12,
     borderRadius: 8,
     alignItems: 'center',
@@ -917,7 +967,7 @@ const styles = StyleSheet.create({
     paddingVertical: 9,
     borderRadius: 999,
   },
-  tabBtnActive: { backgroundColor: '#1a73e8', borderColor: '#1a73e8' },
+  tabBtnActive: { backgroundColor: '#4589d4', borderColor: '#4589d4' },
   tabBtnText: { color: '#567', fontWeight: '600', fontSize: 13 },
   tabBtnTextActive: { color: '#fff' },
   sectionStack: { gap: 12 },
@@ -988,7 +1038,7 @@ const styles = StyleSheet.create({
   },
   rejectBtnText: { color: '#be123c', fontWeight: '700', fontSize: 13 },
   advanceBtn: {
-    backgroundColor: '#1a73e8',
+    backgroundColor: '#4589d4',
     paddingHorizontal: 14,
     paddingVertical: 10,
     borderRadius: 8,
@@ -1003,7 +1053,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     backgroundColor: '#f8fbff',
   },
-  ratingAverage: { fontSize: 34, fontWeight: '800', color: '#1a73e8' },
+  ratingAverage: { fontSize: 34, fontWeight: '800', color: '#4589d4' },
   ratingSummaryText: { fontSize: 13, color: '#667085', marginTop: 4 },
   starsRow: { flexDirection: 'row', gap: 2 },
   star: { fontSize: 16, fontWeight: '700' },
@@ -1058,7 +1108,7 @@ const styles = StyleSheet.create({
   timeInputDisabled: { backgroundColor: '#f3f4f6', color: '#98a2b3' },
   timeDivider: { color: '#667085', fontSize: 13, fontWeight: '600' },
   primaryBtn: {
-    backgroundColor: '#1a73e8',
+    backgroundColor: '#4589d4',
     padding: 14,
     borderRadius: 8,
     alignItems: 'center',
@@ -1072,4 +1122,27 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   secondaryHomeBtnText: { color: '#475467', fontWeight: '700', fontSize: 14 },
+
+  // Chat tab
+  chatClientRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f6f4ee',
+    borderRadius: 12,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(14,20,36,0.07)',
+    gap: 12,
+  },
+  chatClientAvatar: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: '#4589d4',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  chatClientAvatarText: { color: '#f6f4ee', fontSize: 17, fontWeight: '700' },
+  chatClientName: { flex: 1, fontSize: 15, fontWeight: '600', color: '#0e1424' },
+  chatArrow: { fontSize: 18, color: '#4589d4', fontWeight: '700' },
 });

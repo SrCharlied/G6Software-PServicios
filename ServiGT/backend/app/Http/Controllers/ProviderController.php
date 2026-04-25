@@ -4,19 +4,22 @@ namespace App\Http\Controllers;
 
 use App\Models\DocumentoProveedor;
 use App\Models\Proveedor;
+use App\Traits\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 
 class ProviderController extends Controller
 {
+    use ApiResponse;
+
     public function index(): JsonResponse
     {
         $proveedores = Proveedor::with('categoria')
             ->orderBy('calificacion_promedio', 'desc')
             ->get();
 
-        return response()->json(['proveedores' => $proveedores]);
+        return $this->success('OK', ['proveedores' => $proveedores]);
     }
 
     public function show(int $id): JsonResponse
@@ -25,10 +28,10 @@ class ProviderController extends Controller
             ->find($id);
 
         if (!$proveedor) {
-            return response()->json(['message' => 'Proveedor no encontrado'], 404);
+            return $this->error('Proveedor no encontrado', 404);
         }
 
-        return response()->json(['proveedor' => $proveedor]);
+        return $this->success('OK', ['proveedor' => $proveedor]);
     }
 
     public function showByUser(int $userId): JsonResponse
@@ -38,10 +41,10 @@ class ProviderController extends Controller
             ->first();
 
         if (!$proveedor) {
-            return response()->json(['message' => 'Perfil de proveedor no encontrado'], 404);
+            return $this->error('Perfil de proveedor no encontrado', 404);
         }
 
-        return response()->json(['proveedor' => $proveedor]);
+        return $this->success('OK', ['proveedor' => $proveedor]);
     }
 
     public function store(Request $request): JsonResponse
@@ -63,22 +66,18 @@ class ProviderController extends Controller
         $proveedor = Proveedor::create($validated);
         $proveedor->load('categoria');
 
-        return response()->json([
-            'message'   => 'Proveedor creado exitosamente',
-            'proveedor' => $proveedor,
-        ], 201);
+        return $this->success('Proveedor creado exitosamente', ['proveedor' => $proveedor], 201);
     }
 
     public function update(Request $request, int $id): JsonResponse
     {
         $proveedor = Proveedor::find($id);
         if (!$proveedor) {
-            return response()->json(['message' => 'Proveedor no encontrado'], 404);
+            return $this->error('Proveedor no encontrado', 404);
         }
 
-        // Solo el dueño puede editar
         if ($proveedor->user_id !== $request->user()->id) {
-            return response()->json(['message' => 'No autorizado'], 403);
+            return $this->error('No tienes permiso para editar este perfil', 403);
         }
 
         $validated = $request->validate([
@@ -96,20 +95,17 @@ class ProviderController extends Controller
         $proveedor->update($validated);
         $proveedor->load(['categoria', 'documentos', 'disponibilidad']);
 
-        return response()->json([
-            'message'   => 'Proveedor actualizado',
-            'proveedor' => $proveedor,
-        ]);
+        return $this->success('Perfil actualizado correctamente', ['proveedor' => $proveedor]);
     }
 
     public function getDocumentos(int $id): JsonResponse
     {
         $proveedor = Proveedor::find($id);
         if (!$proveedor) {
-            return response()->json(['message' => 'Proveedor no encontrado'], 404);
+            return $this->error('Proveedor no encontrado', 404);
         }
 
-        return response()->json([
+        return $this->success('OK', [
             'documentos' => DocumentoProveedor::where('proveedor_id', $id)
                 ->orderBy('created_at', 'desc')
                 ->get(),
@@ -120,7 +116,7 @@ class ProviderController extends Controller
     {
         $proveedor = Proveedor::find($id);
         if (!$proveedor) {
-            return response()->json(['message' => 'Proveedor no encontrado'], 404);
+            return $this->error('Proveedor no encontrado', 404);
         }
 
         $request->validate([
@@ -140,9 +136,6 @@ class ProviderController extends Controller
             'estado_validacion' => 'pendiente',
         ]);
 
-        return response()->json([
-            'message'   => 'Documento subido',
-            'documento' => $documento,
-        ], 201);
+        return $this->success('Documento subido correctamente', ['documento' => $documento], 201);
     }
 }

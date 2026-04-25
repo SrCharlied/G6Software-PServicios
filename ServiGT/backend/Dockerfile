@@ -21,6 +21,7 @@ RUN composer require laravel/sanctum --no-interaction --no-progress --quiet
 COPY routes/api.php /app/routes/api.php
 COPY app/Http/Controllers/ /app/app/Http/Controllers/
 COPY app/Models/ /app/app/Models/
+COPY app/Traits/ /app/app/Traits/
 COPY config/cors.php /app/config/cors.php
 COPY bootstrap/app.php /app/bootstrap/app.php
 COPY docker/entrypoint.sh /app/docker/entrypoint.sh

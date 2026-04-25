@@ -3,6 +3,7 @@
     "name": "PServicios",
     "slug": "pservicios",
     "version": "1.0.0",
+    "scheme": "pservicios",
     "platforms": ["web"],
     "web": {
       "bundler": "metro",

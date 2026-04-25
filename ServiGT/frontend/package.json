@@ -1,7 +1,7 @@
 {
   "name": "pservicios-frontend",
   "version": "1.0.0",
-  "main": "src/App.js",
+  "main": "expo-router/entry",
   "scripts": {
     "start": "expo start",
     "web": "expo start --web",
@@ -10,11 +10,14 @@
   },
   "dependencies": {
     "expo": "~52.0.0",
+    "expo-router": "~4.0.17",
     "expo-status-bar": "~2.0.0",
     "react": "18.3.1",
     "react-dom": "18.3.1",
     "react-native": "0.76.6",
     "react-native-web": "~0.19.13",
+    "react-native-safe-area-context": "4.12.0",
+    "react-native-screens": "~4.4.0",
     "@expo/metro-runtime": "~4.0.1",
     "axios": "1.7.4"
   },

@@ -29,6 +29,7 @@ export default function ProviderDetailScreen({
   user,
   providerProfile,
   selectedProvider,
+  providerId,
 }) {
   const [proveedor, setProveedor] = useState(selectedProvider || null);
   const [calificaciones, setCalificaciones] = useState([]);
@@ -40,11 +41,26 @@ export default function ProviderDetailScreen({
 
   useEffect(() => {
     if (selectedProvider) {
+      setProveedor(selectedProvider);
       loadExtras(selectedProvider.id);
+    } else if (providerId) {
+      // Carga por ID cuando se accede directamente por URL
+      getProvider(providerId)
+        .then((data) => { setProveedor(data.proveedor); loadExtras(data.proveedor.id); })
+        .catch(() => setLoading(false))
+        .finally(() => setLoading(false));
     }
-  }, [selectedProvider]);
+  }, [selectedProvider, providerId]);
 
-  if (!selectedProvider && !proveedor) {
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#1a73e8" />
+      </View>
+    );
+  }
+
+  if (!proveedor) {
     return (
       <View style={styles.loadingContainer}>
         <Text style={styles.loadingText}>No se encontro el proveedor seleccionado.</Text>

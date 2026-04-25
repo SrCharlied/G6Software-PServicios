@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   ScrollView,
   StyleSheet,
   Text,
@@ -10,6 +9,8 @@ import {
   View,
 } from 'react-native';
 import { getCategorias, updateProvider, createProvider } from '../services/api';
+import { useToast } from '../context/ToastContext';
+import { validateRequired, validatePhone, validateNumeric } from '../utils/validation';
 
 const DEPARTAMENTOS = [
   'Alta Verapaz', 'Baja Verapaz', 'Chimaltenango', 'Chiquimula', 'El Progreso',
@@ -25,6 +26,7 @@ export default function ProviderEditProfileScreen({
   providerProfile,
   onProfileUpdated,
 }) {
+  const toast = useToast();
   const isEditing = !!providerProfile;
 
   const [nombre, setNombre] = useState(providerProfile?.nombre || user?.name || '');
@@ -45,10 +47,13 @@ export default function ProviderEditProfileScreen({
   const [categorias, setCategorias] = useState([]);
   const [loadingCats, setLoadingCats] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [errors, setErrors] = useState({});
 
   const [showDepartamentos, setShowDepartamentos] = useState(false);
   const [showNivelSelector, setShowNivelSelector] = useState(false);
   const NIVELES = ['novato', 'intermedio', 'experto'];
+
+  const clearError = (field) => setErrors((e) => ({ ...e, [field]: null }));
 
   useEffect(() => {
     loadCategorias();
@@ -63,21 +68,27 @@ export default function ProviderEditProfileScreen({
         setCategoriaId(String(data.categorias[0].id));
       }
     } catch {
-      Alert.alert('Aviso', 'No se pudieron cargar las categorias.');
+      toast('No se pudieron cargar las categorias.', 'warning');
     } finally {
       setLoadingCats(false);
     }
   };
 
   const handleSave = async () => {
-    if (!nombre.trim() || !descripcion.trim() || !departamento || !categoriaId) {
-      Alert.alert('Error', 'Completa los campos obligatorios: nombre, descripcion, departamento y categoria.');
-      return;
-    }
+    const errs = {};
+    if (!validateRequired(nombre)) errs.nombre = 'El nombre es requerido.';
+    if (telefono && !validatePhone(telefono)) errs.telefono = 'Ingresa un numero de telefono valido.';
+    if (!validateRequired(descripcion)) errs.descripcion = 'La descripcion es requerida.';
+    else if (descripcion.trim().length < 20) errs.descripcion = 'La descripcion debe tener al menos 20 caracteres.';
+    if (!departamento) errs.departamento = 'Selecciona tu departamento.';
+    if (!categoriaId) errs.categoriaId = 'Selecciona una categoria.';
+    if (tarifaHora && !validateNumeric(tarifaHora)) errs.tarifaHora = 'Ingresa una tarifa valida.';
+    if (tarifaProyecto && !validateNumeric(tarifaProyecto)) errs.tarifaProyecto = 'Ingresa una tarifa valida.';
+    if (Object.keys(errs).length) { setErrors(errs); return; }
+    setErrors({});
 
     setSaving(true);
     try {
-      let data;
       const payload = {
         nombre: nombre.trim(),
         telefono: telefono.trim() || null,
@@ -90,19 +101,17 @@ export default function ProviderEditProfileScreen({
         nivel,
       };
 
+      let data;
       if (isEditing) {
         data = await updateProvider(providerProfile.id, payload);
       } else {
         data = await createProvider({ ...payload, user_id: user.id, email: user.email });
       }
 
-      Alert.alert(
-        'Perfil guardado',
-        isEditing ? 'Tus datos han sido actualizados.' : 'Perfil de proveedor creado.',
-        [{ text: 'OK', onPress: () => onProfileUpdated && onProfileUpdated(data.proveedor) }]
-      );
+      toast(isEditing ? 'Perfil actualizado correctamente.' : 'Perfil de proveedor creado.', 'success');
+      onProfileUpdated && onProfileUpdated(data.proveedor);
     } catch (error) {
-      Alert.alert('Error al guardar', error.message);
+      toast(error.message, 'error');
     } finally {
       setSaving(false);
     }
@@ -110,7 +119,6 @@ export default function ProviderEditProfileScreen({
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation?.navigate('ProviderDashboard')} style={styles.backBtn}>
           <Text style={styles.backBtnText}>← Volver</Text>
@@ -125,35 +133,37 @@ export default function ProviderEditProfileScreen({
 
         <Text style={styles.label}>Nombre *</Text>
         <TextInput
-          style={styles.input}
+          style={[styles.input, errors.nombre && styles.inputError]}
           placeholder="Nombre completo o nombre del negocio"
           value={nombre}
-          onChangeText={setNombre}
+          onChangeText={(v) => { setNombre(v); clearError('nombre'); }}
         />
+        {errors.nombre ? <Text style={styles.fieldError}>{errors.nombre}</Text> : null}
 
         <Text style={styles.label}>Telefono</Text>
         <TextInput
-          style={styles.input}
+          style={[styles.input, errors.telefono && styles.inputError]}
           placeholder="Ej: 5555-1234"
           value={telefono}
-          onChangeText={setTelefono}
+          onChangeText={(v) => { setTelefono(v); clearError('telefono'); }}
           keyboardType="phone-pad"
         />
+        {errors.telefono ? <Text style={styles.fieldError}>{errors.telefono}</Text> : null}
 
         <Text style={styles.label}>Descripcion de servicios *</Text>
         <TextInput
-          style={[styles.input, styles.textArea]}
+          style={[styles.input, styles.textArea, errors.descripcion && styles.inputError]}
           placeholder="Describe los servicios que ofreces, tu experiencia, horarios de atencion..."
           value={descripcion}
-          onChangeText={setDescripcion}
+          onChangeText={(v) => { setDescripcion(v); clearError('descripcion'); }}
           multiline
           numberOfLines={5}
         />
+        {errors.descripcion ? <Text style={styles.fieldError}>{errors.descripcion}</Text> : null}
 
-        {/* Departamento */}
         <Text style={styles.label}>Departamento *</Text>
         <TouchableOpacity
-          style={styles.selectBtn}
+          style={[styles.selectBtn, errors.departamento && styles.inputError]}
           onPress={() => setShowDepartamentos(!showDepartamentos)}
         >
           <Text style={departamento ? styles.selectBtnText : styles.selectBtnPlaceholder}>
@@ -161,6 +171,7 @@ export default function ProviderEditProfileScreen({
           </Text>
           <Text style={styles.selectArrow}>{showDepartamentos ? '▲' : '▼'}</Text>
         </TouchableOpacity>
+        {errors.departamento ? <Text style={styles.fieldError}>{errors.departamento}</Text> : null}
 
         {showDepartamentos && (
           <ScrollView style={styles.dropdownList} nestedScrollEnabled>
@@ -170,6 +181,7 @@ export default function ProviderEditProfileScreen({
                 style={[styles.dropdownOption, departamento === dep && styles.dropdownOptionActive]}
                 onPress={() => {
                   setDepartamento(dep);
+                  clearError('departamento');
                   setShowDepartamentos(false);
                 }}
               >
@@ -189,26 +201,26 @@ export default function ProviderEditProfileScreen({
           onChangeText={setMunicipio}
         />
 
-        {/* Tarifas */}
         <Text style={styles.label}>Tarifa por hora (Q)</Text>
         <TextInput
-          style={styles.input}
+          style={[styles.input, errors.tarifaHora && styles.inputError]}
           placeholder="Ej: 75.00"
           value={tarifaHora}
-          onChangeText={setTarifaHora}
+          onChangeText={(v) => { setTarifaHora(v); clearError('tarifaHora'); }}
           keyboardType="decimal-pad"
         />
+        {errors.tarifaHora ? <Text style={styles.fieldError}>{errors.tarifaHora}</Text> : null}
 
         <Text style={styles.label}>Tarifa por proyecto (Q)</Text>
         <TextInput
-          style={styles.input}
+          style={[styles.input, errors.tarifaProyecto && styles.inputError]}
           placeholder="Ej: 500.00"
           value={tarifaProyecto}
-          onChangeText={setTarifaProyecto}
+          onChangeText={(v) => { setTarifaProyecto(v); clearError('tarifaProyecto'); }}
           keyboardType="decimal-pad"
         />
+        {errors.tarifaProyecto ? <Text style={styles.fieldError}>{errors.tarifaProyecto}</Text> : null}
 
-        {/* Nivel */}
         <Text style={styles.label}>Nivel de experiencia</Text>
         <TouchableOpacity
           style={styles.selectBtn}
@@ -233,24 +245,26 @@ export default function ProviderEditProfileScreen({
           </View>
         )}
 
-        {/* Categoria */}
         <Text style={styles.label}>Categoria de servicio *</Text>
         {loadingCats ? (
           <ActivityIndicator color="#1a73e8" style={{ marginVertical: 10 }} />
         ) : (
-          <View style={styles.categoriaGrid}>
-            {categorias.map((cat) => (
-              <TouchableOpacity
-                key={cat.id}
-                style={[styles.categoriaOption, categoriaId === String(cat.id) && styles.categoriaOptionActive]}
-                onPress={() => setCategoriaId(String(cat.id))}
-              >
-                <Text style={[styles.categoriaOptionText, categoriaId === String(cat.id) && styles.categoriaOptionTextActive]}>
-                  {cat.nombre}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
+          <>
+            <View style={styles.categoriaGrid}>
+              {categorias.map((cat) => (
+                <TouchableOpacity
+                  key={cat.id}
+                  style={[styles.categoriaOption, categoriaId === String(cat.id) && styles.categoriaOptionActive]}
+                  onPress={() => { setCategoriaId(String(cat.id)); clearError('categoriaId'); }}
+                >
+                  <Text style={[styles.categoriaOptionText, categoriaId === String(cat.id) && styles.categoriaOptionTextActive]}>
+                    {cat.nombre}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            {errors.categoriaId ? <Text style={styles.fieldError}>{errors.categoriaId}</Text> : null}
+          </>
         )}
 
         <TouchableOpacity style={styles.saveBtn} onPress={handleSave} disabled={saving}>
@@ -315,8 +329,18 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 13,
     fontSize: 15,
-    marginBottom: 12,
+    marginBottom: 4,
     color: '#333',
+  },
+  inputError: {
+    borderColor: '#c0392b',
+    backgroundColor: '#fff5f5',
+  },
+  fieldError: {
+    fontSize: 12,
+    color: '#c0392b',
+    marginBottom: 10,
+    marginLeft: 2,
   },
   textArea: {
     height: 120,
@@ -331,7 +355,7 @@ const styles = StyleSheet.create({
     borderColor: '#d9e2ef',
     borderRadius: 8,
     padding: 13,
-    marginBottom: 6,
+    marginBottom: 4,
   },
   selectBtnText: { flex: 1, fontSize: 15, color: '#333' },
   selectBtnPlaceholder: { flex: 1, fontSize: 15, color: '#aaa' },
@@ -354,7 +378,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
-    marginBottom: 16,
+    marginBottom: 4,
   },
   categoriaOption: {
     backgroundColor: '#f7f9fc',

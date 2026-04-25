@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Platform,
   ScrollView,
   StyleSheet,
@@ -11,6 +10,8 @@ import {
   View,
 } from 'react-native';
 import { register, createProvider, getCategorias, uploadDocumento } from '../services/api';
+import { useToast } from '../context/ToastContext';
+import { validateEmail, validatePhone, validatePassword, validateRequired } from '../utils/validation';
 
 const DEPARTAMENTOS = [
   'Alta Verapaz', 'Baja Verapaz', 'Chimaltenango', 'Chiquimula', 'El Progreso',
@@ -87,7 +88,9 @@ const dd = StyleSheet.create({
 
 // ── Pantalla principal ────────────────────────────────────────────────────
 export default function RegisterScreen({ navigation, onRegisterSuccess }) {
+  const toast = useToast();
   const [step, setStep] = useState(1);
+  const [errors, setErrors] = useState({});
 
   // Paso 1
   const [name, setName]       = useState('');
@@ -115,6 +118,8 @@ export default function RegisterScreen({ navigation, onRegisterSuccess }) {
   const [providerProfile, setProviderProfile] = useState(null);
   const fileInputRef = useRef(null);
 
+  const clearError = (field) => setErrors((e) => ({ ...e, [field]: null }));
+
   useEffect(() => {
     if (step === 2 && categorias.length === 0) loadCategorias();
   }, [step]);
@@ -127,7 +132,7 @@ export default function RegisterScreen({ navigation, onRegisterSuccess }) {
       setCategorias(cats);
       if (cats.length > 0) setCategoriaId(String(cats[0].id));
     } catch {
-      Alert.alert('Aviso', 'No se pudieron cargar las categorias.');
+      toast('No se pudieron cargar las categorias.', 'warning');
     } finally {
       setLoadingCats(false);
     }
@@ -135,26 +140,25 @@ export default function RegisterScreen({ navigation, onRegisterSuccess }) {
 
   // ── Paso 1: registrar usuario ─────────────────────────────────────────
   const handleStep1 = async () => {
-    if (!name.trim() || !email.trim() || !password.trim()) {
-      Alert.alert('Campos incompletos', 'Completa nombre, correo y contrasena.');
-      return;
-    }
-    if (password.length < 6) {
-      Alert.alert('Contrasena muy corta', 'Debe tener al menos 6 caracteres.');
-      return;
-    }
+    const errs = {};
+    if (!validateRequired(name)) errs.name = 'El nombre es requerido.';
+    if (!validateRequired(email)) errs.email = 'El correo es requerido.';
+    else if (!validateEmail(email)) errs.email = 'El formato del correo no es valido.';
+    if (!validatePassword(password)) errs.password = 'La contrasena debe tener al menos 6 caracteres.';
+    if (Object.keys(errs).length) { setErrors(errs); return; }
+    setErrors({});
+
     setLoading(true);
     try {
-      const data = await register(name.trim(), email.trim(), password, role);
+      const data = await register(name.trim(), email.trim().toLowerCase(), password, role);
       setRegisteredUser(data.user);
       if (role === 'proveedor') {
         setStep(2);
       } else {
-        // Cliente → directo al main
         onRegisterSuccess && onRegisterSuccess(data.user, null);
       }
     } catch (error) {
-      Alert.alert('Error en el registro', error.message);
+      toast(error.message, 'error');
     } finally {
       setLoading(false);
     }
@@ -162,22 +166,16 @@ export default function RegisterScreen({ navigation, onRegisterSuccess }) {
 
   // ── Paso 2: crear perfil de proveedor ────────────────────────────────
   const handleStep2 = async () => {
-    if (!telefono.trim()) {
-      Alert.alert('Campo requerido', 'Ingresa tu numero de telefono.');
-      return;
-    }
-    if (!descripcion.trim()) {
-      Alert.alert('Campo requerido', 'Describe los servicios que ofreces.');
-      return;
-    }
-    if (!departamento) {
-      Alert.alert('Campo requerido', 'Selecciona tu departamento.');
-      return;
-    }
-    if (!categoriaId) {
-      Alert.alert('Campo requerido', 'Selecciona una categoria de servicio.');
-      return;
-    }
+    const errs = {};
+    if (!validateRequired(telefono)) errs.telefono = 'El telefono es requerido.';
+    else if (!validatePhone(telefono)) errs.telefono = 'Ingresa un numero de telefono valido.';
+    if (!validateRequired(descripcion)) errs.descripcion = 'Describe los servicios que ofreces.';
+    else if (descripcion.trim().length < 20) errs.descripcion = 'La descripcion debe tener al menos 20 caracteres.';
+    if (!departamento) errs.departamento = 'Selecciona tu departamento.';
+    if (!categoriaId) errs.categoriaId = 'Selecciona una categoria de servicio.';
+    if (Object.keys(errs).length) { setErrors(errs); return; }
+    setErrors({});
+
     setLoading(true);
     try {
       const data = await createProvider({
@@ -193,7 +191,7 @@ export default function RegisterScreen({ navigation, onRegisterSuccess }) {
       setProviderProfile(data.proveedor);
       setStep(3);
     } catch (error) {
-      Alert.alert('Error al crear perfil', error.message);
+      toast(error.message, 'error');
     } finally {
       setLoading(false);
     }
@@ -207,12 +205,18 @@ export default function RegisterScreen({ navigation, onRegisterSuccess }) {
 
   const uploadFile = async (file) => {
     if (!providerProfile) return;
+    const maxBytes = 5 * 1024 * 1024;
+    if (file.size > maxBytes) {
+      toast('El archivo supera el limite de 5 MB.', 'warning');
+      return;
+    }
     setUploading(true);
     try {
       const data = await uploadDocumento(providerProfile.id, file, tipoDocumento);
       setDocumentos((prev) => [...prev, data.documento]);
+      toast('Documento subido correctamente.', 'success');
     } catch (error) {
-      Alert.alert('Error al subir documento', error.message);
+      toast(error.message, 'error');
     } finally {
       setUploading(false);
     }
@@ -252,20 +256,30 @@ export default function RegisterScreen({ navigation, onRegisterSuccess }) {
       <Text style={styles.cardTitle}>Datos de la cuenta</Text>
 
       <Text style={styles.inputLabel}>Nombre completo</Text>
-      <TextInput style={styles.input} placeholder="Tu nombre" value={name} onChangeText={setName} />
+      <TextInput
+        style={[styles.input, errors.name && styles.inputError]}
+        placeholder="Tu nombre" value={name}
+        onChangeText={(v) => { setName(v); clearError('name'); }}
+      />
+      {errors.name ? <Text style={styles.fieldError}>{errors.name}</Text> : null}
 
       <Text style={styles.inputLabel}>Correo electronico</Text>
       <TextInput
-        style={styles.input} placeholder="correo@ejemplo.com"
-        value={email} onChangeText={setEmail}
+        style={[styles.input, errors.email && styles.inputError]}
+        placeholder="correo@ejemplo.com"
+        value={email} onChangeText={(v) => { setEmail(v); clearError('email'); }}
         keyboardType="email-address" autoCapitalize="none"
       />
+      {errors.email ? <Text style={styles.fieldError}>{errors.email}</Text> : null}
 
       <Text style={styles.inputLabel}>Contrasena</Text>
       <TextInput
-        style={styles.input} placeholder="Minimo 6 caracteres"
-        value={password} onChangeText={setPassword} secureTextEntry
+        style={[styles.input, errors.password && styles.inputError]}
+        placeholder="Minimo 6 caracteres"
+        value={password} onChangeText={(v) => { setPassword(v); clearError('password'); }}
+        secureTextEntry
       />
+      {errors.password ? <Text style={styles.fieldError}>{errors.password}</Text> : null}
 
       <Text style={styles.inputLabel}>Tipo de cuenta</Text>
       <View style={styles.roleRow}>
@@ -312,25 +326,30 @@ export default function RegisterScreen({ navigation, onRegisterSuccess }) {
 
       <Text style={styles.inputLabel}>Telefono *</Text>
       <TextInput
-        style={styles.input} placeholder="Ej: 5555-1234"
-        value={telefono} onChangeText={setTelefono} keyboardType="phone-pad"
+        style={[styles.input, errors.telefono && styles.inputError]}
+        placeholder="Ej: 5555-1234"
+        value={telefono} onChangeText={(v) => { setTelefono(v); clearError('telefono'); }}
+        keyboardType="phone-pad"
       />
+      {errors.telefono ? <Text style={styles.fieldError}>{errors.telefono}</Text> : null}
 
       <Text style={styles.inputLabel}>Descripcion de tus servicios *</Text>
       <TextInput
-        style={[styles.input, styles.textArea]}
+        style={[styles.input, styles.textArea, errors.descripcion && styles.inputError]}
         placeholder="Describe que servicios ofreces, tu experiencia y horarios..."
-        value={descripcion} onChangeText={setDescripcion}
+        value={descripcion} onChangeText={(v) => { setDescripcion(v); clearError('descripcion'); }}
         multiline numberOfLines={4}
       />
+      {errors.descripcion ? <Text style={styles.fieldError}>{errors.descripcion}</Text> : null}
 
       <Dropdown
         label="Departamento *"
         value={departamento}
         placeholder="Selecciona tu departamento"
         options={DEPARTAMENTOS}
-        onSelect={setDepartamento}
+        onSelect={(v) => { setDepartamento(v); clearError('departamento'); }}
       />
+      {errors.departamento ? <Text style={styles.fieldError}>{errors.departamento}</Text> : null}
 
       <Text style={styles.inputLabel}>Municipio (opcional)</Text>
       <TextInput
@@ -341,13 +360,16 @@ export default function RegisterScreen({ navigation, onRegisterSuccess }) {
       {loadingCats
         ? <ActivityIndicator color="#1a73e8" style={{ marginVertical: 12 }} />
         : (
-          <Dropdown
-            label="Categoria de servicio *"
-            value={categorias.find((c) => String(c.id) === categoriaId)?.nombre || ''}
-            placeholder="Selecciona una categoria"
-            options={categorias.map((c) => ({ label: c.nombre, value: String(c.id) }))}
-            onSelect={setCategoriaId}
-          />
+          <>
+            <Dropdown
+              label="Categoria de servicio *"
+              value={categorias.find((c) => String(c.id) === categoriaId)?.nombre || ''}
+              placeholder="Selecciona una categoria"
+              options={categorias.map((c) => ({ label: c.nombre, value: String(c.id) }))}
+              onSelect={(v) => { setCategoriaId(v); clearError('categoriaId'); }}
+            />
+            {errors.categoriaId ? <Text style={styles.fieldError}>{errors.categoriaId}</Text> : null}
+          </>
         )}
 
       <TouchableOpacity
@@ -558,8 +580,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: 13,
     paddingVertical: 13,
     fontSize: 15,
-    marginBottom: 14,
+    marginBottom: 4,
     color: '#333',
+  },
+  inputError: {
+    borderColor: '#c0392b',
+    backgroundColor: '#fff5f5',
+  },
+  fieldError: {
+    fontSize: 12,
+    color: '#c0392b',
+    marginBottom: 10,
+    marginLeft: 2,
   },
   textArea: {
     height: 110,

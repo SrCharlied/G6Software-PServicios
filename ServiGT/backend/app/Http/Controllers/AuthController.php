@@ -3,12 +3,15 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
+use App\Traits\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 
 class AuthController extends Controller
 {
+    use ApiResponse;
+
     public function register(Request $request): JsonResponse
     {
         $validated = $request->validate([
@@ -21,10 +24,9 @@ class AuthController extends Controller
         $user  = User::create($validated);
         $token = $user->createToken('auth-token')->plainTextToken;
 
-        return response()->json([
-            'message' => 'Usuario registrado exitosamente',
-            'user'    => $user,
-            'token'   => $token,
+        return $this->success('Usuario registrado exitosamente', [
+            'user'  => $user,
+            'token' => $token,
         ], 201);
     }
 
@@ -38,19 +40,16 @@ class AuthController extends Controller
         $user = User::where('email', $request->email)->first();
 
         if (!$user || !Hash::check($request->password, $user->password)) {
-            return response()->json([
-                'message' => 'Credenciales incorrectas',
-            ], 401);
+            return $this->error('Credenciales incorrectas', 401);
         }
 
         // Revocar tokens anteriores y crear uno nuevo
         $user->tokens()->delete();
         $token = $user->createToken('auth-token')->plainTextToken;
 
-        return response()->json([
-            'message' => 'Login exitoso',
-            'user'    => $user,
-            'token'   => $token,
+        return $this->success('Login exitoso', [
+            'user'  => $user,
+            'token' => $token,
         ]);
     }
 
@@ -58,15 +57,11 @@ class AuthController extends Controller
     {
         $request->user()->currentAccessToken()->delete();
 
-        return response()->json([
-            'message' => 'Sesion cerrada correctamente',
-        ]);
+        return $this->success('Sesion cerrada correctamente');
     }
 
     public function me(Request $request): JsonResponse
     {
-        return response()->json([
-            'user' => $request->user(),
-        ]);
+        return $this->success('OK', ['user' => $request->user()]);
     }
 }

@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   ScrollView,
   StyleSheet,
   Text,
@@ -10,21 +9,27 @@ import {
   View,
 } from 'react-native';
 import { login, getProviderByUser } from '../services/api';
+import { useToast } from '../context/ToastContext';
+import { validateEmail } from '../utils/validation';
 
 export default function LoginScreen({ navigation, onLogin }) {
+  const toast = useToast();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [errors, setErrors] = useState({});
 
   const handleLogin = async () => {
-    if (!email.trim() || !password) {
-      Alert.alert('Campos incompletos', 'Ingresa tu correo y contrasena.');
-      return;
-    }
+    const errs = {};
+    if (!email.trim()) errs.email = 'Ingresa tu correo electronico.';
+    else if (!validateEmail(email)) errs.email = 'El formato del correo no es valido.';
+    if (!password) errs.password = 'Ingresa tu contrasena.';
+    if (Object.keys(errs).length) { setErrors(errs); return; }
+    setErrors({});
 
     setLoading(true);
     try {
-      const data = await login(email.trim(), password);
+      const data = await login(email.trim().toLowerCase(), password);
       const user = data.user;
 
       let providerProfile = null;
@@ -39,7 +44,7 @@ export default function LoginScreen({ navigation, onLogin }) {
 
       if (onLogin) onLogin(user, providerProfile);
     } catch (error) {
-      Alert.alert('Error al iniciar sesion', error.message);
+      toast(error.message, 'error');
     } finally {
       setLoading(false);
     }
@@ -53,23 +58,25 @@ export default function LoginScreen({ navigation, onLogin }) {
       <View style={styles.form}>
         <Text style={styles.label}>Correo electronico</Text>
         <TextInput
-          style={styles.input}
+          style={[styles.input, errors.email && styles.inputError]}
           placeholder="correo@ejemplo.com"
           value={email}
-          onChangeText={setEmail}
+          onChangeText={(v) => { setEmail(v); setErrors((e) => ({ ...e, email: null })); }}
           keyboardType="email-address"
           autoCapitalize="none"
           autoCorrect={false}
         />
+        {errors.email ? <Text style={styles.fieldError}>{errors.email}</Text> : null}
 
         <Text style={styles.label}>Contrasena</Text>
         <TextInput
-          style={styles.input}
+          style={[styles.input, errors.password && styles.inputError]}
           placeholder="••••••••"
           value={password}
-          onChangeText={setPassword}
+          onChangeText={(v) => { setPassword(v); setErrors((e) => ({ ...e, password: null })); }}
           secureTextEntry
         />
+        {errors.password ? <Text style={styles.fieldError}>{errors.password}</Text> : null}
 
         <TouchableOpacity
           style={[styles.button, loading && styles.buttonDisabled]}
@@ -138,8 +145,18 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 13,
     fontSize: 15,
-    marginBottom: 14,
+    marginBottom: 4,
     color: '#333',
+  },
+  inputError: {
+    borderColor: '#c0392b',
+    backgroundColor: '#fff5f5',
+  },
+  fieldError: {
+    fontSize: 12,
+    color: '#c0392b',
+    marginBottom: 10,
+    marginLeft: 2,
   },
   button: {
     backgroundColor: '#1a73e8',

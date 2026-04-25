@@ -4,13 +4,15 @@ namespace App\Http\Controllers;
 
 use App\Models\Notificacion;
 use App\Models\Servicio;
+use App\Traits\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 
 class ServicioController extends Controller
 {
-    // Cliente crea una solicitud de servicio
+    use ApiResponse;
+
     public function store(Request $request): JsonResponse
     {
         $validated = $request->validate([
@@ -28,7 +30,6 @@ class ServicioController extends Controller
         $servicio = Servicio::create($validated);
         $servicio->load(['cliente', 'proveedor', 'categoria']);
 
-        // Notificar al proveedor
         $proveedor = $servicio->proveedor;
         if ($proveedor?->user_id) {
             Notificacion::create([
@@ -40,44 +41,39 @@ class ServicioController extends Controller
             ]);
         }
 
-        return response()->json([
-            'message'  => 'Solicitud enviada exitosamente',
-            'servicio' => $servicio,
-        ], 201);
+        return $this->success('Solicitud enviada exitosamente', ['servicio' => $servicio], 201);
     }
 
-    // Ver detalle de un servicio
     public function show(int $id, Request $request): JsonResponse
     {
         $servicio = Servicio::with(['cliente', 'proveedor.categoria', 'categoria', 'calificaciones', 'pago'])
             ->find($id);
 
         if (!$servicio) {
-            return response()->json(['message' => 'Servicio no encontrado'], 404);
+            return $this->error('Servicio no encontrado', 404);
         }
 
-        $userId = $request->user()->id;
+        $userId          = $request->user()->id;
         $proveedorUserId = $servicio->proveedor?->user_id;
 
         if ($servicio->cliente_id !== $userId && $proveedorUserId !== $userId) {
-            return response()->json(['message' => 'No autorizado'], 403);
+            return $this->error('No tienes permiso para ver este servicio', 403);
         }
 
-        return response()->json(['servicio' => $servicio]);
+        return $this->success('OK', ['servicio' => $servicio]);
     }
 
-    // Proveedor: ver solicitudes entrantes
     public function solicitudesProveedor(Request $request): JsonResponse
     {
         $user      = $request->user();
         $proveedor = $user->proveedor;
 
         if (!$proveedor) {
-            return response()->json(['message' => 'No tienes perfil de proveedor'], 404);
+            return $this->error('No tienes perfil de proveedor', 404);
         }
 
-        $estado   = $request->query('estado');
-        $query    = Servicio::with(['cliente', 'categoria'])
+        $estado = $request->query('estado');
+        $query  = Servicio::with(['cliente', 'categoria'])
             ->where('proveedor_id', $proveedor->id);
 
         if ($estado) {
@@ -86,17 +82,13 @@ class ServicioController extends Controller
 
         $servicios = $query->orderBy('created_at', 'desc')->get();
 
-        return response()->json([
-            'servicios' => $servicios,
-            'total'     => $servicios->count(),
-        ]);
+        return $this->success('OK', ['servicios' => $servicios, 'total' => $servicios->count()]);
     }
 
-    // Cliente: ver sus solicitudes
     public function solicitudesCliente(Request $request): JsonResponse
     {
-        $estado    = $request->query('estado');
-        $query     = Servicio::with(['proveedor.categoria', 'categoria'])
+        $estado = $request->query('estado');
+        $query  = Servicio::with(['proveedor.categoria', 'categoria'])
             ->where('cliente_id', $request->user()->id);
 
         if ($estado) {
@@ -105,17 +97,16 @@ class ServicioController extends Controller
 
         $servicios = $query->orderBy('created_at', 'desc')->get();
 
-        return response()->json(['servicios' => $servicios]);
+        return $this->success('OK', ['servicios' => $servicios]);
     }
 
-    // Proveedor acepta solicitud
     public function aceptar(int $id, Request $request): JsonResponse
     {
         $servicio = $this->getServicioProveedor($id, $request);
         if ($servicio instanceof JsonResponse) return $servicio;
 
         if ($servicio->estado !== 'pendiente') {
-            return response()->json(['message' => 'Solo se pueden aceptar solicitudes pendientes'], 422);
+            return $this->error('Solo se pueden aceptar solicitudes pendientes', 422);
         }
 
         $servicio->update(['estado' => 'aceptado']);
@@ -128,17 +119,16 @@ class ServicioController extends Controller
             'datos'           => ['servicio_id' => $servicio->id],
         ]);
 
-        return response()->json(['message' => 'Solicitud aceptada', 'servicio' => $servicio]);
+        return $this->success('Solicitud aceptada', ['servicio' => $servicio]);
     }
 
-    // Proveedor rechaza solicitud
     public function rechazar(int $id, Request $request): JsonResponse
     {
         $servicio = $this->getServicioProveedor($id, $request);
         if ($servicio instanceof JsonResponse) return $servicio;
 
         if ($servicio->estado !== 'pendiente') {
-            return response()->json(['message' => 'Solo se pueden rechazar solicitudes pendientes'], 422);
+            return $this->error('Solo se pueden rechazar solicitudes pendientes', 422);
         }
 
         $request->validate(['motivo' => 'nullable|string|max:500']);
@@ -156,10 +146,9 @@ class ServicioController extends Controller
             'datos'           => ['servicio_id' => $servicio->id],
         ]);
 
-        return response()->json(['message' => 'Solicitud rechazada', 'servicio' => $servicio]);
+        return $this->success('Solicitud rechazada', ['servicio' => $servicio]);
     }
 
-    // Actualizar estado del servicio
     public function actualizarEstado(int $id, Request $request): JsonResponse
     {
         $servicio = $this->getServicioProveedor($id, $request);
@@ -181,21 +170,21 @@ class ServicioController extends Controller
             ]);
         }
 
-        return response()->json(['message' => 'Estado actualizado', 'servicio' => $servicio]);
+        return $this->success('Estado actualizado', ['servicio' => $servicio]);
     }
 
-    // ── Helpers ──────────────────────────────────────────────────────────────
+    // ── Helper ────────────────────────────────────────────────────────────────
 
     private function getServicioProveedor(int $id, Request $request)
     {
-        $servicio  = Servicio::find($id);
+        $servicio = Servicio::find($id);
         if (!$servicio) {
-            return response()->json(['message' => 'Servicio no encontrado'], 404);
+            return $this->error('Servicio no encontrado', 404);
         }
 
         $proveedor = $request->user()->proveedor;
         if (!$proveedor || $servicio->proveedor_id !== $proveedor->id) {
-            return response()->json(['message' => 'No autorizado'], 403);
+            return $this->error('No tienes permiso para gestionar este servicio', 403);
         }
 
         return $servicio;

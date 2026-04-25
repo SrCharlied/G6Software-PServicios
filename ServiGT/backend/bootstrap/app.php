@@ -1,10 +1,14 @@
 <?php
 
 use Illuminate\Auth\AuthenticationException;
+use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -17,12 +21,53 @@ return Application::configure(basePath: dirname(__DIR__))
         // Sin statefulApi() — usamos Bearer tokens, no cookies
     })
     ->withExceptions(function (Exceptions $exceptions): void {
-        // Devolver JSON cuando falla la autenticacion (en lugar de redirigir a login web)
-        $exceptions->render(function (AuthenticationException $e, Request $request) {
-            if ($request->is('api/*') || $request->expectsJson()) {
+
+        $isApi = fn(Request $r) => $r->is('api/*') || $r->expectsJson();
+
+        $exceptions->render(function (AuthenticationException $e, Request $request) use ($isApi) {
+            if ($isApi($request)) {
                 return response()->json([
+                    'success' => false,
                     'message' => 'No autenticado. Por favor inicia sesion.',
                 ], 401);
             }
         });
+
+        $exceptions->render(function (ValidationException $e, Request $request) use ($isApi) {
+            if ($isApi($request)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Los datos ingresados no son validos.',
+                    'errors'  => $e->errors(),
+                ], 422);
+            }
+        });
+
+        $exceptions->render(function (AuthorizationException $e, Request $request) use ($isApi) {
+            if ($isApi($request)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No tienes permiso para realizar esta accion.',
+                ], 403);
+            }
+        });
+
+        $exceptions->render(function (ModelNotFoundException $e, Request $request) use ($isApi) {
+            if ($isApi($request)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'El recurso solicitado no fue encontrado.',
+                ], 404);
+            }
+        });
+
+        $exceptions->render(function (NotFoundHttpException $e, Request $request) use ($isApi) {
+            if ($isApi($request)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Ruta no encontrada.',
+                ], 404);
+            }
+        });
+
     })->create();

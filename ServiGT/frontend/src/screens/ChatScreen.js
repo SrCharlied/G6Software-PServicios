@@ -149,7 +149,7 @@ export default function ChatScreen({
       {/* Messages */}
       {loading ? (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#1a73e8" />
+          <ActivityIndicator size="large" color="#4589d4" />
         </View>
       ) : (
         <FlatList
@@ -200,12 +200,12 @@ export default function ChatScreen({
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f5f5f5' },
+  container: { flex: 1, backgroundColor: '#f0eee9' },
 
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#1a73e8',
+    backgroundColor: '#0e1424',
     paddingTop: 20,
     paddingBottom: 14,
     paddingHorizontal: 16,
@@ -226,7 +226,7 @@ const styles = StyleSheet.create({
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   backHomeBtn: {
     marginTop: 16,
-    backgroundColor: '#1a73e8',
+    backgroundColor: '#4589d4',
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 20,
@@ -240,7 +240,7 @@ const styles = StyleSheet.create({
   bubbleLeft: { alignSelf: 'flex-start' },
   bubbleRight: { alignSelf: 'flex-end' },
   bubble: { borderRadius: 16, paddingHorizontal: 14, paddingVertical: 9 },
-  bubbleMio: { backgroundColor: '#1a73e8', borderBottomRightRadius: 4 },
+  bubbleMio: { backgroundColor: '#4589d4', borderBottomRightRadius: 4 },
   bubbleOtro: { backgroundColor: '#fff', borderBottomLeftRadius: 4, elevation: 1 },
   bubbleText: { fontSize: 15, lineHeight: 20 },
   bubbleTextMio: { color: '#fff' },
@@ -252,7 +252,7 @@ const styles = StyleSheet.create({
   inputRow: {
     flexDirection: 'row',
     alignItems: 'flex-end',
-    backgroundColor: '#fff',
+    backgroundColor: '#f6f4ee',
     padding: 10,
     borderTopWidth: 1,
     borderTopColor: '#e0e0e0',
@@ -271,7 +271,7 @@ const styles = StyleSheet.create({
     maxHeight: 100,
   },
   sendBtn: {
-    backgroundColor: '#1a73e8',
+    backgroundColor: '#4589d4',
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 20,

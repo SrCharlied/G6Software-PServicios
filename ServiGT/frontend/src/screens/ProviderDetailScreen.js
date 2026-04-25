@@ -55,7 +55,7 @@ export default function ProviderDetailScreen({
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#1a73e8" />
+        <ActivityIndicator size="large" color="#4589d4" />
       </View>
     );
   }
@@ -92,7 +92,7 @@ export default function ProviderDetailScreen({
   if (loading || !proveedor) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#1a73e8" />
+        <ActivityIndicator size="large" color="#4589d4" />
         <Text style={styles.loadingText}>Cargando perfil...</Text>
       </View>
     );
@@ -266,13 +266,13 @@ export default function ProviderDetailScreen({
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f5f5f5' },
+  container: { flex: 1, backgroundColor: '#f0eee9' },
   content: { padding: 16, paddingBottom: 40 },
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   loadingText: { marginTop: 12, fontSize: 16, color: '#666' },
   backFallbackBtn: {
     marginTop: 14,
-    backgroundColor: '#1a73e8',
+    backgroundColor: '#4589d4',
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 8,
@@ -280,10 +280,10 @@ const styles = StyleSheet.create({
   backFallbackBtnText: { color: '#fff', fontWeight: '700', fontSize: 14 },
 
   backRow: { marginBottom: 12 },
-  backText: { color: '#1a73e8', fontSize: 15, fontWeight: '600' },
+  backText: { color: '#4589d4', fontSize: 15, fontWeight: '600' },
 
   profileCard: {
-    backgroundColor: '#fff',
+    backgroundColor: '#f6f4ee',
     borderRadius: 14,
     padding: 20,
     alignItems: 'center',
@@ -298,13 +298,13 @@ const styles = StyleSheet.create({
     width: 72,
     height: 72,
     borderRadius: 36,
-    backgroundColor: '#1a73e8',
+    backgroundColor: '#4589d4',
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 12,
   },
   avatarInitial: { fontSize: 30, fontWeight: 'bold', color: '#fff' },
-  provName: { fontSize: 22, fontWeight: '800', color: '#1a1a2e', marginBottom: 8 },
+  provName: { fontSize: 22, fontWeight: '800', color: '#0e1424', marginBottom: 8 },
   badge: {
     backgroundColor: '#e3f2fd',
     paddingHorizontal: 12,
@@ -312,14 +312,14 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     marginBottom: 4,
   },
-  badgeText: { fontSize: 13, color: '#1a73e8', fontWeight: '600' },
+  badgeText: { fontSize: 13, color: '#4589d4', fontWeight: '600' },
   ratingRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8, marginBottom: 4 },
   ratingText: { fontSize: 13, color: '#555' },
   location: { fontSize: 14, color: '#666', marginTop: 4 },
-  phone: { fontSize: 14, color: '#1a73e8', fontWeight: '600', marginTop: 4 },
+  phone: { fontSize: 14, color: '#4589d4', fontWeight: '600', marginTop: 4 },
 
   card: {
-    backgroundColor: '#fff',
+    backgroundColor: '#f6f4ee',
     borderRadius: 12,
     padding: 16,
     marginBottom: 14,
@@ -354,7 +354,7 @@ const styles = StyleSheet.create({
   dispNoDisp: { fontSize: 11, color: '#9ca3af', marginTop: 2 },
 
   actionsCard: {
-    backgroundColor: '#fff',
+    backgroundColor: '#f6f4ee',
     borderRadius: 12,
     padding: 16,
     marginBottom: 14,
@@ -366,7 +366,7 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   loginPrompt: { fontSize: 14, color: '#666', textAlign: 'center', marginBottom: 8, lineHeight: 20 },
-  primaryBtn: { backgroundColor: '#1a73e8', padding: 14, borderRadius: 8, alignItems: 'center' },
+  primaryBtn: { backgroundColor: '#4589d4', padding: 14, borderRadius: 8, alignItems: 'center' },
   primaryBtnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
   secondaryBtn: {
     backgroundColor: '#f0f0f0', padding: 14, borderRadius: 8, alignItems: 'center',

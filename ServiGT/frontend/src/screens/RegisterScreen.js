@@ -12,6 +12,8 @@ import {
 import { register, createProvider, getCategorias, uploadDocumento } from '../services/api';
 import { useToast } from '../context/ToastContext';
 import { validateEmail, validatePhone, validatePassword, validateRequired } from '../utils/validation';
+import ServiGTLogo from '../components/ServiGTLogo';
+import { T } from '../theme';
 
 const DEPARTAMENTOS = [
   'Alta Verapaz', 'Baja Verapaz', 'Chimaltenango', 'Chiquimula', 'El Progreso',
@@ -83,7 +85,7 @@ const dd = StyleSheet.create({
   option: { paddingHorizontal: 14, paddingVertical: 11, borderBottomWidth: 1, borderBottomColor: '#f5f5f5' },
   optionActive: { backgroundColor: '#e3f2fd' },
   optionText: { fontSize: 14, color: '#555' },
-  optionTextActive: { color: '#1a73e8', fontWeight: '600' },
+  optionTextActive: { color: '#4589d4', fontWeight: '600' },
 });
 
 // ── Pantalla principal ────────────────────────────────────────────────────
@@ -358,7 +360,7 @@ export default function RegisterScreen({ navigation, onRegisterSuccess }) {
       />
 
       {loadingCats
-        ? <ActivityIndicator color="#1a73e8" style={{ marginVertical: 12 }} />
+        ? <ActivityIndicator color="#4589d4" style={{ marginVertical: 12 }} />
         : (
           <>
             <Dropdown
@@ -420,7 +422,7 @@ export default function RegisterScreen({ navigation, onRegisterSuccess }) {
             disabled={uploading}
           >
             {uploading
-              ? <ActivityIndicator color="#1a73e8" />
+              ? <ActivityIndicator color="#4589d4" />
               : <Text style={styles.btnSecondaryText}>+ Subir documento</Text>}
           </TouchableOpacity>
         </>
@@ -460,7 +462,7 @@ export default function RegisterScreen({ navigation, onRegisterSuccess }) {
   // ── Render principal ──────────────────────────────────────────────────
   return (
     <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
-      <Text style={styles.appTitle}>PServicios</Text>
+      <View style={styles.logoWrap}><ServiGTLogo size={24} mode="dark" /></View>
       <Text style={styles.appSubtitle}>Crear cuenta</Text>
 
       {/* Indicador de pasos solo para proveedor (o si ya paso del paso 1) */}
@@ -479,17 +481,12 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     padding: 20,
     paddingTop: 36,
-    backgroundColor: '#f0f4f8',
+    backgroundColor: T.canvas,
   },
-  appTitle: {
-    fontSize: 30,
-    fontWeight: 'bold',
-    color: '#1a73e8',
-    textAlign: 'center',
-  },
+  logoWrap: { alignItems: 'center', marginBottom: 4 },
   appSubtitle: {
     fontSize: 16,
-    color: '#666',
+    color: T.muted,
     textAlign: 'center',
     marginTop: 4,
     marginBottom: 20,
@@ -518,7 +515,7 @@ const styles = StyleSheet.create({
     zIndex: 1,
   },
   stepCircleActive: {
-    backgroundColor: '#1a73e8',
+    backgroundColor: '#4589d4',
   },
   stepCircleCurrent: {
     borderWidth: 3,
@@ -528,7 +525,7 @@ const styles = StyleSheet.create({
   stepNumActive: { color: '#fff' },
   stepCheck: { fontSize: 14, color: '#fff', fontWeight: '700' },
   stepLabel: { fontSize: 11, color: '#999', marginTop: 5, textAlign: 'center' },
-  stepLabelActive: { color: '#1a73e8', fontWeight: '600' },
+  stepLabelActive: { color: '#4589d4', fontWeight: '600' },
   stepLine: {
     position: 'absolute',
     top: 17,
@@ -538,14 +535,14 @@ const styles = StyleSheet.create({
   },
   stepLine1: { left: '26%' },
   stepLine2: { right: '26%' },
-  stepLineActive: { backgroundColor: '#1a73e8' },
+  stepLineActive: { backgroundColor: '#4589d4' },
 
   // Card
   card: {
-    backgroundColor: '#fff',
+    backgroundColor: T.paper,
     borderRadius: 14,
     padding: 20,
-    shadowColor: '#000',
+    shadowColor: T.ink,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.07,
     shadowRadius: 6,
@@ -615,8 +612,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   roleBtnActive: {
-    backgroundColor: '#1a73e8',
-    borderColor: '#1a73e8',
+    backgroundColor: '#4589d4',
+    borderColor: '#4589d4',
   },
   roleText: { fontSize: 14, fontWeight: '700', color: '#555' },
   roleTextActive: { color: '#fff' },
@@ -625,7 +622,7 @@ const styles = StyleSheet.create({
 
   // Botones
   btnPrimary: {
-    backgroundColor: '#1a73e8',
+    backgroundColor: '#4589d4',
     paddingVertical: 15,
     borderRadius: 10,
     alignItems: 'center',
@@ -636,17 +633,17 @@ const styles = StyleSheet.create({
   btnPrimaryText: { color: '#fff', fontSize: 16, fontWeight: '700' },
   btnSecondary: {
     borderWidth: 1.5,
-    borderColor: '#1a73e8',
+    borderColor: '#4589d4',
     paddingVertical: 13,
     borderRadius: 10,
     alignItems: 'center',
     marginTop: 6,
     marginBottom: 12,
   },
-  btnSecondaryText: { color: '#1a73e8', fontSize: 15, fontWeight: '600' },
+  btnSecondaryText: { color: '#4589d4', fontSize: 15, fontWeight: '600' },
 
   linkText: {
-    color: '#1a73e8',
+    color: '#4589d4',
     textAlign: 'center',
     fontSize: 14,
     paddingVertical: 4,

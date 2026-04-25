@@ -11,6 +11,8 @@ import {
 import { login, getProviderByUser } from '../services/api';
 import { useToast } from '../context/ToastContext';
 import { validateEmail } from '../utils/validation';
+import ServiGTLogo from '../components/ServiGTLogo';
+import { T } from '../theme';
 
 export default function LoginScreen({ navigation, onLogin }) {
   const toast = useToast();
@@ -52,8 +54,8 @@ export default function LoginScreen({ navigation, onLogin }) {
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.title}>PServicios</Text>
-      <Text style={styles.subtitle}>Iniciar sesion</Text>
+      <View style={styles.logoWrap}><ServiGTLogo size={28} mode="dark" /></View>
+      <Text style={styles.subtitle}>Iniciar sesión</Text>
 
       <View style={styles.form}>
         <Text style={styles.label}>Correo electronico</Text>
@@ -105,82 +107,81 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     justifyContent: 'center',
     padding: 24,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: T.canvas,
   },
-  title: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: '#1a73e8',
-    textAlign: 'center',
+  logoWrap: {
+    alignItems: 'center',
+    marginBottom: 8,
   },
   subtitle: {
-    fontSize: 18,
-    color: '#666',
+    fontSize: 17,
+    color: T.muted,
     textAlign: 'center',
     marginTop: 4,
     marginBottom: 32,
+    letterSpacing: 0.1,
   },
   form: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
+    backgroundColor: T.paper,
+    borderRadius: 14,
     padding: 20,
     marginBottom: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 4,
+    shadowColor: T.ink,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.07,
+    shadowRadius: 6,
     elevation: 2,
   },
   label: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#444',
+    color: T.ink,
     marginBottom: 6,
     marginTop: 4,
   },
   input: {
-    backgroundColor: '#f7f9fc',
+    backgroundColor: T.white,
     borderWidth: 1,
-    borderColor: '#d9e2ef',
+    borderColor: T.inputBorder,
     borderRadius: 8,
     padding: 13,
     fontSize: 15,
     marginBottom: 4,
-    color: '#333',
+    color: T.text,
   },
   inputError: {
-    borderColor: '#c0392b',
+    borderColor: T.danger,
     backgroundColor: '#fff5f5',
   },
   fieldError: {
     fontSize: 12,
-    color: '#c0392b',
+    color: T.danger,
     marginBottom: 10,
     marginLeft: 2,
   },
   button: {
-    backgroundColor: '#1a73e8',
+    backgroundColor: T.blue,
     padding: 15,
     borderRadius: 8,
     alignItems: 'center',
     marginTop: 4,
   },
   buttonDisabled: {
-    backgroundColor: '#91b8f3',
+    backgroundColor: T.soft,
   },
   buttonText: {
-    color: '#fff',
+    color: T.paper,
     fontSize: 16,
     fontWeight: '600',
   },
   link: {
-    color: '#1a73e8',
+    color: T.blue,
     textAlign: 'center',
     marginBottom: 10,
     fontSize: 14,
   },
   linkSecondary: {
-    color: '#999',
+    color: T.faint,
     textAlign: 'center',
     fontSize: 14,
   },

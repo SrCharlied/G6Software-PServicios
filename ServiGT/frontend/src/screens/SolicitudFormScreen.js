@@ -152,12 +152,12 @@ export default function SolicitudFormScreen({
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f5f5f5' },
+  container: { flex: 1, backgroundColor: '#f0eee9' },
   content: { padding: 16, paddingBottom: 40 },
   emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
   emptyText: { fontSize: 15, color: '#667085', textAlign: 'center', marginBottom: 16 },
   backHomeBtn: {
-    backgroundColor: '#1a73e8',
+    backgroundColor: '#4589d4',
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 8,
@@ -165,10 +165,10 @@ const styles = StyleSheet.create({
   backHomeBtnText: { color: '#fff', fontWeight: '700', fontSize: 14 },
 
   backRow: { marginBottom: 14 },
-  backText: { color: '#1a73e8', fontSize: 15, fontWeight: '600' },
+  backText: { color: '#4589d4', fontSize: 15, fontWeight: '600' },
 
   card: {
-    backgroundColor: '#fff',
+    backgroundColor: '#f6f4ee',
     borderRadius: 12,
     padding: 20,
     shadowColor: '#000',
@@ -179,7 +179,7 @@ const styles = StyleSheet.create({
   },
   cardTitle: { fontSize: 20, fontWeight: '800', color: '#333', marginBottom: 6 },
   cardSubtitle: { fontSize: 14, color: '#666', marginBottom: 20 },
-  provName: { fontWeight: '700', color: '#1a73e8' },
+  provName: { fontWeight: '700', color: '#4589d4' },
 
   label: {
     fontSize: 13, fontWeight: '600', color: '#444',
@@ -208,7 +208,7 @@ const styles = StyleSheet.create({
   textArea: { height: 120, textAlignVertical: 'top' },
 
   submitBtn: {
-    backgroundColor: '#1a73e8',
+    backgroundColor: '#4589d4',
     padding: 16,
     borderRadius: 8,
     alignItems: 'center',

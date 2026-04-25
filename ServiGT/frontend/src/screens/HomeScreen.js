@@ -13,8 +13,10 @@ import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useSession } from '../context/SessionContext';
 import Drawer from '../components/Drawer';
+import ServiGTLogo from '../components/ServiGTLogo';
 import { getProviders } from '../services/api';
 import { mockProviders } from '../data/mockProviders';
+import { T } from '../theme';
 
 const normalizeText = (value) =>
   (value || '').toString().normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
@@ -29,7 +31,7 @@ function TopBar({ onMenuPress }) {
           <View style={styles.hamburgerLine} />
         </View>
       </TouchableOpacity>
-      <Text style={styles.topBarTitle}>PServicios</Text>
+      <ServiGTLogo size={18} mode="dark" />
       <View style={styles.menuBtnPlaceholder} />
     </View>
   );
@@ -141,7 +143,7 @@ export default function HomeScreen() {
 
   const ListEmpty = loading ? (
     <View style={styles.center}>
-      <ActivityIndicator size="large" color="#1a73e8" />
+      <ActivityIndicator size="large" color="#4589d4" />
       <Text style={styles.loadingText}>Cargando proveedores...</Text>
     </View>
   ) : (
@@ -186,10 +188,10 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f4f6f9' },
+  container: { flex: 1, backgroundColor: T.canvas },
   topBar: {
     height: 56,
-    backgroundColor: '#fff',
+    backgroundColor: T.paper,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -206,7 +208,7 @@ const styles = StyleSheet.create({
   menuBtnPlaceholder: { width: 32 },
   hamburger: { gap: 5, paddingVertical: 2 },
   hamburgerLine: { width: 22, height: 2, backgroundColor: '#333', borderRadius: 2 },
-  topBarTitle: { fontSize: 18, fontWeight: '700', color: '#1a73e8', letterSpacing: 0.3 },
+  topBarTitle: { fontSize: 18, fontWeight: '700', color: '#4589d4', letterSpacing: 0.3 },
   listContent: { paddingBottom: 32 },
   listHeader: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 4 },
   noticeBox: {
@@ -215,7 +217,7 @@ const styles = StyleSheet.create({
   },
   noticeText: { color: '#8a5a00', fontSize: 13, lineHeight: 18 },
   searchBar: {
-    flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff',
+    flexDirection: 'row', alignItems: 'center', backgroundColor: T.white,
     borderWidth: 1, borderColor: '#dde3ea', borderRadius: 12,
     paddingHorizontal: 12, paddingVertical: 10, marginBottom: 14, gap: 8,
     shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
@@ -226,29 +228,29 @@ const styles = StyleSheet.create({
   searchClear: { fontSize: 16, color: '#aaa', fontWeight: '600' },
   sectionRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
   sectionTitle: { fontSize: 15, fontWeight: '700', color: '#444' },
-  refreshBtn: { fontSize: 20, color: '#1a73e8', fontWeight: '700' },
+  refreshBtn: { fontSize: 20, color: '#4589d4', fontWeight: '700' },
   provCard: {
-    backgroundColor: '#fff', borderRadius: 14,
+    backgroundColor: T.paper, borderRadius: 14,
     marginHorizontal: 16, marginBottom: 12, padding: 16,
     shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.07, shadowRadius: 4, elevation: 2,
   },
   provHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: 6 },
-  provName: { fontSize: 16, fontWeight: '700', color: '#1a1a2e', flex: 1 },
+  provName: { fontSize: 16, fontWeight: '700', color: T.ink, flex: 1 },
   provBadge: { backgroundColor: '#eef4ff', paddingHorizontal: 9, paddingVertical: 3, borderRadius: 10, maxWidth: 120 },
-  provBadgeText: { fontSize: 11, color: '#1a73e8', fontWeight: '600' },
+  provBadgeText: { fontSize: 11, color: '#4589d4', fontWeight: '600' },
   provDesc: { fontSize: 13, color: '#667085', lineHeight: 19, marginBottom: 8 },
   provMeta: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8 },
   provLocation: { fontSize: 12, color: '#9aa3af', flex: 1 },
-  provPhone: { fontSize: 12, color: '#1a73e8', fontWeight: '600' },
+  provPhone: { fontSize: 12, color: '#4589d4', fontWeight: '600' },
   tarifaRow: { flexDirection: 'row', gap: 8, marginTop: 8 },
   tarifa: { fontSize: 12, color: '#27ae60', fontWeight: '600', backgroundColor: '#f0faf4', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 },
   cardCta: { marginTop: 12, paddingTop: 10, borderTopWidth: 1, borderTopColor: '#f0f4f8' },
-  cardCtaText: { fontSize: 13, color: '#1a73e8', fontWeight: '700' },
+  cardCtaText: { fontSize: 13, color: '#4589d4', fontWeight: '700' },
   center: { padding: 48, alignItems: 'center' },
   loadingText: { marginTop: 14, fontSize: 15, color: '#667085' },
   emptyText: { fontSize: 15, color: '#667085', textAlign: 'center', marginBottom: 20 },
-  retryBtn: { backgroundColor: '#1a73e8', paddingHorizontal: 24, paddingVertical: 11, borderRadius: 8 },
+  retryBtn: { backgroundColor: '#4589d4', paddingHorizontal: 24, paddingVertical: 11, borderRadius: 8 },
   retryText: { color: '#fff', fontSize: 15, fontWeight: '600' },
   footerText: { textAlign: 'center', fontSize: 11, color: '#bcc5d0', paddingVertical: 20 },
 });

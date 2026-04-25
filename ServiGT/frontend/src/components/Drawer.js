@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSession } from '../context/SessionContext';
+import ServiGTLogo from './ServiGTLogo';
 
 const DRAWER_WIDTH = Math.min(Dimensions.get('window').width * 0.78, 300);
 
@@ -67,7 +68,7 @@ export default function Drawer({ isOpen, onClose }) {
               </Text>
             </>
           ) : (
-            <Text style={styles.guestLabel}>PServicios</Text>
+            <ServiGTLogo size={20} mode="light" />
           )}
         </View>
 
@@ -97,7 +98,7 @@ export default function Drawer({ isOpen, onClose }) {
           <NavItem icon="←" label="Cerrar sesion" danger onPress={handleLogout} />
         )}
 
-        <Text style={styles.version}>PServicios · Grupo 6</Text>
+        <Text style={styles.version}>ServiGT · Guatemala</Text>
       </Animated.View>
     </View>
   );
@@ -110,7 +111,7 @@ const styles = StyleSheet.create({
   panel: {
     width: DRAWER_WIDTH,
     height: '100%',
-    backgroundColor: '#fff',
+    backgroundColor: '#f6f4ee',
     shadowColor: '#000',
     shadowOffset: { width: 4, height: 0 },
     shadowOpacity: 0.18,
@@ -118,7 +119,7 @@ const styles = StyleSheet.create({
     elevation: 16,
   },
   drawerHead: {
-    backgroundColor: '#1a73e8',
+    backgroundColor: '#0e1424',
     paddingTop: 52,
     paddingBottom: 24,
     paddingHorizontal: 20,
@@ -136,7 +137,7 @@ const styles = StyleSheet.create({
   navSection:  { paddingVertical: 4 },
   navItem:     { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 20, gap: 16 },
   navIcon:     { fontSize: 18, color: '#555', width: 22, textAlign: 'center' },
-  navLabel:    { fontSize: 15, color: '#333', fontWeight: '500' },
+  navLabel:    { fontSize: 15, color: '#0e1424', fontWeight: '500' },
   navIconDanger:  { color: '#c0392b' },
   navLabelDanger: { color: '#c0392b' },
   version: {

@@ -171,7 +171,7 @@ export default function HomeScreen() {
         ListHeaderComponent={ListHeader}
         ListEmptyComponent={ListEmpty}
         ListFooterComponent={
-          <Text style={styles.footerText}>PServicios Guatemala · Grupo 6 · Ingenieria de Software</Text>
+          <Text style={styles.footerText}>PServicios Guatemala</Text>
         }
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}

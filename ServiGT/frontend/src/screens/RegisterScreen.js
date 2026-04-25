@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { Fragment, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Platform,
@@ -237,7 +237,7 @@ export default function RegisterScreen({ navigation, onRegisterSuccess }) {
         const active  = step >= n;
         const current = step === n;
         return (
-          <React.Fragment key={n}>
+          <Fragment key={n}>
             {i > 0 && (
               <View style={[styles.stepConnector, step >= n && styles.stepConnectorActive]} />
             )}
@@ -253,7 +253,7 @@ export default function RegisterScreen({ navigation, onRegisterSuccess }) {
               </View>
               <Text style={[styles.stepLabel, active && styles.stepLabelActive]}>{label}</Text>
             </View>
-          </React.Fragment>
+          </Fragment>
         );
       })}
     </View>

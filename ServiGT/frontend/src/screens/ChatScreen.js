@@ -157,10 +157,16 @@ export default function ChatScreen({
           <Text style={[styles.bubbleText, esMio ? styles.bubbleTextMio : styles.bubbleTextOtro]}>
             {item.contenido}
           </Text>
-          <Text style={[styles.bubbleTime, esMio ? styles.bubbleTimeMio : styles.bubbleTimeOtro]}>
-            {formatTime(item.created_at)}
-            {esMio && (item.leido ? ' ✓✓' : ' ✓')}
-          </Text>
+          <View style={styles.timeRow}>
+            <Text style={[styles.bubbleTime, esMio ? styles.bubbleTimeMio : styles.bubbleTimeOtro]}>
+              {formatTime(item.created_at)}
+            </Text>
+            {esMio && (
+              <Text style={[styles.checkMarks, item.leido ? styles.checkRead : styles.checkUnread]}>
+                {item.leido ? ' ✓✓' : ' ✓'}
+              </Text>
+            )}
+          </View>
         </View>
       </View>
     );
@@ -215,18 +221,20 @@ export default function ChatScreen({
 
       {/* Input */}
       <View style={styles.inputRow}>
-        <TextInput
-          style={styles.textInput}
-          placeholder="Escribe un mensaje..."
-          placeholderTextColor="#999"
-          value={texto}
-          onChangeText={setTexto}
-          multiline
-          maxLength={2000}
-          onSubmitEditing={handleSend}
-          returnKeyType="send"
-          blurOnSubmit
-        />
+        <View style={styles.inputContainer}>
+          <TextInput
+            style={styles.textInput}
+            placeholder="Mensaje"
+            placeholderTextColor="#999"
+            value={texto}
+            onChangeText={setTexto}
+            multiline
+            maxLength={2000}
+            onSubmitEditing={handleSend}
+            returnKeyType="send"
+            blurOnSubmit={false}
+          />
+        </View>
         <TouchableOpacity
           style={[styles.sendBtn, (!texto.trim() || sending) && styles.sendBtnDisabled]}
           onPress={handleSend}
@@ -235,7 +243,7 @@ export default function ChatScreen({
           {sending ? (
             <ActivityIndicator color="#fff" size="small" />
           ) : (
-            <Text style={styles.sendBtnText}>Enviar</Text>
+            <Text style={styles.sendBtnIcon}>➤</Text>
           )}
         </TouchableOpacity>
       </View>
@@ -244,85 +252,99 @@ export default function ChatScreen({
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f0eee9' },
+  container: { flex: 1, backgroundColor: '#ece5dd' }, // WhatsApp background color
 
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#0e1424',
+    backgroundColor: '#075E54', // WhatsApp dark green
     paddingTop: 20,
-    paddingBottom: 14,
-    paddingHorizontal: 16,
-    gap: 12,
+    paddingBottom: 12,
+    paddingHorizontal: 8,
+    gap: 8,
+    elevation: 3,
   },
-  backBtn: { padding: 4 },
+  backBtn: { padding: 8 },
   backText: { color: '#fff', fontSize: 22, fontWeight: 'bold' },
   headerInfo: { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 },
   avatarSmall: {
     width: 40, height: 40, borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.25)',
+    backgroundColor: '#dfe5e7',
     justifyContent: 'center', alignItems: 'center',
   },
-  avatarSmallText: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
-  headerName: { color: '#fff', fontWeight: '700', fontSize: 16 },
-  headerStatus: { color: 'rgba(255,255,255,0.75)', fontSize: 12 },
+  avatarSmallText: { color: '#075E54', fontWeight: 'bold', fontSize: 18 },
+  headerName: { color: '#fff', fontWeight: '600', fontSize: 17 },
+  headerStatus: { color: 'rgba(255,255,255,0.8)', fontSize: 13 },
 
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   backHomeBtn: {
     marginTop: 16,
-    backgroundColor: '#4589d4',
+    backgroundColor: '#075E54',
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 20,
   },
   backHomeBtnText: { color: '#fff', fontWeight: '700', fontSize: 14 },
-  listContent: { padding: 16, paddingBottom: 8 },
-  emptyContainer: { paddingTop: 60, alignItems: 'center' },
-  emptyText: { color: '#999', fontSize: 14, textAlign: 'center' },
+  listContent: { padding: 12, paddingBottom: 16 },
+  emptyContainer: { paddingTop: 60, alignItems: 'center', paddingHorizontal: 40 },
+  emptyText: { color: '#555', fontSize: 15, textAlign: 'center', backgroundColor: '#fff', padding: 12, borderRadius: 8, elevation: 1 },
 
-  bubbleContainer: { marginBottom: 8, maxWidth: '80%' },
+  bubbleContainer: { marginBottom: 12, maxWidth: '85%' },
   bubbleLeft: { alignSelf: 'flex-start' },
   bubbleRight: { alignSelf: 'flex-end' },
-  bubble: { borderRadius: 16, paddingHorizontal: 14, paddingVertical: 9 },
-  bubbleMio: { backgroundColor: '#4589d4', borderBottomRightRadius: 4 },
-  bubbleOtro: { backgroundColor: '#fff', borderBottomLeftRadius: 4, elevation: 1 },
+  bubble: { 
+    borderRadius: 12, 
+    paddingHorizontal: 12, 
+    paddingVertical: 8, 
+    elevation: 1,
+    shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 1, shadowOffset: { width: 0, height: 1 } 
+  },
+  bubbleMio: { backgroundColor: '#dcf8c6', borderTopRightRadius: 0 },
+  bubbleOtro: { backgroundColor: '#fff', borderTopLeftRadius: 0 },
   bubbleText: { fontSize: 15, lineHeight: 20 },
-  bubbleTextMio: { color: '#fff' },
-  bubbleTextOtro: { color: '#333' },
-  bubbleTime: { fontSize: 11, marginTop: 4, textAlign: 'right' },
-  bubbleTimeMio: { color: 'rgba(255,255,255,0.7)' },
-  bubbleTimeOtro: { color: '#999' },
+  bubbleTextMio: { color: '#111' },
+  bubbleTextOtro: { color: '#111' },
+  timeRow: { flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', marginTop: 4, gap: 4 },
+  bubbleTime: { fontSize: 11 },
+  bubbleTimeMio: { color: 'rgba(0,0,0,0.45)' },
+  bubbleTimeOtro: { color: 'rgba(0,0,0,0.45)' },
+  checkMarks: { fontSize: 12 },
+  checkRead: { color: '#34B7F1' }, // WhatsApp Blue ticks
+  checkUnread: { color: 'rgba(0,0,0,0.3)' },
 
   inputRow: {
     flexDirection: 'row',
     alignItems: 'flex-end',
-    backgroundColor: '#f6f4ee',
-    padding: 10,
-    borderTopWidth: 1,
-    borderTopColor: '#e0e0e0',
+    backgroundColor: 'transparent',
+    paddingHorizontal: 8,
+    paddingVertical: 8,
     gap: 8,
   },
-  textInput: {
+  inputContainer: {
     flex: 1,
-    backgroundColor: '#f7f9fc',
-    borderWidth: 1,
-    borderColor: '#d9e2ef',
-    borderRadius: 20,
-    paddingHorizontal: 14,
-    paddingVertical: 9,
-    fontSize: 15,
-    color: '#333',
-    maxHeight: 100,
+    backgroundColor: '#fff',
+    borderRadius: 24,
+    minHeight: 48,
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+    elevation: 1,
+  },
+  textInput: {
+    fontSize: 16,
+    color: '#000',
+    maxHeight: 120,
+    paddingTop: 12,
+    paddingBottom: 12,
   },
   sendBtn: {
-    backgroundColor: '#4589d4',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 20,
+    backgroundColor: '#128C7E',
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     justifyContent: 'center',
     alignItems: 'center',
-    minWidth: 72,
+    elevation: 1,
   },
-  sendBtnDisabled: { backgroundColor: '#b0c4de' },
-  sendBtnText: { color: '#fff', fontWeight: '700', fontSize: 14 },
+  sendBtnDisabled: { backgroundColor: '#a5d6d1' },
+  sendBtnIcon: { color: '#fff', fontSize: 20, paddingLeft: 2 },
 });

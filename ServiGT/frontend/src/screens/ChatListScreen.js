@@ -54,6 +54,7 @@ export default function ChatListScreen({ navigation, user }) {
       <TouchableOpacity
         style={styles.chatCard}
         onPress={() => navigation.navigate('ChatDetail', { userId: otraPersona.id, name: otraPersona.name })}
+        activeOpacity={0.7}
       >
         <View style={styles.avatar}>
           <Text style={styles.avatarText}>
@@ -70,13 +71,18 @@ export default function ChatListScreen({ navigation, user }) {
             </Text>
           </View>
           <View style={styles.chatFooter}>
+            {esMio && (
+              <Text style={[styles.checkMarks, item.leido ? styles.checkRead : styles.checkUnread]}>
+                {item.leido ? '✓✓ ' : '✓ '}
+              </Text>
+            )}
             <Text
               style={[styles.chatSnippet, noLeido && styles.textBold, noLeido && styles.textUnread]}
               numberOfLines={1}
             >
-              {esMio ? 'Tú: ' : ''}{item.contenido}
+              {item.contenido}
             </Text>
-            {noLeido && <View style={styles.unreadDot} />}
+            {noLeido && <View style={styles.unreadBadge}><Text style={styles.unreadBadgeText}>1</Text></View>}
           </View>
         </View>
       </TouchableOpacity>
@@ -86,8 +92,8 @@ export default function ChatListScreen({ navigation, user }) {
   if (loading && conversaciones.length === 0) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator size="large" color="#1a73e8" />
-        <Text style={styles.loadingText}>Cargando mensajes...</Text>
+        <ActivityIndicator size="large" color="#075E54" />
+        <Text style={styles.loadingText}>Cargando chats...</Text>
       </View>
     );
   }
@@ -96,9 +102,9 @@ export default function ChatListScreen({ navigation, user }) {
     <View style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity style={styles.backBtn} onPress={() => navigation.navigate('Home')}>
-          <Text style={styles.backBtnText}>← Volver</Text>
+          <Text style={styles.backBtnText}>←</Text>
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Mensajes</Text>
+        <Text style={styles.headerTitle}>Chats</Text>
         <TouchableOpacity style={styles.refreshBtn} onPress={fetchConversaciones}>
           <Text style={styles.refreshBtnText}>↻</Text>
         </TouchableOpacity>
@@ -126,58 +132,58 @@ export default function ChatListScreen({ navigation, user }) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f4f6f9' },
+  container: { flex: 1, backgroundColor: '#fff' },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: '#fff',
+    backgroundColor: '#075E54', // WhatsApp dark green
     paddingTop: 16,
     paddingBottom: 16,
-    paddingHorizontal: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e8ecf1',
-    elevation: 2,
+    paddingHorizontal: 8,
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
   },
-  backBtn: { padding: 4 },
-  backBtnText: { color: '#1a73e8', fontSize: 16, fontWeight: '600' },
-  headerTitle: { fontSize: 18, fontWeight: 'bold', color: '#0e1424' },
-  refreshBtn: { padding: 4 },
-  refreshBtnText: { color: '#1a73e8', fontSize: 20, fontWeight: 'bold' },
+  backBtn: { padding: 8 },
+  backBtnText: { color: '#fff', fontSize: 24, fontWeight: 'bold' },
+  headerTitle: { fontSize: 20, fontWeight: '600', color: '#fff', flex: 1, marginLeft: 8 },
+  refreshBtn: { padding: 8 },
+  refreshBtnText: { color: '#fff', fontSize: 22, fontWeight: 'bold' },
 
-  listContent: { padding: 12 },
+  listContent: { padding: 0 },
   chatCard: {
     flexDirection: 'row',
     backgroundColor: '#fff',
-    borderRadius: 12,
     padding: 14,
-    marginBottom: 10,
-    elevation: 1,
-    shadowColor: '#000',
-    shadowOpacity: 0.05,
-    shadowRadius: 3,
     alignItems: 'center',
   },
   avatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#e8ecf1',
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: '#dfe5e7',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
+    marginRight: 14,
   },
-  avatarText: { fontSize: 20, fontWeight: 'bold', color: '#1a73e8' },
-  chatInfo: { flex: 1 },
+  avatarText: { fontSize: 22, fontWeight: 'bold', color: '#075E54' },
+  chatInfo: { flex: 1, borderBottomWidth: 1, borderBottomColor: '#f2f2f2', paddingBottom: 14, marginTop: 4 },
   chatHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 },
-  chatName: { fontSize: 16, color: '#1a1a2e', fontWeight: '600' },
-  chatTime: { fontSize: 12, color: '#9aa3af' },
-  chatFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  chatSnippet: { fontSize: 14, color: '#667085', flex: 1, marginRight: 8 },
+  chatName: { fontSize: 16, color: '#000', fontWeight: '500' },
+  chatTime: { fontSize: 12, color: '#888' },
+  chatFooter: { flexDirection: 'row', alignItems: 'center' },
+  chatSnippet: { fontSize: 15, color: '#667085', flex: 1, marginRight: 8 },
   textBold: { fontWeight: '700' },
-  textUnread: { color: '#1a1a2e' },
-  timeUnread: { color: '#1a73e8', fontWeight: '600' },
-  unreadDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#1a73e8' },
+  textUnread: { color: '#000' },
+  timeUnread: { color: '#25D366', fontWeight: '600' }, // WhatsApp light green
+  
+  checkMarks: { fontSize: 14 },
+  checkRead: { color: '#34B7F1' }, // WhatsApp Blue ticks
+  checkUnread: { color: '#999' },
+  
+  unreadBadge: { width: 20, height: 20, borderRadius: 10, backgroundColor: '#25D366', justifyContent: 'center', alignItems: 'center' },
+  unreadBadgeText: { color: '#fff', fontSize: 10, fontWeight: 'bold' },
 
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   loadingText: { marginTop: 12, color: '#667085' },

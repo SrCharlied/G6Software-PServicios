@@ -36,25 +36,33 @@ class MessageController extends Controller
     public function conversacion(int $otroUsuarioId, Request $request): JsonResponse
     {
         $userId = $request->user()->id;
+        $lastId = $request->query('last_id');
 
-        $mensajes = Mensaje::with([
+        $query = Mensaje::with([
                 'emisor:id,name,role,foto_perfil',
                 'receptor:id,name,role,foto_perfil',
             ])
             ->where(function ($q) use ($userId, $otroUsuarioId) {
-                $q->where('emisor_id', $userId)->where('receptor_id', $otroUsuarioId);
-            })
-            ->orWhere(function ($q) use ($userId, $otroUsuarioId) {
-                $q->where('emisor_id', $otroUsuarioId)->where('receptor_id', $userId);
-            })
-            ->orderBy('created_at', 'asc')
-            ->get();
+                $q->where(function ($q2) use ($userId, $otroUsuarioId) {
+                    $q2->where('emisor_id', $userId)->where('receptor_id', $otroUsuarioId);
+                })->orWhere(function ($q2) use ($userId, $otroUsuarioId) {
+                    $q2->where('emisor_id', $otroUsuarioId)->where('receptor_id', $userId);
+                });
+            });
+
+        if ($lastId) {
+            $query->where('id', '>', $lastId);
+        }
+
+        $mensajes = $query->orderBy('created_at', 'asc')->get();
 
         // Marcar como leidos los mensajes recibidos
-        Mensaje::where('emisor_id', $otroUsuarioId)
-            ->where('receptor_id', $userId)
-            ->where('leido', false)
-            ->update(['leido' => true]);
+        if ($mensajes->isNotEmpty()) {
+            Mensaje::where('emisor_id', $otroUsuarioId)
+                ->where('receptor_id', $userId)
+                ->where('leido', false)
+                ->update(['leido' => true]);
+        }
 
         return response()->json(['mensajes' => $mensajes]);
     }

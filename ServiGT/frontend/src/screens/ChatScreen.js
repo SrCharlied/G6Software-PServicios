@@ -10,6 +10,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getConversacion, sendMensaje } from '../services/api';
 import { useToast } from '../context/ToastContext';
 
@@ -26,6 +27,13 @@ export default function ChatScreen({
   const [sending, setSending] = useState(false);
   const flatListRef = useRef(null);
   const pollRef = useRef(null);
+  const mensajesRef = useRef([]);
+
+  useEffect(() => {
+    mensajesRef.current = mensajes;
+  }, [mensajes]);
+
+  const getStorageKey = () => `chat_${user?.id}_${chatWithUserId}`;
 
   useEffect(() => {
     if (!chatWithUserId) return undefined;
@@ -47,12 +55,34 @@ export default function ChatScreen({
   }
 
   const loadMensajes = async () => {
-    setLoading(true);
+    let locales = [];
     try {
-      const data = await getConversacion(chatWithUserId);
-      setMensajes(data.mensajes || []);
+      const localData = await AsyncStorage.getItem(getStorageKey());
+      if (localData) {
+        locales = JSON.parse(localData);
+        setMensajes(locales);
+        setLoading(false); // Mostramos los locales instantaneamente
+      }
+    } catch (e) { console.log('Error AsyncStorage', e); }
+
+    if (locales.length === 0) setLoading(true);
+
+    try {
+      let lastId = null;
+      if (locales.length > 0) {
+        const validIds = locales.filter(m => !String(m.id).startsWith('temp-')).map(m => m.id);
+        if (validIds.length > 0) lastId = Math.max(...validIds);
+      }
+
+      const data = await getConversacion(chatWithUserId, lastId);
+      if (data.mensajes && data.mensajes.length > 0) {
+        const filtrados = locales.filter(m => !String(m.id).startsWith('temp-'));
+        const finales = [...filtrados, ...data.mensajes];
+        setMensajes(finales);
+        AsyncStorage.setItem(getStorageKey(), JSON.stringify(finales));
+      }
     } catch (error) {
-      toast(error.message, 'error');
+      if (locales.length === 0) toast(error.message, 'error');
     } finally {
       setLoading(false);
     }
@@ -60,8 +90,19 @@ export default function ChatScreen({
 
   const loadMensajesSilencioso = async () => {
     try {
-      const data = await getConversacion(chatWithUserId);
-      setMensajes(data.mensajes || []);
+      const actuales = mensajesRef.current;
+      let lastId = null;
+      if (actuales.length > 0) {
+        const validIds = actuales.filter(m => !String(m.id).startsWith('temp-')).map(m => m.id);
+        if (validIds.length > 0) lastId = Math.max(...validIds);
+      }
+      const data = await getConversacion(chatWithUserId, lastId);
+      if (data.mensajes && data.mensajes.length > 0) {
+        const filtrados = actuales.filter(m => !String(m.id).startsWith('temp-'));
+        const nuevos = [...filtrados, ...data.mensajes];
+        setMensajes(nuevos);
+        AsyncStorage.setItem(getStorageKey(), JSON.stringify(nuevos));
+      }
     } catch { /* ignorar */ }
   };
 
@@ -86,9 +127,11 @@ export default function ChatScreen({
     setSending(true);
     try {
       const data = await sendMensaje(chatWithUserId, contenido);
-      setMensajes((prev) =>
-        prev.map((m) => (m.id === tempMsg.id ? data.mensaje : m))
-      );
+      setMensajes((prev) => {
+        const nuevos = prev.map((m) => (m.id === tempMsg.id ? data.mensaje : m));
+        AsyncStorage.setItem(getStorageKey(), JSON.stringify(nuevos));
+        return nuevos;
+      });
     } catch (error) {
       // Revertir mensaje temporal en caso de error
       setMensajes((prev) => prev.filter((m) => m.id !== tempMsg.id));

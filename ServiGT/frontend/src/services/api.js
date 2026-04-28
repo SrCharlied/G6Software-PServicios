@@ -369,9 +369,10 @@ export const sendMensaje = async (receptorId, contenido, servicioId = null) => {
   }
 };
 
-export const getConversacion = async (otroUsuarioId) => {
+export const getConversacion = async (otroUsuarioId, lastId = null) => {
   try {
-    const response = await api.get(`/mensajes/conversacion/${otroUsuarioId}`);
+    const params = lastId ? { last_id: lastId } : {};
+    const response = await api.get(`/mensajes/conversacion/${otroUsuarioId}`, { params });
     return response.data;
   } catch (error) {
     throw new Error(getErrorMessage(error, 'No se pudo cargar la conversacion.'));

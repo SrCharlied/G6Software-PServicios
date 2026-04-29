@@ -149,6 +149,16 @@ export default function ChatScreen({
     } catch { return ''; }
   };
 
+  const getCheckMark = (item) => {
+    if (String(item.id).startsWith('temp-')) {
+      return <Text style={[styles.checkMarks, styles.checkPending]}> 🕒</Text>;
+    }
+    if (item.leido) {
+      return <Text style={[styles.checkMarks, styles.checkRead]}> ✓✓</Text>;
+    }
+    return <Text style={[styles.checkMarks, styles.checkUnread]}> ✓</Text>;
+  };
+
   const renderMensaje = ({ item }) => {
     const esMio = item.emisor_id === user.id;
     return (
@@ -161,11 +171,7 @@ export default function ChatScreen({
             <Text style={[styles.bubbleTime, esMio ? styles.bubbleTimeMio : styles.bubbleTimeOtro]}>
               {formatTime(item.created_at)}
             </Text>
-            {esMio && (
-              <Text style={[styles.checkMarks, item.leido ? styles.checkRead : styles.checkUnread]}>
-                {item.leido ? ' ✓✓' : ' ✓'}
-              </Text>
-            )}
+            {esMio && getCheckMark(item)}
           </View>
         </View>
       </View>
@@ -311,6 +317,7 @@ const styles = StyleSheet.create({
   checkMarks: { fontSize: 12 },
   checkRead: { color: '#34B7F1' }, // WhatsApp Blue ticks
   checkUnread: { color: 'rgba(0,0,0,0.3)' },
+  checkPending: { color: 'rgba(0,0,0,0.3)', fontSize: 10 },
 
   inputRow: {
     flexDirection: 'row',

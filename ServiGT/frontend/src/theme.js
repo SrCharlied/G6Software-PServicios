@@ -27,4 +27,36 @@ export const T = {
   border:  'rgba(14,20,36,0.09)',
   inputBg: '#f9f8f5',
   inputBorder: '#d9e2ef',
+
+  // ── Espaciado ────────────────────────────────────────────
+  s1: 4, s2: 8, s3: 12, s4: 16, s5: 20, s6: 24,
+
+  // ── Radii ────────────────────────────────────────────────
+  rSm: 8, rMd: 12, rLg: 16,
+
+  // ── Sombras en formato RN ────────────────────────────────
+  sh1: {
+    shadowColor: '#0f1a2e',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  sh2: {
+    shadowColor: '#0f1a2e',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.06,
+    shadowRadius: 14,
+    elevation: 3,
+  },
+  sh3: {
+    shadowColor: '#0f1a2e',
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.10,
+    shadowRadius: 32,
+    elevation: 6,
+  },
 };
+
+export default T;
+

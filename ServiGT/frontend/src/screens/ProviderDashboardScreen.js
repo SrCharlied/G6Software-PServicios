@@ -22,6 +22,7 @@ import {
   uploadDocumento,
 } from '../services/api';
 import { useToast } from '../context/ToastContext';
+import { T } from '../theme';
 
 const TIPOS_DOCUMENTO = [
   'DPI (Documento Personal de Identificacion)',
@@ -820,38 +821,78 @@ export default function ProviderDashboardScreen({
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f0eee9' },
-  content: { padding: 16, paddingBottom: 40 },
+  container: {
+    flex: 1,
+    backgroundColor: T.white,
+  },
+  content: {
+    padding: T.s4,
+    paddingBottom: 40,
+  },
+
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   loadingText: { marginTop: 12, fontSize: 16, color: '#666' },
+  
   header: {
-    backgroundColor: '#0e1424',
-    borderRadius: 16,
+    backgroundColor: T.white,
+    borderRadius: T.rLg,
     padding: 18,
-    marginBottom: 16,
+    paddingLeft: 22,
+    marginBottom: T.s4,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-end',
     flexWrap: 'wrap',
     gap: 10,
+    borderWidth: 1,
+    borderColor: T.soft,
+    borderLeftWidth: 4,
+    borderLeftColor: T.blue,
+    ...T.sh1,
   },
-  headerTitle: { fontSize: 24, fontWeight: '800', color: '#fff' },
-  headerSubtitle: { fontSize: 14, color: 'rgba(255,255,255,0.82)', marginTop: 4 },
-  headerActions: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
+  headerTitle: {
+    fontSize: 24,
+    fontWeight: '800',
+    color: T.ink,                     
+    letterSpacing: -0.4,
+  },
+  headerSubtitle: {
+    fontSize: 14,
+    color: T.muted,
+    marginTop: 4,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    gap: 8,
+    flexWrap: 'wrap',
+  },
+
   headerGhostBtn: {
-    backgroundColor: 'rgba(255,255,255,0.2)',
+    backgroundColor: T.white,
+    borderWidth: 1,
+    borderColor: T.soft,
     paddingHorizontal: 12,
     paddingVertical: 7,
-    borderRadius: 8,
+    borderRadius: T.rSm,
   },
-  headerGhostBtnText: { color: '#fff', fontWeight: '600', fontSize: 13 },
+  headerGhostBtnText: {
+    color: T.deep,
+    fontWeight: '600',
+    fontSize: 13,
+  },
+
   logoutBtn: {
-    backgroundColor: '#fff',
+    backgroundColor: T.blue,
     paddingHorizontal: 12,
     paddingVertical: 7,
-    borderRadius: 8,
+    borderRadius: T.rSm,
   },
-  logoutBtnText: { color: '#0e1424', fontWeight: '700', fontSize: 13 },
+  logoutBtnText: {
+    color: T.white,
+    fontWeight: '700',
+    fontSize: 13,
+  },
+
   emptyCard: {
     backgroundColor: '#fff',
     borderRadius: 12,
@@ -860,21 +901,35 @@ const styles = StyleSheet.create({
   },
   emptyCardTitle: { fontSize: 18, fontWeight: '700', color: '#333', marginBottom: 8 },
   emptyCardText: { fontSize: 14, color: '#666', textAlign: 'center', marginBottom: 18, lineHeight: 20 },
-  summaryRow: { flexDirection: 'row', gap: 12, marginBottom: 16 },
+  
+  summaryRow: {
+    flexDirection: 'row',
+    gap: T.s3,
+    marginBottom: T.s4,
+  },
   summaryCard: {
     flex: 1,
-    backgroundColor: '#f6f4ee',
-    borderRadius: 12,
+    backgroundColor: T.paper,
+    borderRadius: T.rMd,
     padding: 14,
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 3,
-    elevation: 2,
+    borderWidth: 1,
+    borderColor: T.border,
+    ...T.sh1,
   },
-  summaryNumber: { fontSize: 24, fontWeight: '800', color: '#4589d4' },
-  summaryLabel: { marginTop: 4, fontSize: 12, color: '#666' },
+  summaryNumber: {
+    fontSize: 26,
+    fontWeight: '800',
+    color: T.blue,
+    letterSpacing: -0.6,
+  },
+  summaryLabel: {
+    marginTop: 6,
+    fontSize: 12,
+    color: T.muted,
+    fontWeight: '600',
+  },
+  
   card: {
     backgroundColor: '#f6f4ee',
     borderRadius: 12,

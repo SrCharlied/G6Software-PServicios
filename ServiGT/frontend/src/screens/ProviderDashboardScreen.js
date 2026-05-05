@@ -823,7 +823,7 @@ export default function ProviderDashboardScreen({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: T.white,
+    backgroundColor: T.canvas,
   },
   content: {
     padding: T.s4,
@@ -832,7 +832,7 @@ const styles = StyleSheet.create({
 
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   loadingText: { marginTop: 12, fontSize: 16, color: '#666' },
-  
+
   header: {
     backgroundColor: T.white,
     borderRadius: T.rLg,
@@ -853,7 +853,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 24,
     fontWeight: '800',
-    color: T.ink,                     
+    color: T.ink,
     letterSpacing: -0.4,
   },
   headerSubtitle: {
@@ -901,7 +901,7 @@ const styles = StyleSheet.create({
   },
   emptyCardTitle: { fontSize: 18, fontWeight: '700', color: '#333', marginBottom: 8 },
   emptyCardText: { fontSize: 14, color: '#666', textAlign: 'center', marginBottom: 18, lineHeight: 20 },
-  
+
   summaryRow: {
     flexDirection: 'row',
     gap: T.s3,
@@ -929,17 +929,15 @@ const styles = StyleSheet.create({
     color: T.muted,
     fontWeight: '600',
   },
-  
+
   card: {
-    backgroundColor: '#f6f4ee',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 3,
-    elevation: 2,
+    backgroundColor: T.paper,
+    borderRadius: T.rMd,
+    padding: T.s4,
+    marginBottom: T.s4,
+    borderWidth: 1,
+    borderColor: T.border,
+    ...T.sh1,
   },
   cardHeader: {
     flexDirection: 'row',
@@ -948,9 +946,24 @@ const styles = StyleSheet.create({
     gap: 12,
     marginBottom: 10,
   },
-  cardTitle: { fontSize: 17, fontWeight: '700', color: '#333' },
-  cardSubtitle: { fontSize: 13, color: '#666', marginBottom: 12, lineHeight: 18 },
-  linkText: { color: '#4589d4', fontWeight: '700', fontSize: 13 },
+  cardTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: T.ink,
+    letterSpacing: -0.2,
+  },
+  cardSubtitle: {
+    fontSize: 13,
+    color: T.muted,
+    marginBottom: 12,
+    lineHeight: 18,
+  },
+  linkText: {
+    color: T.blue,
+    fontWeight: '700',
+    fontSize: 13,
+  },
+
   profileName: { fontSize: 18, fontWeight: '700', color: '#222', marginBottom: 8 },
   profileDescription: { fontSize: 14, color: '#555', lineHeight: 20 },
   profileMetaWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 12 },
@@ -1020,18 +1033,24 @@ const styles = StyleSheet.create({
   documentType: { fontSize: 12, fontWeight: '700', color: '#555', marginBottom: 2 },
   documentName: { fontSize: 13, color: '#777' },
   emptyInlineText: { fontSize: 14, color: '#999', textAlign: 'center', paddingVertical: 8 },
-  tabsRow: { gap: 10, paddingBottom: 12 },
+
+  tabsRow: { gap: 8, paddingBottom: 12 },
   tabBtn: {
-    backgroundColor: '#fff',
+    backgroundColor: T.white,
     borderWidth: 1,
-    borderColor: '#d8e0ee',
+    borderColor: T.inputBorder,
     paddingHorizontal: 14,
     paddingVertical: 9,
     borderRadius: 999,
   },
-  tabBtnActive: { backgroundColor: '#4589d4', borderColor: '#4589d4' },
-  tabBtnText: { color: '#567', fontWeight: '600', fontSize: 13 },
-  tabBtnTextActive: { color: '#fff' },
+  tabBtnActive: {
+    backgroundColor: T.blue,
+    borderColor: T.blue,
+    ...T.sh2,
+  },
+  tabBtnText: { color: T.muted, fontWeight: '600', fontSize: 13 },
+  tabBtnTextActive: { color: T.white },
+
   sectionStack: { gap: 12 },
   sectionHeaderRow: {
     flexDirection: 'row',
@@ -1045,22 +1064,23 @@ const styles = StyleSheet.create({
   sectionLoader: { marginVertical: 12 },
   emptyState: {
     borderWidth: 1,
-    borderColor: '#e6ebf2',
+    borderColor: T.inputBorder,
     borderStyle: 'dashed',
     borderRadius: 10,
-    padding: 16,
+    padding: 18,
     alignItems: 'center',
-    backgroundColor: '#fafcff',
+    backgroundColor: T.paper,
   },
-  emptyStateText: { fontSize: 14, color: '#667085', textAlign: 'center' },
+  emptyStateText: { fontSize: 14, color: T.muted, textAlign: 'center', lineHeight: 20 },
+
   serviceCard: {
     borderWidth: 1,
     borderColor: '#edf2f7',
-    borderRadius: 12,
+    borderRadius: T.rMd,
     padding: 14,
-    backgroundColor: '#fbfdff',
+    backgroundColor: T.paper,
   },
-  serviceCardCompact: { backgroundColor: '#fff' },
+  serviceCardCompact: { backgroundColor: T.white },
   serviceTopRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -1069,13 +1089,19 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   serviceTopInfo: { flex: 1 },
-  serviceClient: { fontSize: 15, fontWeight: '700', color: '#2a2a2a' },
-  serviceCategory: { fontSize: 12, color: '#6b7280', marginTop: 3 },
+  serviceClient: { fontSize: 15, fontWeight: '700', color: T.ink },
+  serviceCategory: { fontSize: 12, color: T.muted, marginTop: 3 },
   statusBadge: { borderRadius: 999, paddingHorizontal: 10, paddingVertical: 5 },
   statusBadgeText: { fontSize: 12, fontWeight: '700', textTransform: 'capitalize' },
-  serviceDescription: { fontSize: 14, color: '#4b5563', lineHeight: 20, marginBottom: 10 },
+  serviceDescription: {
+    fontSize: 14,
+    color: T.text,
+    lineHeight: 20,
+    marginBottom: 10,
+  },
   serviceMetaGrid: { gap: 4 },
-  serviceMeta: { fontSize: 12, color: '#667085' },
+  serviceMeta: { fontSize: 12, color: T.muted },
+
   reasonBox: {
     marginTop: 10,
     padding: 10,
@@ -1084,49 +1110,63 @@ const styles = StyleSheet.create({
   },
   reasonLabel: { fontSize: 11, fontWeight: '700', color: '#842029', marginBottom: 4 },
   reasonText: { fontSize: 13, color: '#842029' },
+
   actionRow: { flexDirection: 'row', gap: 10, marginTop: 12, flexWrap: 'wrap' },
   acceptBtn: {
-    backgroundColor: '#16a34a',
+    backgroundColor: T.success,
     paddingHorizontal: 14,
     paddingVertical: 10,
-    borderRadius: 8,
+    borderRadius: T.rSm,
   },
-  acceptBtnText: { color: '#fff', fontWeight: '700', fontSize: 13 },
+  acceptBtnText: { color: T.white, fontWeight: '700', fontSize: 13 },
   rejectBtn: {
     backgroundColor: '#fff1f2',
     paddingHorizontal: 14,
     paddingVertical: 10,
-    borderRadius: 8,
+    borderRadius: T.rSm,
   },
-  rejectBtnText: { color: '#be123c', fontWeight: '700', fontSize: 13 },
+  rejectBtnText: { color: T.danger, fontWeight: '700', fontSize: 13 },
   advanceBtn: {
-    backgroundColor: '#4589d4',
+    backgroundColor: T.blue,
     paddingHorizontal: 14,
     paddingVertical: 10,
-    borderRadius: 8,
+    borderRadius: T.rSm,
   },
-  advanceBtnText: { color: '#fff', fontWeight: '700', fontSize: 13 },
+  advanceBtnText: { color: T.white, fontWeight: '700', fontSize: 13 },
   disabledBlock: { opacity: 0.65 },
+
   ratingSummary: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 14,
-    padding: 14,
-    borderRadius: 12,
-    backgroundColor: '#f8fbff',
+    padding: 16,
+    borderRadius: T.rMd,
+    backgroundColor: T.paper,
+    borderWidth: 1,
+    borderColor: T.soft,
+    borderLeftWidth: 4,
+    borderLeftColor: T.blue,
   },
-  ratingAverage: { fontSize: 34, fontWeight: '800', color: '#4589d4' },
-  ratingSummaryText: { fontSize: 13, color: '#667085', marginTop: 4 },
+  ratingAverage: {
+    fontSize: 38,
+    fontWeight: '800',
+    color: T.blue,
+    letterSpacing: -1.2,
+  },
+  ratingSummaryText: { fontSize: 13, color: T.muted, marginTop: 4 },
   starsRow: { flexDirection: 'row', gap: 2 },
   star: { fontSize: 16, fontWeight: '700' },
-  starOn: { color: '#f59e0b' },
+  starOn: { color: T.amber },
   starOff: { color: '#cbd5e1' },
+
   reviewCard: {
     borderWidth: 1,
     borderColor: '#edf2f7',
-    borderRadius: 12,
+    borderRadius: T.rMd,
     padding: 14,
+    backgroundColor: T.white,
   },
+
   reviewHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -1140,21 +1180,23 @@ const styles = StyleSheet.create({
   scheduleRow: {
     borderWidth: 1,
     borderColor: '#edf2f7',
-    borderRadius: 12,
+    borderRadius: T.rMd,
     padding: 12,
-    gap: 12,
+    gap: 10,
+    backgroundColor: T.white,
   },
   dayToggle: {
     borderWidth: 1,
-    borderColor: '#d8e0ee',
-    borderRadius: 8,
+    borderColor: T.inputBorder,
+    borderRadius: T.rSm,
     paddingVertical: 10,
     paddingHorizontal: 12,
-    backgroundColor: '#fff',
+    backgroundColor: T.white,
   },
   dayToggleActive: { backgroundColor: '#ecfdf3', borderColor: '#86efac' },
-  dayToggleText: { fontSize: 14, fontWeight: '600', color: '#4b5563' },
-  dayToggleTextActive: { color: '#166534' },
+  dayToggleText: { fontSize: 14, fontWeight: '600', color: T.text },
+  dayToggleTextActive: { color: T.success },
+
   timeInputsRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   timeInput: {
     flex: 1,
@@ -1170,20 +1212,21 @@ const styles = StyleSheet.create({
   timeInputDisabled: { backgroundColor: '#f3f4f6', color: '#98a2b3' },
   timeDivider: { color: '#667085', fontSize: 13, fontWeight: '600' },
   primaryBtn: {
-    backgroundColor: '#4589d4',
+    backgroundColor: T.blue,
     padding: 14,
-    borderRadius: 8,
+    borderRadius: T.rSm,
     alignItems: 'center',
   },
-  primaryBtnDisabled: { opacity: 0.65 },
-  primaryBtnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
+  primaryBtnText: { color: T.white, fontWeight: '700', fontSize: 15 },
   secondaryHomeBtn: {
-    backgroundColor: '#eef2f7',
+    backgroundColor: T.canvas,
     padding: 14,
-    borderRadius: 8,
+    borderRadius: T.rSm,
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: T.border,
   },
-  secondaryHomeBtnText: { color: '#475467', fontWeight: '700', fontSize: 14 },
+  secondaryHomeBtnText: { color: T.deep, fontWeight: '700', fontSize: 14 },
 
   // Chat tab
   chatClientRow: {

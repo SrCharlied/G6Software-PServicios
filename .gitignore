@@ -4,3 +4,9 @@ ServiGT/frontend/node_modules/
 ServiGT/backend/vendor/
 .env
 *.log
+# Editor / IDE
+.claude/
+.vscode/
+.idea/
+*.swp
+.DS_Store

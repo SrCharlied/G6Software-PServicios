@@ -16,6 +16,8 @@ const tabs = [
   { key: 'recibidas', label: 'Recibidas' },
 ];
 
+const ESTADOS_CON_CODIGO = new Set(['pendiente', 'aceptado']);
+
 export default function SolicitudesScreen({ navigation, user }) {
   const toast = useToast();
   const [activeTab, setActiveTab] = useState('enviadas');
@@ -71,6 +73,10 @@ export default function SolicitudesScreen({ navigation, user }) {
       ? item.proveedor?.nombre || 'Proveedor'
       : item.cliente?.name || 'Cliente';
 
+    const mostrarCodigo = activeTab === 'enviadas'
+      && item.codigo_inicio
+      && ESTADOS_CON_CODIGO.has(item.estado);
+
     return (
       <View style={styles.card}>
         <View style={styles.cardHeader}>
@@ -84,6 +90,16 @@ export default function SolicitudesScreen({ navigation, user }) {
           </Text>
           <Text style={styles.metaText}>{formatDate(item.created_at)}</Text>
         </View>
+
+        {mostrarCodigo ? (
+          <View style={styles.codigoBox}>
+            <Text style={styles.codigoLabel}>Codigo de inicio</Text>
+            <Text style={styles.codigoValue}>{item.codigo_inicio}</Text>
+            <Text style={styles.codigoHint}>
+              Compartelo con el proveedor cuando llegue para iniciar el servicio.
+            </Text>
+          </View>
+        ) : null}
       </View>
     );
   };
@@ -215,6 +231,16 @@ const styles = StyleSheet.create({
   descripcion: { marginTop: 10, fontSize: 14, lineHeight: 20, color: '#526071' },
   metaRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 12, marginTop: 12 },
   metaText: { fontSize: 12, color: '#8c96a3', fontWeight: '600' },
+  codigoBox: {
+    marginTop: 14,
+    backgroundColor: '#e3f0ff',
+    borderRadius: 10,
+    padding: 14,
+    alignItems: 'center',
+  },
+  codigoLabel: { fontSize: 12, color: '#1858a6', fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.6 },
+  codigoValue: { fontSize: 30, fontWeight: '800', color: '#0e1424', letterSpacing: 6, marginTop: 4 },
+  codigoHint:  { fontSize: 11, color: '#1858a6', marginTop: 6, textAlign: 'center' },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
   loadingText: { marginTop: 12, color: '#667085' },
   emptyState: { alignItems: 'center', paddingVertical: 64, paddingHorizontal: 24 },

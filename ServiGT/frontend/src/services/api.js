@@ -316,6 +316,15 @@ export const aceptarServicio = async (id) => {
   }
 };
 
+export const iniciarServicio = async (id, codigo) => {
+  try {
+    const response = await api.post(`/servicios/${id}/iniciar`, { codigo });
+    return response.data;
+  } catch (error) {
+    throw new Error(getErrorMessage(error, 'No se pudo iniciar el servicio.'));
+  }
+};
+
 export const rechazarServicio = async (id, motivo = '') => {
   try {
     const response = await api.post(`/servicios/${id}/rechazar`, { motivo });

@@ -7,7 +7,6 @@ use App\Models\Servicio;
 use App\Traits\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Str;
 
 class ServicioController extends Controller
 {
@@ -24,8 +23,9 @@ class ServicioController extends Controller
             'monto_acordado' => 'nullable|numeric|min:0',
         ]);
 
-        $validated['cliente_id'] = $request->user()->id;
-        $validated['estado']     = 'pendiente';
+        $validated['cliente_id']    = $request->user()->id;
+        $validated['estado']        = 'pendiente';
+        $validated['codigo_inicio'] = str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
 
         $servicio = Servicio::create($validated);
         $servicio->load(['cliente', 'proveedor', 'categoria']);
@@ -155,7 +155,7 @@ class ServicioController extends Controller
         if ($servicio instanceof JsonResponse) return $servicio;
 
         $request->validate([
-            'estado' => 'required|in:en_camino,en_progreso,completado,cancelado',
+            'estado' => 'required|in:en_camino,completado,cancelado',
         ]);
 
         $servicio->update(['estado' => $request->estado]);
@@ -171,6 +171,36 @@ class ServicioController extends Controller
         }
 
         return $this->success('Estado actualizado', ['servicio' => $servicio]);
+    }
+
+    public function iniciar(int $id, Request $request): JsonResponse
+    {
+        $request->validate([
+            'codigo' => 'required|string|size:6',
+        ]);
+
+        $servicio = $this->getServicioProveedor($id, $request);
+        if ($servicio instanceof JsonResponse) return $servicio;
+
+        if ($servicio->estado !== 'aceptado') {
+            return $this->error('Solo se puede iniciar un servicio aceptado', 422);
+        }
+
+        if (!hash_equals((string) $servicio->codigo_inicio, (string) $request->codigo)) {
+            return $this->error('Codigo de inicio invalido', 422);
+        }
+
+        $servicio->update(['estado' => 'en_progreso']);
+
+        Notificacion::create([
+            'destinatario_id' => $servicio->cliente_id,
+            'tipo'            => 'servicio_iniciado',
+            'titulo'          => 'Servicio iniciado',
+            'mensaje'         => 'El proveedor inicio el servicio.',
+            'datos'           => ['servicio_id' => $servicio->id],
+        ]);
+
+        return $this->success('Servicio iniciado', ['servicio' => $servicio]);
     }
 
     // ── Helper ────────────────────────────────────────────────────────────────

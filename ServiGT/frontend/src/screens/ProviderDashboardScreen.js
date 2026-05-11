@@ -7,6 +7,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -19,6 +20,7 @@ import {
   getMiDisponibilidad,
   getProviderByUser,
   getSolicitudesProveedor,
+  iniciarServicio,
   rechazarServicio,
   saveDisponibilidad,
   uploadDocumento,
@@ -217,10 +219,11 @@ function TimePickerModal({ visible, value, onSelect, onClose }) {
   );
 }
 
-function ServicioCard({ servicio, onAccept, onReject, onAdvanceStatus, compact = false }) {
-  const canAccept = servicio.estado === 'pendiente';
-  const nextActions = { aceptado: 'en_camino', en_camino: 'en_progreso', en_progreso: 'completado' };
-  const nextStatus = nextActions[servicio.estado];
+function ServicioCard({ servicio, onAccept, onReject, onAdvanceStatus, onIniciar, compact = false }) {
+  const estado    = servicio.estado;
+  const canAccept = estado === 'pendiente';
+  const canStart  = estado === 'aceptado';
+  const canFinish = estado === 'en_camino' || estado === 'en_progreso';
 
   return (
     <View style={[styles.serviceCard, compact && styles.serviceCardCompact]}>
@@ -229,7 +232,7 @@ function ServicioCard({ servicio, onAccept, onReject, onAdvanceStatus, compact =
           <Text style={styles.serviceClient}>{servicio.cliente?.name || 'Cliente'}</Text>
           <Text style={styles.serviceCategory}>{servicio.categoria?.nombre || 'Servicio sin categoria'}</Text>
         </View>
-        <StatusBadge estado={servicio.estado} />
+        <StatusBadge estado={estado} />
       </View>
 
       <Text style={styles.serviceDescription}>{servicio.descripcion}</Text>
@@ -256,10 +259,16 @@ function ServicioCard({ servicio, onAccept, onReject, onAdvanceStatus, compact =
             <Text style={styles.rejectBtnText}>Rechazar</Text>
           </TouchableOpacity>
         </View>
-      ) : nextStatus ? (
+      ) : canStart ? (
         <View style={styles.actionRow}>
-          <TouchableOpacity style={styles.advanceBtn} onPress={() => onAdvanceStatus(servicio.id, nextStatus)}>
-            <Text style={styles.advanceBtnText}>Marcar como {nextStatus.replace(/_/g, ' ')}</Text>
+          <TouchableOpacity style={styles.advanceBtn} onPress={() => onIniciar(servicio)}>
+            <Text style={styles.advanceBtnText}>Iniciar servicio</Text>
+          </TouchableOpacity>
+        </View>
+      ) : canFinish ? (
+        <View style={styles.actionRow}>
+          <TouchableOpacity style={styles.advanceBtn} onPress={() => onAdvanceStatus(servicio.id, 'completado')}>
+            <Text style={styles.advanceBtnText}>Finalizar</Text>
           </TouchableOpacity>
         </View>
       ) : null}
@@ -288,6 +297,10 @@ export default function ProviderDashboardScreen({
   const [tipoDocumento, setTipoDocumento] = useState(TIPOS_DOCUMENTO[0]);
   const [showTipoSelector, setShowTipoSelector] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(null); // { day, which, value } | null
+  const [iniciarTarget, setIniciarTarget] = useState(null); // servicio | null
+  const [codigoInput, setCodigoInput] = useState('');
+  const [codigoError, setCodigoError] = useState('');
+  const [iniciando, setIniciando] = useState(false);
   const [, setTick] = useState(0); // refresca el header cada minuto
   const fileInputRef = useRef(null);
 
@@ -386,6 +399,40 @@ export default function ProviderDashboardScreen({
     try { await rechazarServicio(id); toast('Solicitud rechazada.', 'info'); await refreshSolicitudes(); }
     catch (error) { toast(error.message, 'error'); }
     finally { setMutatingServiceId(null); }
+  };
+
+  const openIniciar = (servicio) => {
+    setIniciarTarget(servicio);
+    setCodigoInput('');
+    setCodigoError('');
+  };
+
+  const closeIniciar = () => {
+    if (iniciando) return;
+    setIniciarTarget(null);
+    setCodigoInput('');
+    setCodigoError('');
+  };
+
+  const submitIniciar = async () => {
+    if (!iniciarTarget) return;
+    if (!/^\d{6}$/.test(codigoInput)) {
+      setCodigoError('El codigo debe tener 6 digitos.');
+      return;
+    }
+    setIniciando(true);
+    setCodigoError('');
+    try {
+      await iniciarServicio(iniciarTarget.id, codigoInput);
+      toast('Servicio iniciado.', 'success');
+      setIniciarTarget(null);
+      setCodigoInput('');
+      await refreshSolicitudes();
+    } catch (error) {
+      setCodigoError(error.message);
+    } finally {
+      setIniciando(false);
+    }
   };
 
   const handleAdvanceStatus = async (id, estado) => {
@@ -507,7 +554,7 @@ export default function ProviderDashboardScreen({
         ) : (
           pendientes.map((s) => (
             <View key={s.id} style={mutatingServiceId === s.id && styles.disabledBlock}>
-              <ServicioCard servicio={s} onAccept={handleAccept} onReject={handleReject} onAdvanceStatus={handleAdvanceStatus} />
+              <ServicioCard servicio={s} onAccept={handleAccept} onReject={handleReject} onAdvanceStatus={handleAdvanceStatus} onIniciar={openIniciar} />
             </View>
           ))
         )}
@@ -517,7 +564,7 @@ export default function ProviderDashboardScreen({
         ) : (
           activas.map((s) => (
             <View key={s.id} style={mutatingServiceId === s.id && styles.disabledBlock}>
-              <ServicioCard servicio={s} onAccept={handleAccept} onReject={handleReject} onAdvanceStatus={handleAdvanceStatus} />
+              <ServicioCard servicio={s} onAccept={handleAccept} onReject={handleReject} onAdvanceStatus={handleAdvanceStatus} onIniciar={openIniciar} />
             </View>
           ))
         )}
@@ -537,7 +584,7 @@ export default function ProviderDashboardScreen({
         <View style={styles.emptyState}><Text style={styles.emptyStateText}>Aun no hay servicios finalizados o rechazados.</Text></View>
       ) : (
         historial.map((s) => (
-          <ServicioCard key={s.id} servicio={s} onAccept={handleAccept} onReject={handleReject} onAdvanceStatus={handleAdvanceStatus} compact />
+          <ServicioCard key={s.id} servicio={s} onAccept={handleAccept} onReject={handleReject} onAdvanceStatus={handleAdvanceStatus} onIniciar={openIniciar} compact />
         ))
       )}
     </View>
@@ -740,6 +787,40 @@ export default function ProviderDashboardScreen({
           setPickerOpen(null);
         }}
       />
+
+      <Modal visible={!!iniciarTarget} transparent animationType="fade" onRequestClose={closeIniciar}>
+        <Pressable style={styles.codigoBackdrop} onPress={closeIniciar}>
+          <Pressable style={styles.codigoSheet} onPress={() => {}}>
+            <Text style={styles.codigoTitle}>Iniciar servicio</Text>
+            <Text style={styles.codigoSubtitle}>
+              Pide al cliente el codigo de 6 digitos para confirmar el inicio del servicio.
+            </Text>
+            <TextInput
+              style={[styles.codigoTextInput, codigoError && styles.codigoInputError]}
+              value={codigoInput}
+              onChangeText={(v) => { setCodigoInput(v.replace(/\D/g, '').slice(0, 6)); setCodigoError(''); }}
+              placeholder="000000"
+              placeholderTextColor="#b9c2cc"
+              keyboardType="number-pad"
+              maxLength={6}
+              autoFocus
+            />
+            {codigoError ? <Text style={styles.codigoErrorText}>{codigoError}</Text> : null}
+            <View style={styles.codigoActions}>
+              <TouchableOpacity style={styles.codigoCancelBtn} onPress={closeIniciar} disabled={iniciando}>
+                <Text style={styles.codigoCancelText}>Cancelar</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.codigoConfirmBtn, iniciando && styles.codigoConfirmBtnDisabled]}
+                onPress={submitIniciar}
+                disabled={iniciando}
+              >
+                {iniciando ? <ActivityIndicator color="#fff" /> : <Text style={styles.codigoConfirmText}>Confirmar</Text>}
+              </TouchableOpacity>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </ScrollView>
   );
 }
@@ -749,6 +830,49 @@ const styles = StyleSheet.create({
   content: { padding: T.s4, paddingBottom: 40 },
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   loadingText: { marginTop: 12, fontSize: 16, color: T.muted },
+
+  codigoBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  codigoSheet: {
+    width: '100%',
+    maxWidth: 360,
+    backgroundColor: '#fff',
+    borderRadius: 14,
+    padding: 22,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.18,
+    shadowRadius: 12,
+    elevation: 16,
+  },
+  codigoTitle:    { fontSize: 18, fontWeight: '800', color: '#1a1a2e', marginBottom: 6 },
+  codigoSubtitle: { fontSize: 13, color: '#667085', marginBottom: 18, lineHeight: 18 },
+  codigoTextInput: {
+    backgroundColor: '#f7f9fc',
+    borderWidth: 1,
+    borderColor: '#d9e2ef',
+    borderRadius: 10,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    fontSize: 26,
+    fontWeight: '800',
+    letterSpacing: 8,
+    textAlign: 'center',
+    color: '#0e1424',
+  },
+  codigoInputError:  { borderColor: '#c0392b', backgroundColor: '#fff5f5' },
+  codigoErrorText:   { color: '#c0392b', fontSize: 12, marginTop: 6 },
+  codigoActions:     { flexDirection: 'row', justifyContent: 'flex-end', gap: 10, marginTop: 18 },
+  codigoCancelBtn:   { paddingVertical: 11, paddingHorizontal: 16 },
+  codigoCancelText:  { color: '#667085', fontWeight: '600', fontSize: 15 },
+  codigoConfirmBtn:  { backgroundColor: '#4589d4', paddingVertical: 11, paddingHorizontal: 22, borderRadius: 8, minWidth: 110, alignItems: 'center' },
+  codigoConfirmBtnDisabled: { opacity: 0.6 },
+  codigoConfirmText: { color: '#fff', fontWeight: '700', fontSize: 15 },
 
   // Header gradient
   header: {

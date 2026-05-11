@@ -19,6 +19,7 @@ import RegisterScreen from './screens/RegisterScreen';
 import ProviderDashboardScreen from './screens/ProviderDashboardScreen';
 import ProviderDetailScreen from './screens/ProviderDetailScreen';
 import ProviderEditProfileScreen from './screens/ProviderEditProfileScreen';
+import AdminDashboardScreen from './screens/AdminDashboardScreen';
 import SolicitudFormScreen from './screens/SolicitudFormScreen';
 import ChatScreen from './screens/ChatScreen';
 import {
@@ -203,6 +204,9 @@ export default function App() {
         onLogout={handleLogout}
       />
     );
+  }
+  if (screen === 'admindashboard') {
+    return <AdminDashboardScreen navigation={navigation} user={user} />;
   }
   if (screen === 'providereditprofile') {
     return (

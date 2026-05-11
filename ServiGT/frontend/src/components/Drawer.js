@@ -81,6 +81,9 @@ export default function Drawer({ isOpen, onClose }) {
           {user?.role === 'proveedor' && (
             <NavItem icon="▤" label="Mi panel"       onPress={() => go('/dashboard')} />
           )}
+          {user?.role === 'admin' && (
+            <NavItem icon="★" label="Panel admin"    onPress={() => go('/admin')} />
+          )}
           {user && (
             <NavItem icon="≡" label="Solicitudes"     onPress={() => go('/solicitudes')} />
           )}

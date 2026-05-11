@@ -453,4 +453,34 @@ export const marcarTodasLeidas = async () => {
   }
 };
 
+// ── Admin ─────────────────────────────────────────────────────────────────
+
+export const getAdminStats = async () => {
+  try {
+    const response = await api.get('/admin/stats');
+    return response.data;
+  } catch (error) {
+    throw new Error(getErrorMessage(error, 'No se pudieron cargar las metricas.'));
+  }
+};
+
+export const getAdminUsuarios = async (role = null) => {
+  try {
+    const params = role ? { role } : {};
+    const response = await api.get('/admin/usuarios', { params });
+    return response.data;
+  } catch (error) {
+    throw new Error(getErrorMessage(error, 'No se pudieron cargar los usuarios.'));
+  }
+};
+
+export const getAdminProveedores = async () => {
+  try {
+    const response = await api.get('/admin/proveedores');
+    return response.data;
+  } catch (error) {
+    throw new Error(getErrorMessage(error, 'No se pudieron cargar los proveedores.'));
+  }
+};
+
 export default api;

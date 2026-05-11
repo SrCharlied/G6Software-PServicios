@@ -180,8 +180,8 @@ END $$;
 SQL);
 
 // ── Seed admin por defecto ─────────────────────────────────────────────────
-$adminEmail    = getenv('ADMIN_EMAIL')    ?: 'admin@servigt.gt';
-$adminPassword = getenv('ADMIN_PASSWORD') ?: 'Admin123!';
+$adminEmail    = getenv('ADMIN_EMAIL')    ?: 'admin@gmail.com';
+$adminPassword = getenv('ADMIN_PASSWORD') ?: 'admin';
 $adminName     = getenv('ADMIN_NAME')     ?: 'Administrador ServiGT';
 
 $check = $pdo->prepare('SELECT id FROM users WHERE email = :email LIMIT 1');

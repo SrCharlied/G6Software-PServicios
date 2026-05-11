@@ -65,6 +65,8 @@ Route::middleware('auth:sanctum')->group(function () {
     // Cliente solicita un servicio
     Route::post('/servicios', [ServicioController::class, 'store']);
     Route::post('/solicitudes', [SolicitudController::class, 'store']);
+    Route::get('/solicitudes/enviadas', [SolicitudController::class, 'enviadas']);
+    Route::get('/solicitudes/recibidas', [SolicitudController::class, 'recibidas']);
     // Proveedor ve sus solicitudes entrantes
     Route::get('/servicios/proveedor', [ServicioController::class, 'solicitudesProveedor']);
     // Cliente ve sus solicitudes

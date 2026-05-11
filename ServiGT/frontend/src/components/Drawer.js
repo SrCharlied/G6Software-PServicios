@@ -82,6 +82,9 @@ export default function Drawer({ isOpen, onClose }) {
             <NavItem icon="▤" label="Mi panel"       onPress={() => go('/dashboard')} />
           )}
           {user && (
+            <NavItem icon="≡" label="Solicitudes"     onPress={() => go('/solicitudes')} />
+          )}
+          {user && (
             <NavItem icon="✉" label="Mensajes"       onPress={() => go('/chat')} />
           )}
           {!user && (

@@ -46,4 +46,36 @@ class SolicitudController extends Controller
 
         return $this->success('Solicitud enviada exitosamente', ['solicitud' => $solicitud], 201);
     }
+
+    public function enviadas(Request $request): JsonResponse
+    {
+        $solicitudes = Solicitud::with(['proveedor.categoria', 'categoria'])
+            ->where('cliente_id', $request->user()->id)
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        return $this->success('OK', [
+            'solicitudes' => $solicitudes,
+            'total'       => $solicitudes->count(),
+        ]);
+    }
+
+    public function recibidas(Request $request): JsonResponse
+    {
+        $proveedor = $request->user()->proveedor;
+
+        if (!$proveedor) {
+            return $this->error('No tienes perfil de proveedor', 404);
+        }
+
+        $solicitudes = Solicitud::with(['cliente', 'categoria'])
+            ->where('proveedor_id', $proveedor->id)
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        return $this->success('OK', [
+            'solicitudes' => $solicitudes,
+            'total'       => $solicitudes->count(),
+        ]);
+    }
 }

@@ -1,5 +1,5 @@
 -- ============================================================
--- PServicios Guatemala — Schema completo
+-- ServiGT Guatemala — Schema completo
 -- ============================================================
 
 -- Sanctum tokens

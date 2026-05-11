@@ -186,7 +186,7 @@ export default function HomeScreen() {
         ListHeaderComponent={ListHeader}
         ListEmptyComponent={ListEmpty}
         ListFooterComponent={
-          <Text style={styles.footerText}>PServicios Guatemala</Text>
+          <Text style={styles.footerText}>ServiGT Guatemala</Text>
         }
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}

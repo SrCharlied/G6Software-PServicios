@@ -15,7 +15,7 @@ use App\Http\Controllers\NotificacionController;
 
 /*
 |--------------------------------------------------------------------------
-| API Routes - PServicios Guatemala
+| API Routes - ServiGT Guatemala
 |--------------------------------------------------------------------------
 |
 | Rutas publicas: health, login, register, listado de proveedores/categorias

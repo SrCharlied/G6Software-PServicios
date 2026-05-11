@@ -1,0 +1,6 @@
+ServiGT/frontend/dist/
+ServiGT/frontend/.expo/
+ServiGT/frontend/node_modules/
+ServiGT/backend/vendor/
+.env
+*.log

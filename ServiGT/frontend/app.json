@@ -1,9 +1,9 @@
 {
   "expo": {
-    "name": "PServicios",
-    "slug": "pservicios",
+    "name": "ServiGT",
+    "slug": "servigt",
     "version": "1.0.0",
-    "scheme": "pservicios",
+    "scheme": "servigt",
     "platforms": ["web"],
     "web": {
       "bundler": "metro",

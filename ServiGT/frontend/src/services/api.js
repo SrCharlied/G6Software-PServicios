@@ -3,8 +3,8 @@ import axios from 'axios';
 const DEFAULT_API_URL = 'http://localhost:8080/api';
 const BASE_URL = process.env.EXPO_PUBLIC_API_URL || DEFAULT_API_URL;
 
-const TOKEN_KEY = 'pservicios_token';
-const USER_KEY  = 'pservicios_user';
+const TOKEN_KEY = 'servigt_token';
+const USER_KEY  = 'servigt_user';
 
 // ── Persistencia en localStorage (solo web) ───────────────────────────────
 

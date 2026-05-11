@@ -37,7 +37,7 @@ const normalizeText = (value) =>
     .toLowerCase();
 
 // ── Topbar ────────────────────────────────────────────────────────────────────
-function TopBar({ onMenuPress, title = 'PServicios' }) {
+function TopBar({ onMenuPress, title = 'ServiGT' }) {
   return (
     <View style={styles.topBar}>
       <TouchableOpacity onPress={onMenuPress} style={styles.menuBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
@@ -181,7 +181,7 @@ export default function App() {
   if (sessionLoading) {
     return (
       <View style={styles.splashContainer}>
-        <Text style={styles.splashTitle}>PServicios</Text>
+        <Text style={styles.splashTitle}>ServiGT</Text>
         <ActivityIndicator size="large" color="#1a73e8" style={{ marginTop: 20 }} />
       </View>
     );
@@ -317,7 +317,7 @@ export default function App() {
   );
 
   const ListFooter = (
-    <Text style={styles.footerText}>PServicios Guatemala · Grupo 6 · Ingenieria de Software</Text>
+    <Text style={styles.footerText}>ServiGT Guatemala · Grupo 6 · Ingenieria de Software</Text>
   );
 
   // ── Home screen ───────────────────────────────────────────────────────────

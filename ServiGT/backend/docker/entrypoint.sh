@@ -4,23 +4,25 @@ set -e
 cd /app
 
 echo "================================================"
-echo "  PServicios - Backend Laravel"
+echo "  ServiGT - Backend Laravel"
 echo "================================================"
 
 # Generar .env desde variables de entorno de Docker
 echo "[*] Configurando variables de entorno..."
 cat > /app/.env <<EOF
-APP_NAME=${APP_NAME:-PServicios}
+APP_NAME=${APP_NAME:-ServiGT}
 APP_ENV=${APP_ENV:-local}
 APP_KEY=${APP_KEY}
 APP_DEBUG=${APP_DEBUG:-true}
 APP_URL=${APP_URL:-http://localhost:8000}
+APP_LOCALE=${APP_LOCALE:-es}
+APP_FALLBACK_LOCALE=${APP_FALLBACK_LOCALE:-es}
 DB_CONNECTION=${DB_CONNECTION:-pgsql}
 DB_HOST=${DB_HOST:-db}
 DB_PORT=${DB_PORT:-5432}
-DB_DATABASE=${DB_DATABASE:-pservicios}
-DB_USERNAME=${DB_USERNAME:-pservicios_user}
-DB_PASSWORD=${DB_PASSWORD:-pservicios_secret}
+DB_DATABASE=${DB_DATABASE:-servigt}
+DB_USERNAME=${DB_USERNAME:-servigt_user}
+DB_PASSWORD=${DB_PASSWORD:-servigt_secret}
 CACHE_STORE=file
 SESSION_DRIVER=file
 FILESYSTEM_DISK=public

@@ -27,8 +27,9 @@ class SolicitudController extends Controller
             'monto_acordado' => 'nullable|numeric|min:0',
         ]);
 
-        $validated['cliente_id'] = $request->user()->id;
-        $validated['estado']     = 'pendiente';
+        $validated['cliente_id']    = $request->user()->id;
+        $validated['estado']        = 'pendiente';
+        $validated['codigo_inicio'] = str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
 
         $solicitud = Solicitud::create($validated);
         $solicitud->load(['cliente', 'proveedor', 'categoria']);

@@ -7,6 +7,7 @@ use App\Http\Controllers\ProviderController;
 use App\Http\Controllers\HealthController;
 use App\Http\Controllers\MessageController;
 use App\Http\Controllers\ServicioController;
+use App\Http\Controllers\SolicitudController;
 use App\Http\Controllers\DisponibilidadController;
 use App\Http\Controllers\CalificacionController;
 use App\Http\Controllers\NotificacionController;
@@ -63,6 +64,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // ── Servicios / Solicitudes ──────────────────────────────────────────────
     // Cliente solicita un servicio
     Route::post('/servicios', [ServicioController::class, 'store']);
+    Route::post('/solicitudes', [SolicitudController::class, 'store']);
     // Proveedor ve sus solicitudes entrantes
     Route::get('/servicios/proveedor', [ServicioController::class, 'solicitudesProveedor']);
     // Cliente ve sus solicitudes

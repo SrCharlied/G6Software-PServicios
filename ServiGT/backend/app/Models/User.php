@@ -31,4 +31,9 @@ class User extends Authenticatable
     {
         return $this->hasOne(Proveedor::class);
     }
+
+    public function solicitudes()
+    {
+        return $this->hasMany(Solicitud::class, 'cliente_id');
+    }
 }

@@ -61,4 +61,9 @@ class Proveedor extends Model
     {
         return $this->hasMany(Servicio::class);
     }
+
+    public function solicitudes()
+    {
+        return $this->hasMany(Solicitud::class, 'proveedor_id');
+    }
 }

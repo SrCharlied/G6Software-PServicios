@@ -12,7 +12,9 @@ export default function ProviderDetailRoute() {
       const key = name.toLowerCase();
 
       if (key === 'solicitudform') {
-        if (params.selectedProvider) setSelectedProvider(params.selectedProvider);
+        if (params.provider || params.selectedProvider) {
+          setSelectedProvider(params.provider || params.selectedProvider);
+        }
         router.push('/solicitud');
         return;
       }

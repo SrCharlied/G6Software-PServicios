@@ -251,6 +251,15 @@ export const createServicio = async (data) => {
   }
 };
 
+export const createSolicitud = async (data) => {
+  try {
+    const response = await api.post('/solicitudes', data);
+    return response.data;
+  } catch (error) {
+    throw new Error(getErrorMessage(error, 'No se pudo enviar la solicitud.'));
+  }
+};
+
 export const getServicio = async (id) => {
   try {
     const response = await api.get(`/servicios/${id}`);

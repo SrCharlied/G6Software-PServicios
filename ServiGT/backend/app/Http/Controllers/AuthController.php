@@ -35,6 +35,11 @@ class AuthController extends Controller
         $request->validate([
             'email'    => 'required|email',
             'password' => 'required|string',
+        ], [
+            'email.required'    => 'El correo electronico es obligatorio.',
+            'email.email'       => 'Ingresa un correo electronico valido.',
+            'password.required' => 'La contrasena es obligatoria.',
+            'password.string'   => 'La contrasena no es valida.',
         ]);
 
         $user = User::where('email', $request->email)->first();

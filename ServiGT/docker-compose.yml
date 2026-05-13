@@ -8,8 +8,9 @@ services:
       POSTGRES_DB: servigt
       POSTGRES_USER: servigt_user
       POSTGRES_PASSWORD: servigt_secret
+    # Solo accesible desde el host (no expuesta a internet)
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql
@@ -18,6 +19,8 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+    networks:
+      - servigt_net
 
   # Backend Laravel
   backend:
@@ -33,28 +36,53 @@ services:
       APP_ENV: local
       APP_KEY: base64:xR3TbPNBfz4mGU5MhKtp3HKDO+jMnaSj6UEahGkAjQo=
       APP_DEBUG: "true"
-      APP_URL: http://localhost:8000
+      # Debe coincidir con el puerto publico para que Sanctum y los enlaces de storage funcionen
+      APP_URL: ${APP_URL:-http://localhost:8080}
       DB_CONNECTION: pgsql
       DB_HOST: db
       DB_PORT: 5432
       DB_DATABASE: servigt
       DB_USERNAME: servigt_user
       DB_PASSWORD: servigt_secret
+    volumes:
+      # Persistir fotos y documentos entre rebuilds
+      - backend_storage:/app/storage/app/public
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8000/api/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
     depends_on:
       db:
         condition: service_healthy
+    networks:
+      - servigt_net
 
   # Frontend Expo Web
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        # URL publica del backend que se inyecta al bundle web en build-time.
+        # Sobreescribir en el server con un archivo .env junto a este docker-compose.yml
+        # Ejemplo: PUBLIC_API_URL=http://www.servigtdev.com:8080/api
+        EXPO_PUBLIC_API_URL: ${PUBLIC_API_URL:-http://localhost:8080/api}
     container_name: servigt_frontend
     restart: unless-stopped
     ports:
       - "8081:8081"
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
+    networks:
+      - servigt_net
 
 volumes:
   pgdata:
+  backend_storage:
+
+networks:
+  servigt_net:
+    driver: bridge

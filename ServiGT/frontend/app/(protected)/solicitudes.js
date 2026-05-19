@@ -7,11 +7,15 @@ export default function SolicitudesRoute() {
   const { user } = useSession();
 
   const navigation = {
-    navigate: (name) => {
+    navigate: (name, params = {}) => {
       const map = {
         home: '/home',
         providerdashboard: '/dashboard',
       };
+      if (name.toLowerCase() === 'calificarproveedor' && params.servicioId) {
+        router.push(`/calificar/${params.servicioId}`);
+        return;
+      }
       router.push(map[name.toLowerCase()] ?? '/home');
     },
     goBack: () => router.back(),

@@ -22,6 +22,8 @@ COPY routes/api.php /app/routes/api.php
 COPY app/Http/Controllers/ /app/app/Http/Controllers/
 COPY app/Http/Middleware/ /app/app/Http/Middleware/
 COPY app/Models/ /app/app/Models/
+COPY app/Observers/ /app/app/Observers/
+COPY app/Providers/ /app/app/Providers/
 COPY app/Traits/ /app/app/Traits/
 COPY config/cors.php /app/config/cors.php
 COPY bootstrap/app.php /app/bootstrap/app.php

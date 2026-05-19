@@ -46,7 +46,7 @@ class ServicioController extends Controller
 
     public function show(int $id, Request $request): JsonResponse
     {
-        $servicio = Servicio::with(['cliente', 'proveedor.categoria', 'categoria', 'calificaciones', 'pago'])
+        $servicio = Servicio::with(['cliente', 'proveedor.categoria', 'categoria', 'calificaciones.autor:id,name', 'pago'])
             ->find($id);
 
         if (!$servicio) {
@@ -88,7 +88,7 @@ class ServicioController extends Controller
     public function solicitudesCliente(Request $request): JsonResponse
     {
         $estado = $request->query('estado');
-        $query  = Servicio::with(['proveedor.categoria', 'categoria'])
+        $query  = Servicio::with(['proveedor.categoria', 'categoria', 'calificaciones.autor:id,name'])
             ->where('cliente_id', $request->user()->id);
 
         if ($estado) {
@@ -161,13 +161,7 @@ class ServicioController extends Controller
         $servicio->update(['estado' => $request->estado]);
 
         if ($request->estado === 'completado') {
-            Notificacion::create([
-                'destinatario_id' => $servicio->cliente_id,
-                'tipo'            => 'servicio_completado',
-                'titulo'          => 'Servicio completado',
-                'mensaje'         => 'El servicio fue marcado como completado. Puedes calificar al proveedor.',
-                'datos'           => ['servicio_id' => $servicio->id],
-            ]);
+            $this->notificarServicioCalificable($servicio);
         }
 
         return $this->success('Estado actualizado', ['servicio' => $servicio]);
@@ -218,5 +212,27 @@ class ServicioController extends Controller
         }
 
         return $servicio;
+    }
+
+    private function notificarServicioCalificable(Servicio $servicio): void
+    {
+        $yaExiste = Notificacion::where('destinatario_id', $servicio->cliente_id)
+            ->where('tipo', 'servicio_calificable')
+            ->where('datos->servicio_id', $servicio->id)
+            ->exists();
+
+        if ($yaExiste) {
+            return;
+        }
+
+        $servicio->loadMissing('proveedor');
+
+        Notificacion::create([
+            'destinatario_id' => $servicio->cliente_id,
+            'tipo'            => 'servicio_calificable',
+            'titulo'          => 'Servicio listo para calificar',
+            'mensaje'         => 'El servicio fue completado. Ya puedes calificar a ' . ($servicio->proveedor?->nombre ?? 'tu proveedor') . '.',
+            'datos'           => ['servicio_id' => $servicio->id],
+        ]);
     }
 }

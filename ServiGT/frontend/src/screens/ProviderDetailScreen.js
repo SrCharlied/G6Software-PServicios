@@ -106,6 +106,24 @@ export default function ProviderDetailScreen({
     experto:    { bg: '#fef3c7', text: '#b45309' },
   };
   const nivelColor = nivelColores[proveedor.nivel] || nivelColores.novato;
+  const formatRelativeDate = (value) => {
+    if (!value) return '';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '';
+
+    const diffMs = Date.now() - date.getTime();
+    const minutes = Math.floor(diffMs / 60000);
+    if (minutes < 1) return 'Hace un momento';
+    if (minutes < 60) return `Hace ${minutes} min`;
+
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `Hace ${hours} h`;
+
+    const days = Math.floor(hours / 24);
+    if (days < 7) return `Hace ${days} dia${days === 1 ? '' : 's'}`;
+
+    return date.toLocaleDateString('es-GT', { day: '2-digit', month: 'short', year: 'numeric' });
+  };
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -261,11 +279,14 @@ export default function ProviderDetailScreen({
         {calificaciones.length === 0 ? (
           <Text style={styles.emptyText}>Aun no hay resenas para este proveedor.</Text>
         ) : (
-          calificaciones.slice(0, 5).map((cal) => (
+          calificaciones.slice(0, 10).map((cal) => (
             <View key={cal.id} style={styles.resenaRow}>
               <View style={styles.resenaHeader}>
-                <Text style={styles.resenaAutor}>{cal.autor?.name || 'Usuario'}</Text>
-                <Stars value={cal.puntuacion} />
+                <View style={styles.resenaAuthorBlock}>
+                  <Text style={styles.resenaAutor}>{cal.autor?.name || 'Usuario'}</Text>
+                  <Text style={styles.resenaDate}>{formatRelativeDate(cal.created_at)}</Text>
+                </View>
+                <Stars value={Number(cal.puntuacion || 0)} />
               </View>
               {cal.comentario ? (
                 <Text style={styles.resenaComentario}>{cal.comentario}</Text>
@@ -392,7 +413,9 @@ const styles = StyleSheet.create({
     borderBottomColor: '#f0f0f0',
   },
   resenaHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
+  resenaAuthorBlock: { flex: 1, marginRight: 10 },
   resenaAutor: { fontSize: 14, fontWeight: '600', color: '#333' },
+  resenaDate: { fontSize: 11, color: '#9aa3af', marginTop: 2 },
   resenaComentario: { fontSize: 13, color: '#666', lineHeight: 19, marginTop: 4 },
   emptyText: { fontSize: 14, color: '#999', textAlign: 'center', paddingVertical: 12 },
 });

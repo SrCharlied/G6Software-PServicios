@@ -5,17 +5,17 @@ services:
     container_name: servigt_db
     restart: unless-stopped
     environment:
-      POSTGRES_DB: servigt
-      POSTGRES_USER: servigt_user
-      POSTGRES_PASSWORD: servigt_secret
-    # Solo accesible desde el host (no expuesta a internet)
-    ports:
-      - "127.0.0.1:5432:5432"
+      POSTGRES_DB: pservicios
+      POSTGRES_USER: pservicios_user
+      POSTGRES_PASSWORD: pservicios_secret
+    # Sin binding al host — solo accesible desde la red interna de Docker
+    # ports:
+    #   - "127.0.0.1:5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U servigt_user -d servigt"]
+      test: ["CMD-SHELL", "pg_isready -U pservicios_user -d pservicios"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -41,9 +41,9 @@ services:
       DB_CONNECTION: pgsql
       DB_HOST: db
       DB_PORT: 5432
-      DB_DATABASE: servigt
-      DB_USERNAME: servigt_user
-      DB_PASSWORD: servigt_secret
+      DB_DATABASE: pservicios
+      DB_USERNAME: pservicios_user
+      DB_PASSWORD: pservicios_secret
     volumes:
       # Persistir fotos y documentos entre rebuilds
       - backend_storage:/app/storage/app/public

@@ -83,7 +83,7 @@ function ProviderCard({ prov, onPress }) {
 
 export default function HomeScreen() {
   const router = useRouter();
-  const { setSelectedProvider } = useSession();
+  const { setSelectedProvider, user } = useSession();
 
   const [proveedores, setProveedores] = useState([]);
   const [loading, setLoading]         = useState(true);
@@ -126,6 +126,22 @@ export default function HomeScreen() {
           <Text style={styles.noticeText}>{notice}</Text>
         </View>
       ) : null}
+
+      {/* CTA Marketplace de Demanda */}
+      {user && user.role !== 'proveedor' ? (
+        <TouchableOpacity
+          style={styles.ctaBanner}
+          activeOpacity={0.88}
+          onPress={() => router.push('/pedidos/publicar')}
+        >
+          <View style={styles.ctaLeft}>
+            <Text style={styles.ctaTitle}>Publica tu problema</Text>
+            <Text style={styles.ctaDesc}>Recibe propuestas de proveedores verificados</Text>
+          </View>
+          <Text style={styles.ctaArrow}>→</Text>
+        </TouchableOpacity>
+      ) : null}
+
       <View style={styles.searchBar}>
         <Text style={styles.searchIcon}>🔍</Text>
         <TextInput
@@ -270,4 +286,15 @@ const styles = StyleSheet.create({
   retryBtn: { backgroundColor: '#4589d4', paddingHorizontal: 24, paddingVertical: 11, borderRadius: 8 },
   retryText: { color: '#fff', fontSize: 15, fontWeight: '600' },
   footerText: { textAlign: 'center', fontSize: 11, color: '#bcc5d0', paddingVertical: 20 },
+  ctaBanner: {
+    backgroundColor: '#1b5499', borderRadius: 14,
+    padding: 16, marginBottom: 14,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    shadowColor: '#1b5499', shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.20, shadowRadius: 10, elevation: 4,
+  },
+  ctaLeft:  { flex: 1 },
+  ctaTitle: { fontSize: 16, fontWeight: '800', color: '#fff', marginBottom: 2 },
+  ctaDesc:  { fontSize: 12, color: 'rgba(255,255,255,0.75)' },
+  ctaArrow: { fontSize: 20, color: '#fff', fontWeight: '700', marginLeft: 12 },
 });

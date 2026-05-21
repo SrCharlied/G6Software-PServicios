@@ -73,4 +73,16 @@ return Application::configure(basePath: dirname(__DIR__))
             }
         });
 
+        // Catch-all: cualquier excepción no manejada en rutas API devuelve JSON
+        $exceptions->render(function (\Throwable $e, Request $request) use ($isApi) {
+            if ($isApi($request)) {
+                $status  = method_exists($e, 'getStatusCode') ? $e->getStatusCode() : 500;
+                $message = app()->environment('local') ? $e->getMessage() : 'Error interno del servidor.';
+                return response()->json([
+                    'success' => false,
+                    'message' => $message,
+                ], $status);
+            }
+        });
+
     })->create();

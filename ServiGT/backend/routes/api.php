@@ -86,6 +86,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // ── Calificaciones ───────────────────────────────────────────────────────
     Route::post('/calificaciones', [CalificacionController::class, 'store']);
+    Route::post('/servicios/{id}/calificar', [CalificacionController::class, 'calificarServicio'])->where('id', '[0-9]+');
 
     // ── Mensajes / Chat ──────────────────────────────────────────────────────
     // Enviar mensaje

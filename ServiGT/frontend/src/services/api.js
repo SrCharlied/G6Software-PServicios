@@ -356,6 +356,15 @@ export const createCalificacion = async (data) => {
   }
 };
 
+export const calificarServicio = async (servicioId, data) => {
+  try {
+    const response = await api.post(`/servicios/${servicioId}/calificar`, data);
+    return response.data;
+  } catch (error) {
+    throw new Error(getErrorMessage(error, 'No se pudo enviar la calificacion.'));
+  }
+};
+
 export const getCalificacionesProveedor = async (proveedorId) => {
   try {
     const response = await api.get(`/providers/${proveedorId}/calificaciones`);

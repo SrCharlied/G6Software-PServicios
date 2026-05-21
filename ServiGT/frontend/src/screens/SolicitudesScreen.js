@@ -77,6 +77,13 @@ export default function SolicitudesScreen({ navigation, user }) {
       && item.codigo_inicio
       && ESTADOS_CON_CODIGO.has(item.estado);
 
+    const yaCalifico = (item.calificaciones || []).some(
+      (cal) => Number(cal.autor_id) === Number(user?.id)
+    );
+    const puedeCalificar = activeTab === 'enviadas'
+      && item.estado === 'completado'
+      && !yaCalifico;
+
     return (
       <View style={styles.card}>
         <View style={styles.cardHeader}>
@@ -99,6 +106,19 @@ export default function SolicitudesScreen({ navigation, user }) {
               Compartelo con el proveedor cuando llegue para iniciar el servicio.
             </Text>
           </View>
+        ) : null}
+
+        {puedeCalificar ? (
+          <TouchableOpacity
+            style={styles.rateBtn}
+            onPress={() => navigation.navigate('CalificarProveedor', { servicioId: item.id })}
+          >
+            <Text style={styles.rateBtnText}>Calificar proveedor</Text>
+          </TouchableOpacity>
+        ) : null}
+
+        {activeTab === 'enviadas' && item.estado === 'completado' && yaCalifico ? (
+          <Text style={styles.ratedText}>Ya calificaste este servicio.</Text>
         ) : null}
       </View>
     );
@@ -241,6 +261,15 @@ const styles = StyleSheet.create({
   codigoLabel: { fontSize: 12, color: '#1858a6', fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.6 },
   codigoValue: { fontSize: 30, fontWeight: '800', color: '#0e1424', letterSpacing: 6, marginTop: 4 },
   codigoHint:  { fontSize: 11, color: '#1858a6', marginTop: 6, textAlign: 'center' },
+  rateBtn: {
+    marginTop: 14,
+    backgroundColor: T.blue,
+    borderRadius: 8,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  rateBtnText: { color: T.white, fontSize: 14, fontWeight: '800' },
+  ratedText: { marginTop: 12, color: T.success, fontSize: 13, fontWeight: '700' },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
   loadingText: { marginTop: 12, color: '#667085' },
   emptyState: { alignItems: 'center', paddingVertical: 64, paddingHorizontal: 24 },

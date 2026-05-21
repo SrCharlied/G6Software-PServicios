@@ -8,7 +8,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { createSolicitud } from '../services/api';
+import { createServicio } from '../services/api';
 import { useToast } from '../context/ToastContext';
 import { validateRequired, validateNumeric, validateDate } from '../utils/validation';
 
@@ -56,7 +56,7 @@ export default function SolicitudFormScreen({
 
     setSubmitting(true);
     try {
-      await createSolicitud({
+      await createServicio({
         proveedor_id: selectedProvider.id,
         categoria_id: selectedProvider.categoria_id || null,
         descripcion: descripcion.trim(),

@@ -143,6 +143,46 @@ $statements = [
         created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
     )",
+    "CREATE TABLE IF NOT EXISTS creditos_proveedor (
+        proveedor_id BIGINT PRIMARY KEY REFERENCES proveedores(id) ON DELETE CASCADE,
+        saldo INT NOT NULL DEFAULT 0 CHECK (saldo >= 0),
+        updated_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )",
+    "CREATE TABLE IF NOT EXISTS transacciones_credito (
+        id BIGSERIAL PRIMARY KEY,
+        proveedor_id BIGINT NOT NULL REFERENCES proveedores(id) ON DELETE CASCADE,
+        tipo VARCHAR(20) NOT NULL CHECK (tipo IN ('bono','gasto','recarga')),
+        monto INT NOT NULL CHECK (monto > 0),
+        motivo VARCHAR(255) NOT NULL,
+        referencia_id BIGINT,
+        created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )",
+    "CREATE TABLE IF NOT EXISTS pedidos (
+        id BIGSERIAL PRIMARY KEY,
+        cliente_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        descripcion TEXT NOT NULL,
+        categoria_id BIGINT REFERENCES categorias(id) ON DELETE SET NULL,
+        direccion VARCHAR(500),
+        urgencia VARCHAR(10) NOT NULL DEFAULT 'media'
+            CHECK (urgencia IN ('baja','media','alta')),
+        estado VARCHAR(20) NOT NULL DEFAULT 'abierto'
+            CHECK (estado IN ('abierto','adjudicado','cerrado','expirado')),
+        fecha_expiracion TIMESTAMP WITHOUT TIME ZONE NOT NULL,
+        created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )",
+    "CREATE TABLE IF NOT EXISTS cotizaciones (
+        id BIGSERIAL PRIMARY KEY,
+        pedido_id BIGINT NOT NULL REFERENCES pedidos(id) ON DELETE CASCADE,
+        proveedor_id BIGINT NOT NULL REFERENCES proveedores(id) ON DELETE CASCADE,
+        monto DECIMAL(10,2) NOT NULL CHECK (monto > 0),
+        mensaje TEXT NOT NULL,
+        estado VARCHAR(20) NOT NULL DEFAULT 'enviada'
+            CHECK (estado IN ('enviada','aceptada','rechazada','retirada')),
+        costo_creditos INT NOT NULL DEFAULT 0 CHECK (costo_creditos >= 0),
+        created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )",
     "CREATE INDEX IF NOT EXISTS idx_docs_proveedor_id ON documentos_proveedores (proveedor_id)",
     "CREATE INDEX IF NOT EXISTS idx_proveedores_user_id ON proveedores (user_id)",
     "CREATE INDEX IF NOT EXISTS idx_proveedores_categoria_id ON proveedores (categoria_id)",
@@ -158,6 +198,11 @@ $statements = [
     "CREATE INDEX IF NOT EXISTS idx_mensajes_emisor_receptor ON mensajes (emisor_id, receptor_id, created_at DESC)",
     "CREATE INDEX IF NOT EXISTS idx_mensajes_servicio ON mensajes (servicio_id)",
     "CREATE INDEX IF NOT EXISTS idx_notif_destinatario ON notificaciones (destinatario_id, leida)",
+    "CREATE INDEX IF NOT EXISTS idx_pedidos_cliente ON pedidos (cliente_id)",
+    "CREATE INDEX IF NOT EXISTS idx_pedidos_estado ON pedidos (estado)",
+    "CREATE INDEX IF NOT EXISTS idx_pedidos_categoria ON pedidos (categoria_id)",
+    "CREATE INDEX IF NOT EXISTS idx_trans_cred_proveedor ON transacciones_credito (proveedor_id, created_at DESC)",
+    "CREATE UNIQUE INDEX IF NOT EXISTS idx_cotizaciones_pedido_proveedor ON cotizaciones (pedido_id, proveedor_id)",
 ];
 
 foreach ($statements as $statement) {
@@ -176,6 +221,20 @@ BEGIN
         ADD CONSTRAINT proveedores_user_id_foreign
         FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE;
     END IF;
+END $$;
+SQL);
+
+// Actualizar CHECK constraint de servicios.estado para incluir 'por_confirmar'
+$pdo->exec(<<<'SQL'
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'servicios_estado_check'
+    ) THEN
+        ALTER TABLE servicios DROP CONSTRAINT servicios_estado_check;
+    END IF;
+    ALTER TABLE servicios ADD CONSTRAINT servicios_estado_check
+        CHECK (estado IN ('pendiente','aceptado','en_camino','en_progreso','por_confirmar','completado','cancelado','rechazado'));
 END $$;
 SQL);
 

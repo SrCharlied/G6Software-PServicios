@@ -100,6 +100,25 @@ CREATE TABLE IF NOT EXISTS disponibilidad (
 );
 CREATE INDEX IF NOT EXISTS idx_disponibilidad_proveedor ON disponibilidad (proveedor_id);
 
+-- Creditos del proveedor (saldo unico por proveedor)
+CREATE TABLE IF NOT EXISTS creditos_proveedor (
+    proveedor_id BIGINT PRIMARY KEY REFERENCES proveedores(id) ON DELETE CASCADE,
+    saldo INT NOT NULL DEFAULT 0 CHECK (saldo >= 0),
+    updated_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Log de movimientos de creditos (auditoria + historial)
+CREATE TABLE IF NOT EXISTS transacciones_credito (
+    id BIGSERIAL PRIMARY KEY,
+    proveedor_id BIGINT NOT NULL REFERENCES proveedores(id) ON DELETE CASCADE,
+    tipo VARCHAR(20) NOT NULL CHECK (tipo IN ('bono','gasto','recarga')),
+    monto INT NOT NULL CHECK (monto > 0),
+    motivo VARCHAR(255) NOT NULL,
+    referencia_id BIGINT,
+    created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_trans_cred_proveedor ON transacciones_credito (proveedor_id, created_at DESC);
+
 -- Servicios (solicitudes de trabajo)
 CREATE TABLE IF NOT EXISTS servicios (
     id BIGSERIAL PRIMARY KEY,
@@ -108,7 +127,7 @@ CREATE TABLE IF NOT EXISTS servicios (
     categoria_id BIGINT REFERENCES categorias(id) ON DELETE SET NULL,
     descripcion TEXT NOT NULL,
     estado VARCHAR(20) NOT NULL DEFAULT 'pendiente'
-        CHECK (estado IN ('pendiente','aceptado','en_camino','en_progreso','completado','cancelado','rechazado')),
+        CHECK (estado IN ('pendiente','aceptado','en_camino','en_progreso','por_confirmar','completado','cancelado','rechazado')),
     fecha_agendada TIMESTAMP WITHOUT TIME ZONE,
     direccion VARCHAR(500),
     monto_acordado DECIMAL(10,2),
@@ -121,6 +140,40 @@ CREATE TABLE IF NOT EXISTS servicios (
 CREATE INDEX IF NOT EXISTS idx_servicios_cliente ON servicios (cliente_id);
 CREATE INDEX IF NOT EXISTS idx_servicios_proveedor ON servicios (proveedor_id);
 CREATE INDEX IF NOT EXISTS idx_servicios_estado ON servicios (estado);
+
+-- Pedidos (marketplace de demanda: cliente publica, proveedores cotizan)
+CREATE TABLE IF NOT EXISTS pedidos (
+    id BIGSERIAL PRIMARY KEY,
+    cliente_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    descripcion TEXT NOT NULL,
+    categoria_id BIGINT REFERENCES categorias(id) ON DELETE SET NULL,
+    direccion VARCHAR(500),
+    urgencia VARCHAR(10) NOT NULL DEFAULT 'media'
+        CHECK (urgencia IN ('baja','media','alta')),
+    estado VARCHAR(20) NOT NULL DEFAULT 'abierto'
+        CHECK (estado IN ('abierto','adjudicado','cerrado','expirado')),
+    fecha_expiracion TIMESTAMP WITHOUT TIME ZONE NOT NULL,
+    created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_pedidos_cliente ON pedidos (cliente_id);
+CREATE INDEX IF NOT EXISTS idx_pedidos_estado ON pedidos (estado);
+CREATE INDEX IF NOT EXISTS idx_pedidos_categoria ON pedidos (categoria_id);
+
+-- Cotizaciones (ofertas de proveedores a un pedido del cliente)
+CREATE TABLE IF NOT EXISTS cotizaciones (
+    id BIGSERIAL PRIMARY KEY,
+    pedido_id BIGINT NOT NULL REFERENCES pedidos(id) ON DELETE CASCADE,
+    proveedor_id BIGINT NOT NULL REFERENCES proveedores(id) ON DELETE CASCADE,
+    monto DECIMAL(10,2) NOT NULL CHECK (monto > 0),
+    mensaje TEXT NOT NULL,
+    estado VARCHAR(20) NOT NULL DEFAULT 'enviada'
+        CHECK (estado IN ('enviada','aceptada','rechazada','retirada')),
+    costo_creditos INT NOT NULL DEFAULT 0 CHECK (costo_creditos >= 0),
+    created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_cotizaciones_pedido_proveedor ON cotizaciones (pedido_id, proveedor_id);
 
 -- Pagos
 CREATE TABLE IF NOT EXISTS pagos (

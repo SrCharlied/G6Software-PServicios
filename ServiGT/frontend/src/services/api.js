@@ -298,6 +298,24 @@ export const iniciarServicio = async (id, codigo) => {
   }
 };
 
+export const finalizarServicio = async (id) => {
+  try {
+    const response = await api.post(`/servicios/${id}/finalizar`);
+    return response.data;
+  } catch (error) {
+    throw new Error(getErrorMessage(error, 'No se pudo finalizar el servicio.'));
+  }
+};
+
+export const confirmarFinServicio = async (id, codigo) => {
+  try {
+    const response = await api.post(`/servicios/${id}/confirmar-fin`, { codigo });
+    return response.data;
+  } catch (error) {
+    throw new Error(getErrorMessage(error, 'No se pudo confirmar la finalizacion.'));
+  }
+};
+
 export const rechazarServicio = async (id, motivo = '') => {
   try {
     const response = await api.post(`/servicios/${id}/rechazar`, { motivo });

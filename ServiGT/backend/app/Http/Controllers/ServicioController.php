@@ -197,6 +197,36 @@ class ServicioController extends Controller
         return $this->success('Servicio iniciado', ['servicio' => $servicio]);
     }
 
+    public function finalizar(int $id, Request $request): JsonResponse
+    {
+        $servicio = $this->getServicioProveedor($id, $request);
+        if ($servicio instanceof JsonResponse) return $servicio;
+
+        if ($servicio->estado !== 'en_progreso') {
+            return $this->error('Solo se puede finalizar un servicio en progreso', 422);
+        }
+
+        $codigoFin = str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
+
+        $servicio->update([
+            'codigo_fin' => $codigoFin,
+            'estado'     => 'por_confirmar',
+        ]);
+
+        Notificacion::create([
+            'destinatario_id' => $servicio->cliente_id,
+            'tipo'            => 'servicio_por_confirmar',
+            'titulo'          => 'Confirma la finalizacion del servicio',
+            'mensaje'         => 'El proveedor termino el trabajo. Pide el codigo de 6 digitos para confirmar la finalizacion.',
+            'datos'           => ['servicio_id' => $servicio->id],
+        ]);
+
+        return $this->success('Servicio listo para confirmar', [
+            'servicio'   => $servicio,
+            'codigo_fin' => $codigoFin,
+        ]);
+    }
+
     // ── Helper ────────────────────────────────────────────────────────────────
 
     private function getServicioProveedor(int $id, Request $request)

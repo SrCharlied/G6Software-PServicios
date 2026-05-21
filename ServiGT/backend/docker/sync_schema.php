@@ -224,6 +224,20 @@ BEGIN
 END $$;
 SQL);
 
+// Actualizar CHECK constraint de servicios.estado para incluir 'por_confirmar'
+$pdo->exec(<<<'SQL'
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'servicios_estado_check'
+    ) THEN
+        ALTER TABLE servicios DROP CONSTRAINT servicios_estado_check;
+    END IF;
+    ALTER TABLE servicios ADD CONSTRAINT servicios_estado_check
+        CHECK (estado IN ('pendiente','aceptado','en_camino','en_progreso','por_confirmar','completado','cancelado','rechazado'));
+END $$;
+SQL);
+
 // ── Seed admin por defecto ─────────────────────────────────────────────────
 $adminEmail    = getenv('ADMIN_EMAIL')    ?: 'admin@gmail.com';
 $adminPassword = getenv('ADMIN_PASSWORD') ?: 'admin';

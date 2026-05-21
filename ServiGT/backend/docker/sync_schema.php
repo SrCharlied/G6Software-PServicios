@@ -143,6 +143,20 @@ $statements = [
         created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
     )",
+    "CREATE TABLE IF NOT EXISTS pedidos (
+        id BIGSERIAL PRIMARY KEY,
+        cliente_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        descripcion TEXT NOT NULL,
+        categoria_id BIGINT REFERENCES categorias(id) ON DELETE SET NULL,
+        direccion VARCHAR(500),
+        urgencia VARCHAR(10) NOT NULL DEFAULT 'media'
+            CHECK (urgencia IN ('baja','media','alta')),
+        estado VARCHAR(20) NOT NULL DEFAULT 'abierto'
+            CHECK (estado IN ('abierto','adjudicado','cerrado','expirado')),
+        fecha_expiracion TIMESTAMP WITHOUT TIME ZONE NOT NULL,
+        created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )",
     "CREATE INDEX IF NOT EXISTS idx_docs_proveedor_id ON documentos_proveedores (proveedor_id)",
     "CREATE INDEX IF NOT EXISTS idx_proveedores_user_id ON proveedores (user_id)",
     "CREATE INDEX IF NOT EXISTS idx_proveedores_categoria_id ON proveedores (categoria_id)",
@@ -158,6 +172,9 @@ $statements = [
     "CREATE INDEX IF NOT EXISTS idx_mensajes_emisor_receptor ON mensajes (emisor_id, receptor_id, created_at DESC)",
     "CREATE INDEX IF NOT EXISTS idx_mensajes_servicio ON mensajes (servicio_id)",
     "CREATE INDEX IF NOT EXISTS idx_notif_destinatario ON notificaciones (destinatario_id, leida)",
+    "CREATE INDEX IF NOT EXISTS idx_pedidos_cliente ON pedidos (cliente_id)",
+    "CREATE INDEX IF NOT EXISTS idx_pedidos_estado ON pedidos (estado)",
+    "CREATE INDEX IF NOT EXISTS idx_pedidos_categoria ON pedidos (categoria_id)",
 ];
 
 foreach ($statements as $statement) {

@@ -122,6 +122,25 @@ CREATE INDEX IF NOT EXISTS idx_servicios_cliente ON servicios (cliente_id);
 CREATE INDEX IF NOT EXISTS idx_servicios_proveedor ON servicios (proveedor_id);
 CREATE INDEX IF NOT EXISTS idx_servicios_estado ON servicios (estado);
 
+-- Pedidos (marketplace de demanda: cliente publica, proveedores cotizan)
+CREATE TABLE IF NOT EXISTS pedidos (
+    id BIGSERIAL PRIMARY KEY,
+    cliente_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    descripcion TEXT NOT NULL,
+    categoria_id BIGINT REFERENCES categorias(id) ON DELETE SET NULL,
+    direccion VARCHAR(500),
+    urgencia VARCHAR(10) NOT NULL DEFAULT 'media'
+        CHECK (urgencia IN ('baja','media','alta')),
+    estado VARCHAR(20) NOT NULL DEFAULT 'abierto'
+        CHECK (estado IN ('abierto','adjudicado','cerrado','expirado')),
+    fecha_expiracion TIMESTAMP WITHOUT TIME ZONE NOT NULL,
+    created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_pedidos_cliente ON pedidos (cliente_id);
+CREATE INDEX IF NOT EXISTS idx_pedidos_estado ON pedidos (estado);
+CREATE INDEX IF NOT EXISTS idx_pedidos_categoria ON pedidos (categoria_id);
+
 -- Pagos
 CREATE TABLE IF NOT EXISTS pagos (
     id BIGSERIAL PRIMARY KEY,

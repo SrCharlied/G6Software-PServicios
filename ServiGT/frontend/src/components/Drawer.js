@@ -79,16 +79,22 @@ export default function Drawer({ isOpen, onClose }) {
           <NavItem icon="⌂" label="Inicio" onPress={() => go('/home')} />
 
           {user?.role === 'proveedor' && (
-            <NavItem icon="▤" label="Mi panel"       onPress={() => go('/dashboard')} />
+            <NavItem icon="▤" label="Mi panel"          onPress={() => go('/dashboard')} />
+          )}
+          {user?.role === 'proveedor' && (
+            <NavItem icon="📋" label="Pedidos abiertos" onPress={() => go('/pedidos/abiertos')} />
           )}
           {user?.role === 'admin' && (
-            <NavItem icon="★" label="Panel admin"    onPress={() => go('/admin')} />
+            <NavItem icon="★" label="Panel admin"       onPress={() => go('/admin')} />
+          )}
+          {user && user.role !== 'proveedor' && (
+            <NavItem icon="📝" label="Mis pedidos"      onPress={() => go('/pedidos/mios')} />
           )}
           {user && (
-            <NavItem icon="≡" label="Solicitudes"     onPress={() => go('/solicitudes')} />
+            <NavItem icon="≡" label="Solicitudes"       onPress={() => go('/solicitudes')} />
           )}
           {user && (
-            <NavItem icon="✉" label="Mensajes"       onPress={() => go('/chat')} />
+            <NavItem icon="✉" label="Mensajes"          onPress={() => go('/chat')} />
           )}
           {!user && (
             <>

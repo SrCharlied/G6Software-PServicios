@@ -435,6 +435,37 @@ export const marcarTodasLeidas = async () => {
   }
 };
 
+// ── Pedidos (Marketplace de Demanda) ─────────────────────────────────────
+
+export const crearPedido = async (data) => {
+  try {
+    const response = await api.post('/pedidos', data);
+    return response.data;
+  } catch (error) {
+    throw new Error(getErrorMessage(error, 'No se pudo publicar el pedido.'));
+  }
+};
+
+export const getPedidosAbiertos = async ({ categoriaId = null, page = 1 } = {}) => {
+  try {
+    const params = { page };
+    if (categoriaId) params.categoria_id = categoriaId;
+    const response = await api.get('/pedidos/abiertos', { params });
+    return response.data;
+  } catch (error) {
+    throw new Error(getErrorMessage(error, 'No se pudieron cargar los pedidos.'));
+  }
+};
+
+export const getMisPedidos = async ({ page = 1 } = {}) => {
+  try {
+    const response = await api.get('/pedidos/mios', { params: { page } });
+    return response.data;
+  } catch (error) {
+    throw new Error(getErrorMessage(error, 'No se pudieron cargar tus pedidos.'));
+  }
+};
+
 // ── Admin ─────────────────────────────────────────────────────────────────
 
 export const getAdminStats = async () => {

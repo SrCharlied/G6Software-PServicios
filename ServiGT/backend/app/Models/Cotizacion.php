@@ -36,3 +36,4 @@ class Cotizacion extends Model
         return $this->belongsTo(Proveedor::class);
     }
 }
+

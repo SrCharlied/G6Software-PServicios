@@ -143,6 +143,20 @@ $statements = [
         created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
     )",
+    "CREATE TABLE IF NOT EXISTS creditos_proveedor (
+        proveedor_id BIGINT PRIMARY KEY REFERENCES proveedores(id) ON DELETE CASCADE,
+        saldo INT NOT NULL DEFAULT 0 CHECK (saldo >= 0),
+        updated_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )",
+    "CREATE TABLE IF NOT EXISTS transacciones_credito (
+        id BIGSERIAL PRIMARY KEY,
+        proveedor_id BIGINT NOT NULL REFERENCES proveedores(id) ON DELETE CASCADE,
+        tipo VARCHAR(20) NOT NULL CHECK (tipo IN ('bono','gasto','recarga')),
+        monto INT NOT NULL CHECK (monto > 0),
+        motivo VARCHAR(255) NOT NULL,
+        referencia_id BIGINT,
+        created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )",
     "CREATE TABLE IF NOT EXISTS pedidos (
         id BIGSERIAL PRIMARY KEY,
         cliente_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -175,6 +189,7 @@ $statements = [
     "CREATE INDEX IF NOT EXISTS idx_pedidos_cliente ON pedidos (cliente_id)",
     "CREATE INDEX IF NOT EXISTS idx_pedidos_estado ON pedidos (estado)",
     "CREATE INDEX IF NOT EXISTS idx_pedidos_categoria ON pedidos (categoria_id)",
+    "CREATE INDEX IF NOT EXISTS idx_trans_cred_proveedor ON transacciones_credito (proveedor_id, created_at DESC)",
 ];
 
 foreach ($statements as $statement) {

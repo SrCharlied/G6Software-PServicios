@@ -100,6 +100,25 @@ CREATE TABLE IF NOT EXISTS disponibilidad (
 );
 CREATE INDEX IF NOT EXISTS idx_disponibilidad_proveedor ON disponibilidad (proveedor_id);
 
+-- Creditos del proveedor (saldo unico por proveedor)
+CREATE TABLE IF NOT EXISTS creditos_proveedor (
+    proveedor_id BIGINT PRIMARY KEY REFERENCES proveedores(id) ON DELETE CASCADE,
+    saldo INT NOT NULL DEFAULT 0 CHECK (saldo >= 0),
+    updated_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Log de movimientos de creditos (auditoria + historial)
+CREATE TABLE IF NOT EXISTS transacciones_credito (
+    id BIGSERIAL PRIMARY KEY,
+    proveedor_id BIGINT NOT NULL REFERENCES proveedores(id) ON DELETE CASCADE,
+    tipo VARCHAR(20) NOT NULL CHECK (tipo IN ('bono','gasto','recarga')),
+    monto INT NOT NULL CHECK (monto > 0),
+    motivo VARCHAR(255) NOT NULL,
+    referencia_id BIGINT,
+    created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_trans_cred_proveedor ON transacciones_credito (proveedor_id, created_at DESC);
+
 -- Servicios (solicitudes de trabajo)
 CREATE TABLE IF NOT EXISTS servicios (
     id BIGSERIAL PRIMARY KEY,

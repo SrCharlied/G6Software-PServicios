@@ -61,4 +61,14 @@ class Proveedor extends Model
     {
         return $this->hasMany(Servicio::class);
     }
+
+    public function credito()
+    {
+        return $this->hasOne(CreditoProveedor::class, 'proveedor_id');
+    }
+
+    public function transaccionesCredito()
+    {
+        return $this->hasMany(TransaccionCredito::class, 'proveedor_id');
+    }
 }

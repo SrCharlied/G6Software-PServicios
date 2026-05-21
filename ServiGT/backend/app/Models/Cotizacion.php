@@ -6,20 +6,24 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-/**
- * Modelo stub para el módulo de cotizaciones (sprint futuro).
- * La tabla se creará cuando se implemente SER-196+.
- */
 class Cotizacion extends Model
 {
     use HasFactory;
 
+    protected $table = 'cotizaciones';
+
     protected $fillable = [
         'pedido_id',
         'proveedor_id',
-        'descripcion',
         'monto',
+        'mensaje',
         'estado',
+        'costo_creditos',
+    ];
+
+    protected $casts = [
+        'monto'          => 'decimal:2',
+        'costo_creditos' => 'integer',
     ];
 
     public function pedido(): BelongsTo

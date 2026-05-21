@@ -171,6 +171,18 @@ $statements = [
         created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
     )",
+    "CREATE TABLE IF NOT EXISTS cotizaciones (
+        id BIGSERIAL PRIMARY KEY,
+        pedido_id BIGINT NOT NULL REFERENCES pedidos(id) ON DELETE CASCADE,
+        proveedor_id BIGINT NOT NULL REFERENCES proveedores(id) ON DELETE CASCADE,
+        monto DECIMAL(10,2) NOT NULL CHECK (monto > 0),
+        mensaje TEXT NOT NULL,
+        estado VARCHAR(20) NOT NULL DEFAULT 'enviada'
+            CHECK (estado IN ('enviada','aceptada','rechazada','retirada')),
+        costo_creditos INT NOT NULL DEFAULT 0 CHECK (costo_creditos >= 0),
+        created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )",
     "CREATE INDEX IF NOT EXISTS idx_docs_proveedor_id ON documentos_proveedores (proveedor_id)",
     "CREATE INDEX IF NOT EXISTS idx_proveedores_user_id ON proveedores (user_id)",
     "CREATE INDEX IF NOT EXISTS idx_proveedores_categoria_id ON proveedores (categoria_id)",
@@ -190,6 +202,7 @@ $statements = [
     "CREATE INDEX IF NOT EXISTS idx_pedidos_estado ON pedidos (estado)",
     "CREATE INDEX IF NOT EXISTS idx_pedidos_categoria ON pedidos (categoria_id)",
     "CREATE INDEX IF NOT EXISTS idx_trans_cred_proveedor ON transacciones_credito (proveedor_id, created_at DESC)",
+    "CREATE UNIQUE INDEX IF NOT EXISTS idx_cotizaciones_pedido_proveedor ON cotizaciones (pedido_id, proveedor_id)",
 ];
 
 foreach ($statements as $statement) {

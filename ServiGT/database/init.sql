@@ -160,6 +160,21 @@ CREATE INDEX IF NOT EXISTS idx_pedidos_cliente ON pedidos (cliente_id);
 CREATE INDEX IF NOT EXISTS idx_pedidos_estado ON pedidos (estado);
 CREATE INDEX IF NOT EXISTS idx_pedidos_categoria ON pedidos (categoria_id);
 
+-- Cotizaciones (ofertas de proveedores a un pedido del cliente)
+CREATE TABLE IF NOT EXISTS cotizaciones (
+    id BIGSERIAL PRIMARY KEY,
+    pedido_id BIGINT NOT NULL REFERENCES pedidos(id) ON DELETE CASCADE,
+    proveedor_id BIGINT NOT NULL REFERENCES proveedores(id) ON DELETE CASCADE,
+    monto DECIMAL(10,2) NOT NULL CHECK (monto > 0),
+    mensaje TEXT NOT NULL,
+    estado VARCHAR(20) NOT NULL DEFAULT 'enviada'
+        CHECK (estado IN ('enviada','aceptada','rechazada','retirada')),
+    costo_creditos INT NOT NULL DEFAULT 0 CHECK (costo_creditos >= 0),
+    created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_cotizaciones_pedido_proveedor ON cotizaciones (pedido_id, proveedor_id);
+
 -- Pagos
 CREATE TABLE IF NOT EXISTS pagos (
     id BIGSERIAL PRIMARY KEY,

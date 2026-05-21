@@ -71,4 +71,9 @@ class Proveedor extends Model
     {
         return $this->hasMany(TransaccionCredito::class, 'proveedor_id');
     }
+
+    public function cotizaciones()
+    {
+        return $this->hasMany(Cotizacion::class, 'proveedor_id');
+    }
 }

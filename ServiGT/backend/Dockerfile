@@ -19,8 +19,12 @@ RUN composer require laravel/sanctum --no-interaction --no-progress --quiet
 
 # Copiar archivos personalizados sobre el proyecto Laravel
 COPY routes/api.php /app/routes/api.php
+COPY routes/console.php /app/routes/console.php
 COPY app/Http/Controllers/ /app/app/Http/Controllers/
 COPY app/Http/Middleware/ /app/app/Http/Middleware/
+COPY app/Http/Requests/ /app/app/Http/Requests/
+COPY app/Http/Resources/ /app/app/Http/Resources/
+COPY app/Console/Commands/ /app/app/Console/Commands/
 COPY app/Models/ /app/app/Models/
 COPY app/Observers/ /app/app/Observers/
 COPY app/Providers/ /app/app/Providers/

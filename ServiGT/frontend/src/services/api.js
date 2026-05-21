@@ -240,7 +240,7 @@ export const uploadDocumento = async (proveedorId, file, tipoDocumento) => {
   }
 };
 
-// ── Servicios / Solicitudes ───────────────────────────────────────────────
+// ── Servicios ─────────────────────────────────────────────────────────────
 
 export const createServicio = async (data) => {
   try {
@@ -248,33 +248,6 @@ export const createServicio = async (data) => {
     return response.data;
   } catch (error) {
     throw new Error(getErrorMessage(error, 'No se pudo enviar la solicitud.'));
-  }
-};
-
-export const createSolicitud = async (data) => {
-  try {
-    const response = await api.post('/solicitudes', data);
-    return response.data;
-  } catch (error) {
-    throw new Error(getErrorMessage(error, 'No se pudo enviar la solicitud.'));
-  }
-};
-
-export const getSolicitudesEnviadas = async () => {
-  try {
-    const response = await api.get('/solicitudes/enviadas');
-    return response.data;
-  } catch (error) {
-    throw new Error(getErrorMessage(error, 'No se pudieron cargar las solicitudes enviadas.'));
-  }
-};
-
-export const getSolicitudesRecibidas = async () => {
-  try {
-    const response = await api.get('/solicitudes/recibidas');
-    return response.data;
-  } catch (error) {
-    throw new Error(getErrorMessage(error, 'No se pudieron cargar las solicitudes recibidas.'));
   }
 };
 

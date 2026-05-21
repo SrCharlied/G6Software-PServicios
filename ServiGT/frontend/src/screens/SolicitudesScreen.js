@@ -7,7 +7,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { getSolicitudesEnviadas, getSolicitudesRecibidas } from '../services/api';
+import { getSolicitudesCliente, getSolicitudesProveedor } from '../services/api';
 import { useToast } from '../context/ToastContext';
 import { T } from '../theme';
 
@@ -30,12 +30,12 @@ export default function SolicitudesScreen({ navigation, user }) {
   const fetchSolicitudes = useCallback(async () => {
     setLoading(true);
     try {
-      const enviadasData = await getSolicitudesEnviadas();
-      setEnviadas(enviadasData.solicitudes || []);
+      const enviadasData = await getSolicitudesCliente();
+      setEnviadas(enviadasData.servicios || []);
 
       if (canSeeRecibidas) {
-        const recibidasData = await getSolicitudesRecibidas();
-        setRecibidas(recibidasData.solicitudes || []);
+        const recibidasData = await getSolicitudesProveedor();
+        setRecibidas(recibidasData.servicios || []);
       } else {
         setRecibidas([]);
       }

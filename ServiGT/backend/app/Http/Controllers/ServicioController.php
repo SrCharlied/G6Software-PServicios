@@ -227,6 +227,41 @@ class ServicioController extends Controller
         ]);
     }
 
+    public function confirmarFin(int $id, Request $request): JsonResponse
+    {
+        $request->validate([
+            'codigo' => 'required|string|size:6',
+        ]);
+
+        $servicio = $this->getServicioCliente($id, $request);
+        if ($servicio instanceof JsonResponse) return $servicio;
+
+        if ($servicio->estado !== 'por_confirmar') {
+            return $this->error('Este servicio no esta esperando confirmacion', 422);
+        }
+
+        if (!hash_equals((string) $servicio->codigo_fin, (string) $request->codigo)) {
+            return $this->error('Codigo incorrecto', 422);
+        }
+
+        $servicio->update(['estado' => 'completado']);
+
+        $servicio->loadMissing('proveedor');
+        if ($servicio->proveedor?->user_id) {
+            Notificacion::create([
+                'destinatario_id' => $servicio->proveedor->user_id,
+                'tipo'            => 'servicio_completado',
+                'titulo'          => 'Servicio confirmado',
+                'mensaje'         => 'El cliente confirmo la finalizacion del servicio.',
+                'datos'           => ['servicio_id' => $servicio->id],
+            ]);
+        }
+
+        $this->notificarServicioCalificable($servicio);
+
+        return $this->success('Servicio completado', ['servicio' => $servicio]);
+    }
+
     // ── Helper ────────────────────────────────────────────────────────────────
 
     private function getServicioProveedor(int $id, Request $request)
@@ -239,6 +274,20 @@ class ServicioController extends Controller
         $proveedor = $request->user()->proveedor;
         if (!$proveedor || $servicio->proveedor_id !== $proveedor->id) {
             return $this->error('No tienes permiso para gestionar este servicio', 403);
+        }
+
+        return $servicio;
+    }
+
+    private function getServicioCliente(int $id, Request $request)
+    {
+        $servicio = Servicio::find($id);
+        if (!$servicio) {
+            return $this->error('Servicio no encontrado', 404);
+        }
+
+        if ($servicio->cliente_id !== $request->user()->id) {
+            return $this->error('No tienes permiso para confirmar este servicio', 403);
         }
 
         return $servicio;

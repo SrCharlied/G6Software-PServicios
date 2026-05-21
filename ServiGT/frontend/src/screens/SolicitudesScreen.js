@@ -4,10 +4,15 @@ import {
   FlatList,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
-import { getSolicitudesCliente, getSolicitudesProveedor } from '../services/api';
+import {
+  confirmarFinServicio,
+  getSolicitudesCliente,
+  getSolicitudesProveedor,
+} from '../services/api';
 import { useToast } from '../context/ToastContext';
 import { T } from '../theme';
 
@@ -24,6 +29,9 @@ export default function SolicitudesScreen({ navigation, user }) {
   const [enviadas, setEnviadas] = useState([]);
   const [recibidas, setRecibidas] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [codigoFinInputs, setCodigoFinInputs] = useState({});
+  const [codigoFinErrors, setCodigoFinErrors] = useState({});
+  const [confirmandoId, setConfirmandoId] = useState(null);
 
   const canSeeRecibidas = user?.role === 'proveedor';
 
@@ -55,6 +63,26 @@ export default function SolicitudesScreen({ navigation, user }) {
     [activeTab, enviadas, recibidas]
   );
 
+  const handleConfirmarFin = async (servicioId) => {
+    const codigo = (codigoFinInputs[servicioId] || '').trim();
+    if (!/^\d{6}$/.test(codigo)) {
+      setCodigoFinErrors((e) => ({ ...e, [servicioId]: 'El codigo debe tener 6 digitos.' }));
+      return;
+    }
+    setCodigoFinErrors((e) => ({ ...e, [servicioId]: '' }));
+    setConfirmandoId(servicioId);
+    try {
+      await confirmarFinServicio(servicioId, codigo);
+      toast('Servicio confirmado. Ya puedes calificar al proveedor.', 'success');
+      setCodigoFinInputs((i) => ({ ...i, [servicioId]: '' }));
+      await fetchSolicitudes();
+    } catch (error) {
+      setCodigoFinErrors((e) => ({ ...e, [servicioId]: error.message }));
+    } finally {
+      setConfirmandoId(null);
+    }
+  };
+
   const formatDate = (value) => {
     if (!value) return '';
     try {
@@ -76,6 +104,9 @@ export default function SolicitudesScreen({ navigation, user }) {
     const mostrarCodigo = activeTab === 'enviadas'
       && item.codigo_inicio
       && ESTADOS_CON_CODIGO.has(item.estado);
+
+    const mostrarConfirmarFin = activeTab === 'enviadas'
+      && item.estado === 'por_confirmar';
 
     const yaCalifico = (item.calificaciones || []).some(
       (cal) => Number(cal.autor_id) === Number(user?.id)
@@ -105,6 +136,49 @@ export default function SolicitudesScreen({ navigation, user }) {
             <Text style={styles.codigoHint}>
               Compartelo con el proveedor cuando llegue para iniciar el servicio.
             </Text>
+          </View>
+        ) : null}
+
+        {mostrarConfirmarFin ? (
+          <View style={styles.confirmFinBox}>
+            <Text style={styles.confirmFinLabel}>Confirmar finalizacion</Text>
+            <Text style={styles.confirmFinHint}>
+              Pide al proveedor el codigo de 6 digitos para confirmar que el trabajo esta bien hecho.
+            </Text>
+            <TextInput
+              style={[
+                styles.confirmFinInput,
+                codigoFinErrors[item.id] && styles.confirmFinInputError,
+              ]}
+              placeholder="000000"
+              placeholderTextColor="#b9c2cc"
+              keyboardType="number-pad"
+              maxLength={6}
+              value={codigoFinInputs[item.id] || ''}
+              onChangeText={(v) => {
+                const clean = v.replace(/\D/g, '').slice(0, 6);
+                setCodigoFinInputs((s) => ({ ...s, [item.id]: clean }));
+                setCodigoFinErrors((e) => ({ ...e, [item.id]: '' }));
+              }}
+              editable={confirmandoId !== item.id}
+            />
+            {codigoFinErrors[item.id] ? (
+              <Text style={styles.confirmFinError}>{codigoFinErrors[item.id]}</Text>
+            ) : null}
+            <TouchableOpacity
+              style={[
+                styles.confirmFinBtn,
+                confirmandoId === item.id && styles.confirmFinBtnDisabled,
+              ]}
+              onPress={() => handleConfirmarFin(item.id)}
+              disabled={confirmandoId === item.id}
+            >
+              {confirmandoId === item.id ? (
+                <ActivityIndicator color={T.white} />
+              ) : (
+                <Text style={styles.confirmFinBtnText}>Confirmar finalizacion</Text>
+              )}
+            </TouchableOpacity>
           </View>
         ) : null}
 
@@ -269,6 +343,39 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   rateBtnText: { color: T.white, fontSize: 14, fontWeight: '800' },
+  confirmFinBox: {
+    marginTop: 14,
+    backgroundColor: '#fff4e0',
+    borderRadius: 10,
+    padding: 14,
+  },
+  confirmFinLabel: { fontSize: 12, color: '#b76e00', fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.6 },
+  confirmFinHint:  { fontSize: 12, color: '#7a5200', marginTop: 4, lineHeight: 16 },
+  confirmFinInput: {
+    marginTop: 10,
+    backgroundColor: T.white,
+    borderWidth: 1,
+    borderColor: '#e3c485',
+    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    fontSize: 22,
+    fontWeight: '800',
+    letterSpacing: 6,
+    textAlign: 'center',
+    color: T.ink,
+  },
+  confirmFinInputError: { borderColor: T.danger, backgroundColor: '#fff5f5' },
+  confirmFinError: { color: T.danger, fontSize: 12, marginTop: 6 },
+  confirmFinBtn: {
+    marginTop: 10,
+    backgroundColor: '#b76e00',
+    borderRadius: 8,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  confirmFinBtnDisabled: { opacity: 0.6 },
+  confirmFinBtnText: { color: T.white, fontSize: 14, fontWeight: '800' },
   ratedText: { marginTop: 12, color: T.success, fontSize: 13, fontWeight: '700' },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
   loadingText: { marginTop: 12, color: '#667085' },

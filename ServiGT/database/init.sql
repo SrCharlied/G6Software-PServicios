@@ -127,7 +127,7 @@ CREATE TABLE IF NOT EXISTS servicios (
     categoria_id BIGINT REFERENCES categorias(id) ON DELETE SET NULL,
     descripcion TEXT NOT NULL,
     estado VARCHAR(20) NOT NULL DEFAULT 'pendiente'
-        CHECK (estado IN ('pendiente','aceptado','en_camino','en_progreso','completado','cancelado','rechazado')),
+        CHECK (estado IN ('pendiente','aceptado','en_camino','en_progreso','por_confirmar','completado','cancelado','rechazado')),
     fecha_agendada TIMESTAMP WITHOUT TIME ZONE,
     direccion VARCHAR(500),
     monto_acordado DECIMAL(10,2),

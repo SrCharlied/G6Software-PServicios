@@ -15,6 +15,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import {
   aceptarServicio,
   actualizarEstadoServicio,
+  finalizarServicio,
   getCalificacionesProveedor,
   getDocumentos,
   getMiDisponibilidad,
@@ -219,11 +220,12 @@ function TimePickerModal({ visible, value, onSelect, onClose }) {
   );
 }
 
-function ServicioCard({ servicio, onAccept, onReject, onAdvanceStatus, onIniciar, compact = false }) {
+function ServicioCard({ servicio, onAccept, onReject, onAdvanceStatus, onIniciar, onFinalizar, compact = false }) {
   const estado    = servicio.estado;
   const canAccept = estado === 'pendiente';
   const canStart  = estado === 'aceptado';
-  const canFinish = estado === 'en_camino' || estado === 'en_progreso';
+  const canFinish = estado === 'en_progreso';
+  const porConfirmar = estado === 'por_confirmar';
 
   return (
     <View style={[styles.serviceCard, compact && styles.serviceCardCompact]}>
@@ -250,6 +252,16 @@ function ServicioCard({ servicio, onAccept, onReject, onAdvanceStatus, onIniciar
         </View>
       ) : null}
 
+      {porConfirmar && servicio.codigo_fin ? (
+        <View style={styles.codigoFinBox}>
+          <Text style={styles.codigoFinLabel}>Esperando confirmacion del cliente</Text>
+          <Text style={styles.codigoFinValue}>{servicio.codigo_fin}</Text>
+          <Text style={styles.codigoFinHint}>
+            Dale este codigo al cliente para que confirme la finalizacion del servicio.
+          </Text>
+        </View>
+      ) : null}
+
       {canAccept ? (
         <View style={styles.actionRow}>
           <TouchableOpacity style={styles.acceptBtn} onPress={() => onAccept(servicio.id)}>
@@ -267,8 +279,8 @@ function ServicioCard({ servicio, onAccept, onReject, onAdvanceStatus, onIniciar
         </View>
       ) : canFinish ? (
         <View style={styles.actionRow}>
-          <TouchableOpacity style={styles.advanceBtn} onPress={() => onAdvanceStatus(servicio.id, 'completado')}>
-            <Text style={styles.advanceBtnText}>Finalizar</Text>
+          <TouchableOpacity style={styles.advanceBtn} onPress={() => onFinalizar(servicio)}>
+            <Text style={styles.advanceBtnText}>Finalizar trabajo</Text>
           </TouchableOpacity>
         </View>
       ) : null}
@@ -301,6 +313,9 @@ export default function ProviderDashboardScreen({
   const [codigoInput, setCodigoInput] = useState('');
   const [codigoError, setCodigoError] = useState('');
   const [iniciando, setIniciando] = useState(false);
+  const [finalizarTarget, setFinalizarTarget] = useState(null); // servicio | null
+  const [codigoFinGenerado, setCodigoFinGenerado] = useState('');
+  const [finalizando, setFinalizando] = useState(false);
   const [, setTick] = useState(0); // refresca el header cada minuto
   const fileInputRef = useRef(null);
 
@@ -310,7 +325,7 @@ export default function ProviderDashboardScreen({
   }, []);
 
   const pendientes = useMemo(() => solicitudes.filter((i) => i.estado === 'pendiente'), [solicitudes]);
-  const activas = useMemo(() => solicitudes.filter((i) => ['aceptado','en_camino','en_progreso'].includes(i.estado)), [solicitudes]);
+  const activas = useMemo(() => solicitudes.filter((i) => ['aceptado','en_camino','en_progreso','por_confirmar'].includes(i.estado)), [solicitudes]);
   const historial = useMemo(() => solicitudes.filter((i) => ['completado','rechazado','cancelado'].includes(i.estado)), [solicitudes]);
   const reviewAverage = useMemo(() => {
     if (calificaciones.length === 0) return Number(profile?.calificacion_promedio || 0);
@@ -435,6 +450,28 @@ export default function ProviderDashboardScreen({
     }
   };
 
+  const openFinalizar = async (servicio) => {
+    setFinalizarTarget(servicio);
+    setCodigoFinGenerado('');
+    setFinalizando(true);
+    try {
+      const data = await finalizarServicio(servicio.id);
+      setCodigoFinGenerado(data?.codigo_fin || '');
+      await refreshSolicitudes();
+    } catch (error) {
+      toast(error.message, 'error');
+      setFinalizarTarget(null);
+    } finally {
+      setFinalizando(false);
+    }
+  };
+
+  const closeFinalizar = () => {
+    if (finalizando) return;
+    setFinalizarTarget(null);
+    setCodigoFinGenerado('');
+  };
+
   const handleAdvanceStatus = async (id, estado) => {
     setMutatingServiceId(id);
     const labels = { en_camino: 'En camino.', en_progreso: 'Servicio en progreso.', completado: 'Servicio marcado como completado.' };
@@ -554,7 +591,7 @@ export default function ProviderDashboardScreen({
         ) : (
           pendientes.map((s) => (
             <View key={s.id} style={mutatingServiceId === s.id && styles.disabledBlock}>
-              <ServicioCard servicio={s} onAccept={handleAccept} onReject={handleReject} onAdvanceStatus={handleAdvanceStatus} onIniciar={openIniciar} />
+              <ServicioCard servicio={s} onAccept={handleAccept} onReject={handleReject} onAdvanceStatus={handleAdvanceStatus} onIniciar={openIniciar} onFinalizar={openFinalizar} />
             </View>
           ))
         )}
@@ -564,7 +601,7 @@ export default function ProviderDashboardScreen({
         ) : (
           activas.map((s) => (
             <View key={s.id} style={mutatingServiceId === s.id && styles.disabledBlock}>
-              <ServicioCard servicio={s} onAccept={handleAccept} onReject={handleReject} onAdvanceStatus={handleAdvanceStatus} onIniciar={openIniciar} />
+              <ServicioCard servicio={s} onAccept={handleAccept} onReject={handleReject} onAdvanceStatus={handleAdvanceStatus} onIniciar={openIniciar} onFinalizar={openFinalizar} />
             </View>
           ))
         )}
@@ -584,7 +621,7 @@ export default function ProviderDashboardScreen({
         <View style={styles.emptyState}><Text style={styles.emptyStateText}>Aun no hay servicios finalizados o rechazados.</Text></View>
       ) : (
         historial.map((s) => (
-          <ServicioCard key={s.id} servicio={s} onAccept={handleAccept} onReject={handleReject} onAdvanceStatus={handleAdvanceStatus} onIniciar={openIniciar} compact />
+          <ServicioCard key={s.id} servicio={s} onAccept={handleAccept} onReject={handleReject} onAdvanceStatus={handleAdvanceStatus} onIniciar={openIniciar} onFinalizar={openFinalizar} compact />
         ))
       )}
     </View>
@@ -821,6 +858,38 @@ export default function ProviderDashboardScreen({
           </Pressable>
         </Pressable>
       </Modal>
+
+      <Modal visible={!!finalizarTarget} transparent animationType="fade" onRequestClose={closeFinalizar}>
+        <Pressable style={styles.codigoBackdrop} onPress={closeFinalizar}>
+          <Pressable style={styles.codigoSheet} onPress={() => {}}>
+            <Text style={styles.codigoTitle}>Trabajo finalizado</Text>
+            <Text style={styles.codigoSubtitle}>
+              Dale este codigo al cliente para que confirme la finalizacion del servicio.
+            </Text>
+            {finalizando ? (
+              <View style={styles.codigoFinModalLoader}>
+                <ActivityIndicator size="large" color={T.blue} />
+              </View>
+            ) : codigoFinGenerado ? (
+              <View style={styles.codigoFinModalBox}>
+                <Text style={styles.codigoFinModalValue}>{codigoFinGenerado}</Text>
+              </View>
+            ) : null}
+            <Text style={styles.codigoFinModalHint}>
+              El servicio se marcara como completado cuando el cliente ingrese este codigo.
+            </Text>
+            <View style={styles.codigoActions}>
+              <TouchableOpacity
+                style={[styles.codigoConfirmBtn, finalizando && styles.codigoConfirmBtnDisabled]}
+                onPress={closeFinalizar}
+                disabled={finalizando}
+              >
+                <Text style={styles.codigoConfirmText}>Entendido</Text>
+              </TouchableOpacity>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </ScrollView>
   );
 }
@@ -873,6 +942,40 @@ const styles = StyleSheet.create({
   codigoConfirmBtn:  { backgroundColor: '#4589d4', paddingVertical: 11, paddingHorizontal: 22, borderRadius: 8, minWidth: 110, alignItems: 'center' },
   codigoConfirmBtnDisabled: { opacity: 0.6 },
   codigoConfirmText: { color: '#fff', fontWeight: '700', fontSize: 15 },
+
+  codigoFinModalLoader: { paddingVertical: 30, alignItems: 'center' },
+  codigoFinModalBox: {
+    marginTop: 6,
+    backgroundColor: '#e3f0ff',
+    borderRadius: 10,
+    paddingVertical: 22,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+  },
+  codigoFinModalValue: {
+    fontSize: 40,
+    fontWeight: '800',
+    color: '#0e1424',
+    letterSpacing: 10,
+  },
+  codigoFinModalHint: {
+    marginTop: 14,
+    fontSize: 12,
+    color: '#667085',
+    textAlign: 'center',
+    lineHeight: 17,
+  },
+
+  codigoFinBox: {
+    marginTop: 12,
+    backgroundColor: '#fff4e0',
+    borderRadius: 10,
+    padding: 14,
+    alignItems: 'center',
+  },
+  codigoFinLabel: { fontSize: 11, color: '#b76e00', fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.6 },
+  codigoFinValue: { fontSize: 28, fontWeight: '800', color: '#0e1424', letterSpacing: 6, marginTop: 4 },
+  codigoFinHint:  { fontSize: 11, color: '#7a5200', marginTop: 6, textAlign: 'center' },
 
   // Header gradient
   header: {

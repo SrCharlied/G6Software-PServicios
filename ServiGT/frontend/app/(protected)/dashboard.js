@@ -15,6 +15,10 @@ export default function DashboardRoute() {
         router.push(`/chat?userId=${params.chatWithUserId}&name=${encodeURIComponent(params.chatWithName ?? '')}`);
         return;
       }
+      if (key === 'pedidodetail') {
+        router.push(`/pedidos/${params.pedidoId}`);
+        return;
+      }
       const map = {
         home: '/home',
         providereditprofile: '/profile/edit',

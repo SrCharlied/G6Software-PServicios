@@ -475,6 +475,24 @@ export const getPedidosAbiertos = async ({ categoriaId = null, page = 1 } = {}) 
   }
 };
 
+export const getPedidoDetalle = async (id) => {
+  try {
+    const response = await api.get(`/pedidos/${id}`);
+    return response.data;
+  } catch (error) {
+    throw new Error(getErrorMessage(error, 'No se pudo cargar el pedido.'));
+  }
+};
+
+export const enviarCotizacion = async (pedidoId, { monto, mensaje }) => {
+  try {
+    const response = await api.post(`/pedidos/${pedidoId}/cotizaciones`, { monto, mensaje });
+    return response.data;
+  } catch (error) {
+    throw new Error(getErrorMessage(error, 'No se pudo enviar la cotización.'));
+  }
+};
+
 export const getMisPedidos = async ({ page = 1 } = {}) => {
   try {
     const response = await api.get('/pedidos/mios', { params: { page } });

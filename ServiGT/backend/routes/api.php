@@ -11,6 +11,7 @@ use App\Http\Controllers\ServicioController;
 use App\Http\Controllers\DisponibilidadController;
 use App\Http\Controllers\CalificacionController;
 use App\Http\Controllers\NotificacionController;
+use App\Http\Controllers\CotizacionController;
 use App\Http\Controllers\PedidoController;
 
 /*
@@ -34,6 +35,7 @@ Route::post('/login',    [AuthController::class, 'login']);
 // Consultas publicas
 Route::get('/categorias',              [CategoriaController::class, 'index']);
 Route::get('/pedidos/abiertos',        [PedidoController::class, 'abiertos']);
+Route::get('/pedidos/{id}',            [PedidoController::class, 'show'])->where('id', '[0-9]+');
 Route::get('/providers',      [ProviderController::class, 'index']);
 Route::get('/providers/{id}', [ProviderController::class, 'show'])->where('id', '[0-9]+');
 
@@ -103,8 +105,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/mensajes/conversaciones', [MessageController::class, 'misConversaciones']);
 
     // ── Pedidos (Marketplace de Demanda) ─────────────────────────────────────
-    Route::post('/pedidos',           [PedidoController::class, 'store']);
-    Route::get('/pedidos/mios',       [PedidoController::class, 'mios']);
+    Route::post('/pedidos',                              [PedidoController::class, 'store']);
+    Route::get('/pedidos/mios',                          [PedidoController::class, 'mios']);
+    Route::post('/pedidos/{pedidoId}/cotizaciones',      [CotizacionController::class, 'store'])->where('pedidoId', '[0-9]+');
 
     // ── Notificaciones ───────────────────────────────────────────────────────
     Route::get('/notificaciones',                [NotificacionController::class, 'index']);

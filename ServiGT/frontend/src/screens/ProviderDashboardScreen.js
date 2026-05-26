@@ -19,6 +19,7 @@ import {
   actualizarEstadoServicio,
   finalizarServicio,
   getCalificacionesProveedor,
+  getCategorias,
   getDocumentos,
   getMiDisponibilidad,
   getPedidosAbiertos,
@@ -31,6 +32,13 @@ import {
 } from '../services/api';
 import { useToast } from '../context/ToastContext';
 import { T } from '../theme';
+
+const DEPARTAMENTOS_GT = [
+  'Alta Verapaz', 'Baja Verapaz', 'Chimaltenango', 'Chiquimula', 'El Progreso',
+  'Escuintla', 'Guatemala', 'Huehuetenango', 'Izabal', 'Jalapa', 'Jutiapa',
+  'Petén', 'Quetzaltenango', 'Quiché', 'Retalhuleu', 'Sacatepéquez',
+  'San Marcos', 'Santa Rosa', 'Sololá', 'Suchitepéquez', 'Totonicapán', 'Zacapa',
+];
 
 const TIPOS_DOCUMENTO = [
   'DPI (Documento Personal de Identificacion)',
@@ -273,6 +281,58 @@ function TimePickerModal({ visible, value, onSelect, onClose }) {
   );
 }
 
+const filtStyles = StyleSheet.create({
+  // Category chips
+  chipsRow:       { flexDirection: 'row', gap: 8, paddingVertical: 4 },
+  chip: {
+    paddingHorizontal: 13, paddingVertical: 7,
+    borderRadius: 999, borderWidth: 1,
+    borderColor: T.inputBorder, backgroundColor: T.white,
+  },
+  chipActive:     { backgroundColor: T.blue, borderColor: T.blue },
+  chipMine:       { borderColor: T.deep, borderWidth: 1.5, backgroundColor: 'rgba(27,84,153,0.06)' },
+  chipText:       { fontSize: 12, color: T.muted, fontWeight: '600' },
+  chipTextActive: { color: '#fff' },
+  chipMineText:   { color: T.deep },
+
+  // Dept row
+  deptRow:         { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  deptBtn: {
+    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: 13, paddingVertical: 10,
+    borderRadius: T.rSm, borderWidth: 1, borderColor: T.inputBorder,
+    backgroundColor: T.white,
+  },
+  deptBtnActive:    { borderColor: T.blue, backgroundColor: '#eef4ff' },
+  deptBtnText:      { fontSize: 13, color: T.muted, flex: 1 },
+  deptBtnTextActive:{ color: T.blue, fontWeight: '600' },
+  deptArrow:        { fontSize: 11, color: T.faint, marginLeft: 4 },
+
+  // Clear btn
+  clearBtn:     { paddingHorizontal: 12, paddingVertical: 10 },
+  clearBtnText: { fontSize: 13, color: T.danger, fontWeight: '600' },
+
+  // Result count
+  resultCount: { fontSize: 12, color: T.faint },
+
+  // Empty state limpiar
+  emptyLimpiarBtn:  { marginTop: 12, paddingHorizontal: 20, paddingVertical: 9, borderRadius: T.rSm, borderWidth: 1, borderColor: T.inputBorder },
+  emptyLimpiarText: { fontSize: 13, color: T.muted, fontWeight: '600' },
+
+  // Dept picker modal
+  deptPickerSheet: {
+    width: '100%', maxWidth: 380,
+    backgroundColor: T.white, borderRadius: 16,
+    padding: 20, maxHeight: '75%',
+    ...T.sh3,
+  },
+  deptPickerTitle:      { fontSize: 16, fontWeight: '700', color: T.ink, marginBottom: 14 },
+  deptOption:           { paddingVertical: 13, paddingHorizontal: 4, borderBottomWidth: 1, borderBottomColor: T.paper },
+  deptOptionActive:     { backgroundColor: '#eef4ff', borderRadius: T.rSm, paddingHorizontal: 10 },
+  deptOptionText:       { fontSize: 14, color: T.text },
+  deptOptionTextActive: { color: T.blue, fontWeight: '700' },
+});
+
 const ocStyles = StyleSheet.create({
   card: {
     backgroundColor: T.white,
@@ -445,6 +505,10 @@ export default function ProviderDashboardScreen({
   const [oportunidades, setOportunidades] = useState([]);
   const [loadingOportunidades, setLoadingOportunidades] = useState(false);
   const [selectedPedido, setSelectedPedido] = useState(null);
+  const [categorias, setCategorias] = useState([]);
+  const [catFiltro, setCatFiltro] = useState(null);
+  const [deptFiltro, setDeptFiltro] = useState('');
+  const [showDeptPicker, setShowDeptPicker] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [savingDisponibilidad, setSavingDisponibilidad] = useState(false);
   const [mutatingServiceId, setMutatingServiceId] = useState(null);
@@ -469,6 +533,18 @@ export default function ProviderDashboardScreen({
   const pendientes = useMemo(() => solicitudes.filter((i) => i.estado === 'pendiente'), [solicitudes]);
   const activas = useMemo(() => solicitudes.filter((i) => ['aceptado','en_camino','en_progreso','por_confirmar'].includes(i.estado)), [solicitudes]);
   const historial = useMemo(() => solicitudes.filter((i) => ['completado','rechazado','cancelado'].includes(i.estado)), [solicitudes]);
+  const oportunidadesFiltradas = useMemo(() => {
+    let list = oportunidades;
+    if (catFiltro != null) {
+      list = list.filter((p) => (p.categoria_id ?? p.categoria?.id) === catFiltro);
+    }
+    if (deptFiltro) {
+      const lower = deptFiltro.toLowerCase();
+      list = list.filter((p) => p.direccion?.toLowerCase().includes(lower));
+    }
+    return list;
+  }, [oportunidades, catFiltro, deptFiltro]);
+
   const reviewAverage = useMemo(() => {
     if (calificaciones.length === 0) return Number(profile?.calificacion_promedio || 0);
     const total = calificaciones.reduce((s, i) => s + Number(i.puntuacion || 0), 0);
@@ -478,13 +554,29 @@ export default function ProviderDashboardScreen({
   const availableNow = isAvailableNow(disponibilidad);
 
   useEffect(() => {
+    if (providerProfile) setProfile(providerProfile);
+  }, [providerProfile]);
+
+  useEffect(() => {
     if (!profile && user) { loadProfile(); return; }
     if (profile) loadDashboardData(profile);
   }, [user, profile?.id]);
 
   useEffect(() => {
-    if (activeTab === 'oportunidades' && oportunidades.length === 0 && !loadingOportunidades) {
-      refreshOportunidades();
+    const multi = profile?.categorias;
+    if (multi?.length === 1) {
+      setCatFiltro(multi[0].id);
+    } else if (!multi?.length) {
+      const catId = profile?.categoria_id ?? profile?.categoria?.id;
+      if (catId) setCatFiltro(catId);
+    }
+    // Con múltiples categorías no se fuerza ninguna; los chips ★ orientan al proveedor
+  }, [profile?.categoria_id, profile?.categorias?.length]);
+
+  useEffect(() => {
+    if (activeTab === 'oportunidades') {
+      if (oportunidades.length === 0 && !loadingOportunidades) refreshOportunidades();
+      if (categorias.length === 0) loadCategorias();
     }
   }, [activeTab]);
 
@@ -539,6 +631,13 @@ export default function ProviderDashboardScreen({
     try { const data = await getPedidosAbiertos(); setOportunidades(data.pedidos || []); }
     catch (error) { toast(error.message, 'error'); }
     finally { setLoadingOportunidades(false); }
+  };
+
+  const loadCategorias = async () => {
+    try {
+      const data = await getCategorias();
+      setCategorias(data.categorias || data || []);
+    } catch { /* silent — chips simplemente no aparecen */ }
   };
 
   const handleFileSelect = (event) => {
@@ -813,40 +912,128 @@ export default function ProviderDashboardScreen({
     </View>
   );
 
-  const renderOportunidades = () => (
-    <View style={styles.sectionStack}>
-      <View style={styles.sectionHeaderRow}>
-        <Text style={styles.sectionTitle}>Pedidos abiertos</Text>
-        <TouchableOpacity onPress={refreshOportunidades}><Text style={styles.linkText}>Actualizar</Text></TouchableOpacity>
-      </View>
-      <FlatList
-        data={oportunidades}
-        keyExtractor={(item) => String(item.id)}
-        scrollEnabled={false}
-        refreshControl={
-          <RefreshControl
-            refreshing={loadingOportunidades}
-            onRefresh={refreshOportunidades}
-            colors={[T.blue]}
-            tintColor={T.blue}
-          />
-        }
-        ListEmptyComponent={
-          loadingOportunidades ? (
-            <ActivityIndicator color={T.blue} style={styles.sectionLoader} />
-          ) : (
-            <View style={styles.emptyState}>
-              <Text style={styles.emptyStateText}>No hay oportunidades nuevas en este momento.</Text>
-            </View>
-          )
-        }
-        renderItem={({ item }) => (
-          <OpportunityCard pedido={item} onPress={() => setSelectedPedido(item)} />
+  const renderOportunidades = () => {
+    const hasFilters = catFiltro != null || deptFiltro !== '';
+    const providerCatIds = new Set([
+      ...(profile?.categorias?.map((c) => c.id) ?? []),
+      ...(profile?.categoria_id ? [profile.categoria_id] : []),
+    ]);
+
+    return (
+      <View style={styles.sectionStack}>
+        {/* Header */}
+        <View style={styles.sectionHeaderRow}>
+          <Text style={styles.sectionTitle}>Pedidos abiertos</Text>
+          <TouchableOpacity onPress={refreshOportunidades}>
+            <Text style={styles.linkText}>Actualizar</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Category chips */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={filtStyles.chipsRow}
+        >
+          <TouchableOpacity
+            style={[filtStyles.chip, catFiltro == null && filtStyles.chipActive]}
+            onPress={() => setCatFiltro(null)}
+          >
+            <Text style={[filtStyles.chipText, catFiltro == null && filtStyles.chipTextActive]}>
+              Todas
+            </Text>
+          </TouchableOpacity>
+
+          {categorias.map((cat) => {
+            const active = catFiltro === cat.id;
+            const isProviderCat = providerCatIds.has(cat.id);
+            return (
+              <TouchableOpacity
+                key={cat.id}
+                style={[filtStyles.chip, active && filtStyles.chipActive, isProviderCat && !active && filtStyles.chipMine]}
+                onPress={() => setCatFiltro(active ? null : cat.id)}
+              >
+                <Text style={[filtStyles.chipText, active && filtStyles.chipTextActive, isProviderCat && !active && filtStyles.chipMineText]}>
+                  {getCatIcon(cat.nombre)} {cat.nombre}
+                  {isProviderCat ? ' ★' : ''}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+
+        {/* Dept row */}
+        <View style={filtStyles.deptRow}>
+          <TouchableOpacity
+            style={[filtStyles.deptBtn, deptFiltro !== '' && filtStyles.deptBtnActive]}
+            onPress={() => setShowDeptPicker(true)}
+          >
+            <Text style={[filtStyles.deptBtnText, deptFiltro !== '' && filtStyles.deptBtnTextActive]}>
+              {deptFiltro !== '' ? `📍 ${deptFiltro}` : '📍 Departamento'}
+            </Text>
+            <Text style={filtStyles.deptArrow}>▾</Text>
+          </TouchableOpacity>
+
+          {hasFilters && (
+            <TouchableOpacity
+              style={filtStyles.clearBtn}
+              onPress={() => { setCatFiltro(null); setDeptFiltro(''); }}
+            >
+              <Text style={filtStyles.clearBtnText}>Limpiar filtros</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {/* Results count */}
+        {!loadingOportunidades && oportunidades.length > 0 && (
+          <Text style={filtStyles.resultCount}>
+            {oportunidadesFiltradas.length} resultado{oportunidadesFiltradas.length !== 1 ? 's' : ''}
+            {hasFilters ? ' con filtros aplicados' : ''}
+          </Text>
         )}
-        ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
-      />
-    </View>
-  );
+
+        {/* List */}
+        <FlatList
+          data={oportunidadesFiltradas}
+          keyExtractor={(item) => String(item.id)}
+          scrollEnabled={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={loadingOportunidades}
+              onRefresh={refreshOportunidades}
+              colors={[T.blue]}
+              tintColor={T.blue}
+            />
+          }
+          ListEmptyComponent={
+            loadingOportunidades ? (
+              <ActivityIndicator color={T.blue} style={styles.sectionLoader} />
+            ) : (
+              <View style={styles.emptyState}>
+                <Text style={styles.emptyStateText}>
+                  {hasFilters
+                    ? 'No hay oportunidades con los filtros seleccionados.'
+                    : 'No hay oportunidades nuevas en este momento.'}
+                </Text>
+                {hasFilters && (
+                  <TouchableOpacity
+                    style={filtStyles.emptyLimpiarBtn}
+                    onPress={() => { setCatFiltro(null); setDeptFiltro(''); }}
+                  >
+                    <Text style={filtStyles.emptyLimpiarText}>Limpiar filtros</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            )
+          }
+          renderItem={({ item }) => (
+            <OpportunityCard pedido={item} onPress={() => setSelectedPedido(item)} />
+          )}
+          ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
+        />
+      </View>
+    );
+  };
 
   const renderDisponibilidad = () => (
     <View style={styles.sectionStack}>
@@ -1046,6 +1233,35 @@ export default function ProviderDashboardScreen({
                 {iniciando ? <ActivityIndicator color="#fff" /> : <Text style={styles.codigoConfirmText}>Confirmar</Text>}
               </TouchableOpacity>
             </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      <Modal visible={showDeptPicker} transparent animationType="fade" onRequestClose={() => setShowDeptPicker(false)}>
+        <Pressable style={styles.codigoBackdrop} onPress={() => setShowDeptPicker(false)}>
+          <Pressable style={filtStyles.deptPickerSheet} onPress={() => {}}>
+            <Text style={filtStyles.deptPickerTitle}>Filtrar por departamento</Text>
+            <ScrollView showsVerticalScrollIndicator={false}>
+              <TouchableOpacity
+                style={[filtStyles.deptOption, deptFiltro === '' && filtStyles.deptOptionActive]}
+                onPress={() => { setDeptFiltro(''); setShowDeptPicker(false); }}
+              >
+                <Text style={[filtStyles.deptOptionText, deptFiltro === '' && filtStyles.deptOptionTextActive]}>
+                  Todos los departamentos
+                </Text>
+              </TouchableOpacity>
+              {DEPARTAMENTOS_GT.map((dept) => (
+                <TouchableOpacity
+                  key={dept}
+                  style={[filtStyles.deptOption, deptFiltro === dept && filtStyles.deptOptionActive]}
+                  onPress={() => { setDeptFiltro(dept); setShowDeptPicker(false); }}
+                >
+                  <Text style={[filtStyles.deptOptionText, deptFiltro === dept && filtStyles.deptOptionTextActive]}>
+                    {dept}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
           </Pressable>
         </Pressable>
       </Modal>

@@ -504,7 +504,6 @@ export default function ProviderDashboardScreen({
   const [loadingDisponibilidad, setLoadingDisponibilidad] = useState(false);
   const [oportunidades, setOportunidades] = useState([]);
   const [loadingOportunidades, setLoadingOportunidades] = useState(false);
-  const [selectedPedido, setSelectedPedido] = useState(null);
   const [categorias, setCategorias] = useState([]);
   const [catFiltro, setCatFiltro] = useState(null);
   const [deptFiltro, setDeptFiltro] = useState('');
@@ -1027,7 +1026,7 @@ export default function ProviderDashboardScreen({
             )
           }
           renderItem={({ item }) => (
-            <OpportunityCard pedido={item} onPress={() => setSelectedPedido(item)} />
+            <OpportunityCard pedido={item} onPress={() => navigation.navigate('PedidoDetail', { pedidoId: item.id })} />
           )}
           ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
         />
@@ -1262,76 +1261,6 @@ export default function ProviderDashboardScreen({
                 </TouchableOpacity>
               ))}
             </ScrollView>
-          </Pressable>
-        </Pressable>
-      </Modal>
-
-      <Modal visible={!!selectedPedido} transparent animationType="slide" onRequestClose={() => setSelectedPedido(null)}>
-        <Pressable style={styles.codigoBackdrop} onPress={() => setSelectedPedido(null)}>
-          <Pressable style={styles.pedidoDetailSheet} onPress={() => {}}>
-            {selectedPedido ? (() => {
-              const p      = selectedPedido;
-              const urgCfg = URGENCIA_CONFIG[p.urgencia] ?? URGENCIA_CONFIG.baja;
-              const slot   = getSlotIndicator(p);
-              return (
-                <>
-                  {/* Header */}
-                  <View style={styles.pedidoDetailHeader}>
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.pedidoDetailCat}>
-                        {getCatIcon(p.categoria?.nombre)} {p.categoria?.nombre || 'Sin categoría'}
-                      </Text>
-                      <Text style={styles.pedidoDetailTime}>{timeAgo(p.created_at)}</Text>
-                    </View>
-                    <TouchableOpacity style={styles.pedidoDetailClose} onPress={() => setSelectedPedido(null)}>
-                      <Text style={styles.pedidoDetailCloseText}>✕</Text>
-                    </TouchableOpacity>
-                  </View>
-
-                  {/* Badges row */}
-                  <View style={styles.pedidoDetailBadges}>
-                    <View style={[ocStyles.urgBadge, { backgroundColor: urgCfg.bg, borderColor: urgCfg.border }]}>
-                      <Text style={[ocStyles.urgText, { color: urgCfg.text }]}>{urgCfg.label}</Text>
-                    </View>
-                    <View style={[ocStyles.slotBadge, slot.type === 'gratis' ? ocStyles.slotGratis : ocStyles.slotCredito]}>
-                      <Text style={[ocStyles.slotText, slot.type === 'gratis' ? ocStyles.slotGratisText : ocStyles.slotCreditoText]}>
-                        {slot.label}
-                      </Text>
-                    </View>
-                  </View>
-
-                  {/* Description */}
-                  <Text style={styles.pedidoDetailLabel}>Descripción</Text>
-                  <Text style={styles.pedidoDetailDesc}>{p.descripcion || '—'}</Text>
-
-                  {/* Meta grid */}
-                  <View style={styles.pedidoDetailGrid}>
-                    {p.direccion ? (
-                      <View style={styles.pedidoDetailGridItem}>
-                        <Text style={styles.pedidoDetailGridLabel}>📍 Ubicación</Text>
-                        <Text style={styles.pedidoDetailGridValue}>{p.direccion}</Text>
-                      </View>
-                    ) : null}
-                    {p.presupuesto ? (
-                      <View style={styles.pedidoDetailGridItem}>
-                        <Text style={styles.pedidoDetailGridLabel}>💰 Presupuesto</Text>
-                        <Text style={styles.pedidoDetailGridValue}>{formatCurrency(p.presupuesto)}</Text>
-                      </View>
-                    ) : null}
-                    {p.fecha_requerida ? (
-                      <View style={styles.pedidoDetailGridItem}>
-                        <Text style={styles.pedidoDetailGridLabel}>📅 Fecha requerida</Text>
-                        <Text style={styles.pedidoDetailGridValue}>{formatDate(p.fecha_requerida)}</Text>
-                      </View>
-                    ) : null}
-                    <View style={styles.pedidoDetailGridItem}>
-                      <Text style={styles.pedidoDetailGridLabel}>📊 Cotizaciones</Text>
-                      <Text style={styles.pedidoDetailGridValue}>{p.cotizaciones_count ?? 0}</Text>
-                    </View>
-                  </View>
-                </>
-              );
-            })() : null}
           </Pressable>
         </Pressable>
       </Modal>
@@ -1612,29 +1541,6 @@ const styles = StyleSheet.create({
   primaryBtnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
   secondaryHomeBtn: { backgroundColor: T.paper, padding: 14, borderRadius: T.rSm, alignItems: 'center', borderWidth: 1, borderColor: T.border },
   secondaryHomeBtnText: { color: T.ink, fontWeight: '700', fontSize: 14 },
-
-  // Pedido detail modal
-  pedidoDetailSheet: {
-    width: '100%',
-    maxWidth: 420,
-    backgroundColor: T.white,
-    borderRadius: 20,
-    padding: 22,
-    maxHeight: '85%',
-    ...T.sh3,
-  },
-  pedidoDetailHeader:    { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 14 },
-  pedidoDetailCat:       { fontSize: 16, fontWeight: '700', color: T.ink, marginBottom: 2 },
-  pedidoDetailTime:      { fontSize: 12, color: T.faint },
-  pedidoDetailClose:     { padding: 4 },
-  pedidoDetailCloseText: { fontSize: 18, color: T.muted, fontWeight: '600' },
-  pedidoDetailBadges:    { flexDirection: 'row', gap: 8, marginBottom: 16 },
-  pedidoDetailLabel:     { fontSize: 11, fontWeight: '700', color: T.muted, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 },
-  pedidoDetailDesc:      { fontSize: 14, color: T.text, lineHeight: 21, marginBottom: 18 },
-  pedidoDetailGrid:      { gap: 12 },
-  pedidoDetailGridItem:  { backgroundColor: T.paper, borderRadius: T.rSm, padding: 12 },
-  pedidoDetailGridLabel: { fontSize: 11, color: T.muted, marginBottom: 3 },
-  pedidoDetailGridValue: { fontSize: 14, fontWeight: '600', color: T.ink },
 
   // Chat
   chatClientRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: T.white, borderRadius: T.rMd, paddingHorizontal: 16, paddingVertical: 12, borderWidth: 1, borderColor: T.border, gap: 12 },

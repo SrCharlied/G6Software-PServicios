@@ -39,6 +39,34 @@ class PedidoController extends Controller
     }
 
     /**
+     * GET /api/pedidos/{id}
+     * Detalle público de un pedido con cotizaciones anonimizadas.
+     */
+    public function show(int $id): JsonResponse
+    {
+        $pedido = Pedido::with(['cliente', 'categoria', 'cotizaciones.proveedor'])
+            ->findOrFail($id);
+
+        $cotizaciones = $pedido->cotizaciones
+            ->sortBy('created_at')
+            ->values()
+            ->map(fn($c, $i) => [
+                'indice'      => $i,
+                'monto'       => (float) $c->monto,
+                'calificacion'=> (float) ($c->proveedor?->calificacion_promedio ?? 0),
+                'estado'      => $c->estado,
+                'created_at'  => $c->created_at?->toIso8601String(),
+            ]);
+
+        return response()->json([
+            'success'      => true,
+            'message'      => 'OK',
+            'pedido'       => new PedidoResource($pedido),
+            'cotizaciones' => $cotizaciones,
+        ]);
+    }
+
+    /**
      * GET /api/pedidos/abiertos
      * Listado público paginado. Filtros: categoria_id, page.
      */

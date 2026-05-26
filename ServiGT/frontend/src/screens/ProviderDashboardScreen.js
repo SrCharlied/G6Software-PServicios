@@ -139,6 +139,55 @@ const formatCurrency = (value) => {
   return `Q${number.toFixed(2)}`;
 };
 
+const timeAgo = (iso) => {
+  if (!iso) return '';
+  const diff = Date.now() - new Date(iso).getTime();
+  const m = Math.floor(diff / 60000);
+  if (m < 1) return 'ahora mismo';
+  if (m < 60) return `hace ${m} min`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `hace ${h} h`;
+  const d = Math.floor(h / 24);
+  return `hace ${d} d`;
+};
+
+const CATEGORIA_ICONO = {
+  electric: '⚡', plomeria: '🔧', fontaneria: '🔧', carpinteria: '🪚',
+  pintura: '🎨', limpieza: '🧹', jardineria: '🌿', seguridad: '🔒',
+  mecanica: '🔩', tecnologia: '💻', cocina: '🍳', transporte: '🚗',
+  construccion: '🏗️', mudanza: '📦', ensamble: '🔨',
+};
+
+const getCatIcon = (nombre = '') => {
+  const lower = nombre.toLowerCase();
+  for (const [key, icon] of Object.entries(CATEGORIA_ICONO)) {
+    if (lower.includes(key)) return icon;
+  }
+  return '📋';
+};
+
+const URGENCIA_CONFIG = {
+  alta:  { label: 'URGENTE',  bg: '#fee2e2', text: '#991b1b', border: '#fca5a5' },
+  media: { label: 'MEDIA',    bg: '#fef3c7', text: '#92400e', border: '#fde68a' },
+  baja:  { label: 'BAJA',     bg: '#d1fae5', text: '#065f46', border: '#86efac' },
+};
+
+const getSlotIndicator = (pedido) => {
+  const slotsGratis = pedido.slots_gratis;
+  const slotsTotal  = pedido.slots_total ?? 3;
+  if (slotsGratis != null) {
+    if (slotsGratis > 0) {
+      return { type: 'gratis', label: `Slot gratis (${slotsTotal - slotsGratis}/${slotsTotal})` };
+    }
+    return { type: 'credito', label: 'Costo: 1 crédito' };
+  }
+  const count = pedido.cotizaciones_count ?? 0;
+  if (count < 3) {
+    return { type: 'gratis', label: `Slot gratis (${count}/3)` };
+  }
+  return { type: 'credito', label: 'Costo: 1 crédito' };
+};
+
 const Stars = ({ value }) => (
   <View style={styles.starsRow}>
     {[1, 2, 3, 4, 5].map((star) => (
@@ -221,6 +270,92 @@ function TimePickerModal({ visible, value, onSelect, onClose }) {
         </Pressable>
       </Pressable>
     </Modal>
+  );
+}
+
+const ocStyles = StyleSheet.create({
+  card: {
+    backgroundColor: T.white,
+    borderRadius: T.rLg,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: T.border,
+    ...T.sh2,
+  },
+  topRow:  { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 },
+  urgBadge: {
+    paddingHorizontal: 9, paddingVertical: 3,
+    borderRadius: 6, borderWidth: 1,
+  },
+  urgText: { fontSize: 10, fontWeight: '800', letterSpacing: 0.4 },
+
+  slotBadge: {
+    marginLeft: 'auto',
+    paddingHorizontal: 10, paddingVertical: 3,
+    borderRadius: 6, borderWidth: 1,
+  },
+  slotGratis:     { backgroundColor: '#d1fae5', borderColor: '#86efac' },
+  slotCredito:    { backgroundColor: '#fef9c3', borderColor: '#fde047' },
+  slotText:       { fontSize: 11, fontWeight: '700' },
+  slotGratisText: { color: '#065f46' },
+  slotCreditoText:{ color: '#713f12' },
+
+  desc: { fontSize: 14, color: T.text, lineHeight: 20, marginBottom: 10 },
+
+  metaRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10, flexWrap: 'wrap' },
+  catChip: {
+    fontSize: 12, fontWeight: '600', color: T.deep,
+    backgroundColor: 'rgba(69,137,212,0.10)',
+    paddingHorizontal: 10, paddingVertical: 4,
+    borderRadius: 999, overflow: 'hidden',
+  },
+  locText: { fontSize: 12, color: T.muted, flex: 1 },
+
+  footer:     { flexDirection: 'row', alignItems: 'center', gap: 8, paddingTop: 10, borderTopWidth: 1, borderTopColor: T.border },
+  timeText:   { fontSize: 11, color: T.faint, flex: 1 },
+  budgetText: { fontSize: 13, fontWeight: '700', color: T.blue },
+  arrowText:  { fontSize: 12, color: T.blue, fontWeight: '600' },
+});
+
+function OpportunityCard({ pedido, onPress }) {
+  const urgCfg  = URGENCIA_CONFIG[pedido.urgencia] ?? URGENCIA_CONFIG.baja;
+  const slot    = getSlotIndicator(pedido);
+  const catIcon = getCatIcon(pedido.categoria?.nombre);
+
+  return (
+    <TouchableOpacity style={ocStyles.card} activeOpacity={0.86} onPress={onPress}>
+      {/* Top row: urgency badge + slot indicator */}
+      <View style={ocStyles.topRow}>
+        <View style={[ocStyles.urgBadge, { backgroundColor: urgCfg.bg, borderColor: urgCfg.border }]}>
+          <Text style={[ocStyles.urgText, { color: urgCfg.text }]}>{urgCfg.label}</Text>
+        </View>
+        <View style={[ocStyles.slotBadge, slot.type === 'gratis' ? ocStyles.slotGratis : ocStyles.slotCredito]}>
+          <Text style={[ocStyles.slotText, slot.type === 'gratis' ? ocStyles.slotGratisText : ocStyles.slotCreditoText]}>
+            {slot.label}
+          </Text>
+        </View>
+      </View>
+
+      {/* Description */}
+      <Text style={ocStyles.desc} numberOfLines={2}>{pedido.descripcion || 'Sin descripción'}</Text>
+
+      {/* Category + location row */}
+      <View style={ocStyles.metaRow}>
+        <Text style={ocStyles.catChip}>{catIcon} {pedido.categoria?.nombre || 'Sin categoría'}</Text>
+        {pedido.direccion ? (
+          <Text style={ocStyles.locText} numberOfLines={1}>📍 {pedido.direccion}</Text>
+        ) : null}
+      </View>
+
+      {/* Footer: time + arrow */}
+      <View style={ocStyles.footer}>
+        <Text style={ocStyles.timeText}>{timeAgo(pedido.created_at)}</Text>
+        {pedido.presupuesto ? (
+          <Text style={ocStyles.budgetText}>{formatCurrency(pedido.presupuesto)}</Text>
+        ) : null}
+        <Text style={ocStyles.arrowText}>Ver detalle →</Text>
+      </View>
+    </TouchableOpacity>
   );
 }
 
@@ -309,6 +444,7 @@ export default function ProviderDashboardScreen({
   const [loadingDisponibilidad, setLoadingDisponibilidad] = useState(false);
   const [oportunidades, setOportunidades] = useState([]);
   const [loadingOportunidades, setLoadingOportunidades] = useState(false);
+  const [selectedPedido, setSelectedPedido] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [savingDisponibilidad, setSavingDisponibilidad] = useState(false);
   const [mutatingServiceId, setMutatingServiceId] = useState(null);
@@ -679,7 +815,10 @@ export default function ProviderDashboardScreen({
 
   const renderOportunidades = () => (
     <View style={styles.sectionStack}>
-      <Text style={styles.sectionTitle}>Pedidos abiertos</Text>
+      <View style={styles.sectionHeaderRow}>
+        <Text style={styles.sectionTitle}>Pedidos abiertos</Text>
+        <TouchableOpacity onPress={refreshOportunidades}><Text style={styles.linkText}>Actualizar</Text></TouchableOpacity>
+      </View>
       <FlatList
         data={oportunidades}
         keyExtractor={(item) => String(item.id)}
@@ -702,27 +841,9 @@ export default function ProviderDashboardScreen({
           )
         }
         renderItem={({ item }) => (
-          <View style={styles.oportunidadCard}>
-            <View style={styles.serviceTopRow}>
-              <View style={styles.serviceTopInfo}>
-                <Text style={styles.serviceClient}>{item.titulo || item.descripcion?.slice(0, 40) || 'Pedido sin titulo'}</Text>
-                <Text style={styles.serviceCategory}>{item.categoria?.nombre || 'Sin categoria'}</Text>
-              </View>
-              {item.presupuesto ? (
-                <Text style={styles.oportunidadBudget}>{formatCurrency(item.presupuesto)}</Text>
-              ) : null}
-            </View>
-            {item.descripcion ? (
-              <Text style={styles.serviceDescription} numberOfLines={3}>{item.descripcion}</Text>
-            ) : null}
-            <View style={styles.serviceMetaGrid}>
-              {item.direccion ? <Text style={styles.serviceMeta}>Direccion: {item.direccion}</Text> : null}
-              <Text style={styles.serviceMeta}>Publicado: {formatDate(item.created_at)}</Text>
-              {item.cliente?.name ? <Text style={styles.serviceMeta}>Cliente: {item.cliente.name}</Text> : null}
-            </View>
-          </View>
+          <OpportunityCard pedido={item} onPress={() => setSelectedPedido(item)} />
         )}
-        ItemSeparatorComponent={() => <View style={styles.oportunidadSeparator} />}
+        ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
       />
     </View>
   );
@@ -925,6 +1046,76 @@ export default function ProviderDashboardScreen({
                 {iniciando ? <ActivityIndicator color="#fff" /> : <Text style={styles.codigoConfirmText}>Confirmar</Text>}
               </TouchableOpacity>
             </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      <Modal visible={!!selectedPedido} transparent animationType="slide" onRequestClose={() => setSelectedPedido(null)}>
+        <Pressable style={styles.codigoBackdrop} onPress={() => setSelectedPedido(null)}>
+          <Pressable style={styles.pedidoDetailSheet} onPress={() => {}}>
+            {selectedPedido ? (() => {
+              const p      = selectedPedido;
+              const urgCfg = URGENCIA_CONFIG[p.urgencia] ?? URGENCIA_CONFIG.baja;
+              const slot   = getSlotIndicator(p);
+              return (
+                <>
+                  {/* Header */}
+                  <View style={styles.pedidoDetailHeader}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.pedidoDetailCat}>
+                        {getCatIcon(p.categoria?.nombre)} {p.categoria?.nombre || 'Sin categoría'}
+                      </Text>
+                      <Text style={styles.pedidoDetailTime}>{timeAgo(p.created_at)}</Text>
+                    </View>
+                    <TouchableOpacity style={styles.pedidoDetailClose} onPress={() => setSelectedPedido(null)}>
+                      <Text style={styles.pedidoDetailCloseText}>✕</Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  {/* Badges row */}
+                  <View style={styles.pedidoDetailBadges}>
+                    <View style={[ocStyles.urgBadge, { backgroundColor: urgCfg.bg, borderColor: urgCfg.border }]}>
+                      <Text style={[ocStyles.urgText, { color: urgCfg.text }]}>{urgCfg.label}</Text>
+                    </View>
+                    <View style={[ocStyles.slotBadge, slot.type === 'gratis' ? ocStyles.slotGratis : ocStyles.slotCredito]}>
+                      <Text style={[ocStyles.slotText, slot.type === 'gratis' ? ocStyles.slotGratisText : ocStyles.slotCreditoText]}>
+                        {slot.label}
+                      </Text>
+                    </View>
+                  </View>
+
+                  {/* Description */}
+                  <Text style={styles.pedidoDetailLabel}>Descripción</Text>
+                  <Text style={styles.pedidoDetailDesc}>{p.descripcion || '—'}</Text>
+
+                  {/* Meta grid */}
+                  <View style={styles.pedidoDetailGrid}>
+                    {p.direccion ? (
+                      <View style={styles.pedidoDetailGridItem}>
+                        <Text style={styles.pedidoDetailGridLabel}>📍 Ubicación</Text>
+                        <Text style={styles.pedidoDetailGridValue}>{p.direccion}</Text>
+                      </View>
+                    ) : null}
+                    {p.presupuesto ? (
+                      <View style={styles.pedidoDetailGridItem}>
+                        <Text style={styles.pedidoDetailGridLabel}>💰 Presupuesto</Text>
+                        <Text style={styles.pedidoDetailGridValue}>{formatCurrency(p.presupuesto)}</Text>
+                      </View>
+                    ) : null}
+                    {p.fecha_requerida ? (
+                      <View style={styles.pedidoDetailGridItem}>
+                        <Text style={styles.pedidoDetailGridLabel}>📅 Fecha requerida</Text>
+                        <Text style={styles.pedidoDetailGridValue}>{formatDate(p.fecha_requerida)}</Text>
+                      </View>
+                    ) : null}
+                    <View style={styles.pedidoDetailGridItem}>
+                      <Text style={styles.pedidoDetailGridLabel}>📊 Cotizaciones</Text>
+                      <Text style={styles.pedidoDetailGridValue}>{p.cotizaciones_count ?? 0}</Text>
+                    </View>
+                  </View>
+                </>
+              );
+            })() : null}
           </Pressable>
         </Pressable>
       </Modal>
@@ -1206,10 +1397,28 @@ const styles = StyleSheet.create({
   secondaryHomeBtn: { backgroundColor: T.paper, padding: 14, borderRadius: T.rSm, alignItems: 'center', borderWidth: 1, borderColor: T.border },
   secondaryHomeBtnText: { color: T.ink, fontWeight: '700', fontSize: 14 },
 
-  // Oportunidades
-  oportunidadCard: { borderWidth: 1, borderColor: T.border, borderRadius: T.rMd, padding: 16, backgroundColor: T.white },
-  oportunidadBudget: { fontSize: 15, fontWeight: '800', color: T.blue, letterSpacing: -0.3 },
-  oportunidadSeparator: { height: 10 },
+  // Pedido detail modal
+  pedidoDetailSheet: {
+    width: '100%',
+    maxWidth: 420,
+    backgroundColor: T.white,
+    borderRadius: 20,
+    padding: 22,
+    maxHeight: '85%',
+    ...T.sh3,
+  },
+  pedidoDetailHeader:    { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 14 },
+  pedidoDetailCat:       { fontSize: 16, fontWeight: '700', color: T.ink, marginBottom: 2 },
+  pedidoDetailTime:      { fontSize: 12, color: T.faint },
+  pedidoDetailClose:     { padding: 4 },
+  pedidoDetailCloseText: { fontSize: 18, color: T.muted, fontWeight: '600' },
+  pedidoDetailBadges:    { flexDirection: 'row', gap: 8, marginBottom: 16 },
+  pedidoDetailLabel:     { fontSize: 11, fontWeight: '700', color: T.muted, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 },
+  pedidoDetailDesc:      { fontSize: 14, color: T.text, lineHeight: 21, marginBottom: 18 },
+  pedidoDetailGrid:      { gap: 12 },
+  pedidoDetailGridItem:  { backgroundColor: T.paper, borderRadius: T.rSm, padding: 12 },
+  pedidoDetailGridLabel: { fontSize: 11, color: T.muted, marginBottom: 3 },
+  pedidoDetailGridValue: { fontSize: 14, fontWeight: '600', color: T.ink },
 
   // Chat
   chatClientRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: T.white, borderRadius: T.rMd, paddingHorizontal: 16, paddingVertical: 12, borderWidth: 1, borderColor: T.border, gap: 12 },

@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  FlatList,
   Modal,
   Platform,
   Pressable,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -19,6 +21,7 @@ import {
   getCalificacionesProveedor,
   getDocumentos,
   getMiDisponibilidad,
+  getPedidosAbiertos,
   getProviderByUser,
   getSolicitudesProveedor,
   iniciarServicio,
@@ -51,6 +54,7 @@ const DIAS = [
 
 const TABS = [
   { key: 'solicitudes',   label: 'Solicitudes' },
+  { key: 'oportunidades', label: 'Oportunidades' },
   { key: 'mensajes',      label: 'Mensajes' },
   { key: 'historial',     label: 'Historial' },
   { key: 'calificaciones',label: 'Calificaciones' },
@@ -303,6 +307,8 @@ export default function ProviderDashboardScreen({
   const [loadingSolicitudes, setLoadingSolicitudes] = useState(false);
   const [loadingCalificaciones, setLoadingCalificaciones] = useState(false);
   const [loadingDisponibilidad, setLoadingDisponibilidad] = useState(false);
+  const [oportunidades, setOportunidades] = useState([]);
+  const [loadingOportunidades, setLoadingOportunidades] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [savingDisponibilidad, setSavingDisponibilidad] = useState(false);
   const [mutatingServiceId, setMutatingServiceId] = useState(null);
@@ -339,6 +345,12 @@ export default function ProviderDashboardScreen({
     if (!profile && user) { loadProfile(); return; }
     if (profile) loadDashboardData(profile);
   }, [user, profile?.id]);
+
+  useEffect(() => {
+    if (activeTab === 'oportunidades' && oportunidades.length === 0 && !loadingOportunidades) {
+      refreshOportunidades();
+    }
+  }, [activeTab]);
 
   const loadProfile = async () => {
     setLoadingProfile(true);
@@ -384,6 +396,13 @@ export default function ProviderDashboardScreen({
     try { const data = await getCalificacionesProveedor(profile.id); setCalificaciones(data.calificaciones || []); }
     catch (error) { toast(error.message, 'error'); }
     finally { setLoadingCalificaciones(false); }
+  };
+
+  const refreshOportunidades = async () => {
+    setLoadingOportunidades(true);
+    try { const data = await getPedidosAbiertos(); setOportunidades(data.pedidos || []); }
+    catch (error) { toast(error.message, 'error'); }
+    finally { setLoadingOportunidades(false); }
   };
 
   const handleFileSelect = (event) => {
@@ -658,6 +677,56 @@ export default function ProviderDashboardScreen({
     </View>
   );
 
+  const renderOportunidades = () => (
+    <View style={styles.sectionStack}>
+      <Text style={styles.sectionTitle}>Pedidos abiertos</Text>
+      <FlatList
+        data={oportunidades}
+        keyExtractor={(item) => String(item.id)}
+        scrollEnabled={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={loadingOportunidades}
+            onRefresh={refreshOportunidades}
+            colors={[T.blue]}
+            tintColor={T.blue}
+          />
+        }
+        ListEmptyComponent={
+          loadingOportunidades ? (
+            <ActivityIndicator color={T.blue} style={styles.sectionLoader} />
+          ) : (
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyStateText}>No hay oportunidades nuevas en este momento.</Text>
+            </View>
+          )
+        }
+        renderItem={({ item }) => (
+          <View style={styles.oportunidadCard}>
+            <View style={styles.serviceTopRow}>
+              <View style={styles.serviceTopInfo}>
+                <Text style={styles.serviceClient}>{item.titulo || item.descripcion?.slice(0, 40) || 'Pedido sin titulo'}</Text>
+                <Text style={styles.serviceCategory}>{item.categoria?.nombre || 'Sin categoria'}</Text>
+              </View>
+              {item.presupuesto ? (
+                <Text style={styles.oportunidadBudget}>{formatCurrency(item.presupuesto)}</Text>
+              ) : null}
+            </View>
+            {item.descripcion ? (
+              <Text style={styles.serviceDescription} numberOfLines={3}>{item.descripcion}</Text>
+            ) : null}
+            <View style={styles.serviceMetaGrid}>
+              {item.direccion ? <Text style={styles.serviceMeta}>Direccion: {item.direccion}</Text> : null}
+              <Text style={styles.serviceMeta}>Publicado: {formatDate(item.created_at)}</Text>
+              {item.cliente?.name ? <Text style={styles.serviceMeta}>Cliente: {item.cliente.name}</Text> : null}
+            </View>
+          </View>
+        )}
+        ItemSeparatorComponent={() => <View style={styles.oportunidadSeparator} />}
+      />
+    </View>
+  );
+
   const renderDisponibilidad = () => (
     <View style={styles.sectionStack}>
       <View style={styles.sectionHeaderRow}>
@@ -803,6 +872,7 @@ export default function ProviderDashboardScreen({
 
       <View style={styles.card}>
         {activeTab === 'solicitudes'    && renderSolicitudes()}
+        {activeTab === 'oportunidades'  && renderOportunidades()}
         {activeTab === 'mensajes'       && renderMensajes()}
         {activeTab === 'historial'      && renderHistorial()}
         {activeTab === 'calificaciones' && renderCalificaciones()}
@@ -1135,6 +1205,11 @@ const styles = StyleSheet.create({
   primaryBtnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
   secondaryHomeBtn: { backgroundColor: T.paper, padding: 14, borderRadius: T.rSm, alignItems: 'center', borderWidth: 1, borderColor: T.border },
   secondaryHomeBtnText: { color: T.ink, fontWeight: '700', fontSize: 14 },
+
+  // Oportunidades
+  oportunidadCard: { borderWidth: 1, borderColor: T.border, borderRadius: T.rMd, padding: 16, backgroundColor: T.white },
+  oportunidadBudget: { fontSize: 15, fontWeight: '800', color: T.blue, letterSpacing: -0.3 },
+  oportunidadSeparator: { height: 10 },
 
   // Chat
   chatClientRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: T.white, borderRadius: T.rMd, paddingHorizontal: 16, paddingVertical: 12, borderWidth: 1, borderColor: T.border, gap: 12 },

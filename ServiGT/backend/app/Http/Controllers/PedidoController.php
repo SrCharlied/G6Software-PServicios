@@ -105,6 +105,7 @@ class PedidoController extends Controller
     {
         $pedidos = Pedido::query()
             ->with(['categoria'])
+            ->withCount('cotizaciones')
             ->where('cliente_id', $request->user()->id)
             ->orderByDesc('created_at')
             ->paginate(20);

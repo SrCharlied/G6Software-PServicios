@@ -9,7 +9,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { getNotificaciones, getUnreadNotificationsCount } from '../services/api';
+import { getNotificaciones, getUnreadNotificationsCount, marcarTodasLeidas } from '../services/api';
 import { T } from '../theme';
 
 export default function NotificationBell({ onPress }) {
@@ -19,6 +19,7 @@ export default function NotificationBell({ onPress }) {
   const [notifications, setNotifications] = useState([]);
   const [listLoading, setListLoading] = useState(false);
   const [listError, setListError] = useState('');
+  const [markingAll, setMarkingAll] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -59,6 +60,21 @@ export default function NotificationBell({ onPress }) {
     onPress?.();
     setOpen(true);
     loadNotifications();
+  };
+
+  const handleMarkAllRead = async () => {
+    setMarkingAll(true);
+    setListError('');
+    try {
+      await marcarTodasLeidas();
+      setUnreadCount(0);
+      setNotifications((items) => items.map((item) => ({ ...item, leida: true })));
+      await loadNotifications();
+    } catch (error) {
+      setListError(error.message);
+    } finally {
+      setMarkingAll(false);
+    }
   };
 
   const formatDate = (value) => {
@@ -104,9 +120,22 @@ export default function NotificationBell({ onPress }) {
           <Pressable style={styles.panel} onPress={(event) => event.stopPropagation?.()}>
             <View style={styles.panelHeader}>
               <Text style={styles.panelTitle}>Notificaciones</Text>
-              <TouchableOpacity onPress={loadNotifications} disabled={listLoading}>
-                <Text style={styles.refreshText}>{listLoading ? 'Cargando...' : 'Actualizar'}</Text>
-              </TouchableOpacity>
+              <View style={styles.headerActions}>
+                {unreadCount > 0 ? (
+                  <TouchableOpacity
+                    onPress={handleMarkAllRead}
+                    disabled={markingAll || listLoading}
+                    style={styles.markAllBtn}
+                  >
+                    <Text style={styles.markAllText}>
+                      {markingAll ? 'Marcando...' : 'Marcar leidas'}
+                    </Text>
+                  </TouchableOpacity>
+                ) : null}
+                <TouchableOpacity onPress={loadNotifications} disabled={listLoading || markingAll}>
+                  <Text style={styles.refreshText}>{listLoading ? 'Cargando...' : 'Actualizar'}</Text>
+                </TouchableOpacity>
+              </View>
             </View>
 
             {listLoading && notifications.length === 0 ? (
@@ -246,6 +275,23 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '800',
     color: T.ink,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    flexShrink: 1,
+  },
+  markAllBtn: {
+    backgroundColor: '#eef4ff',
+    borderRadius: 8,
+    paddingHorizontal: 9,
+    paddingVertical: 6,
+  },
+  markAllText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: T.deep,
   },
   refreshText: {
     fontSize: 12,

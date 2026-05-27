@@ -435,6 +435,15 @@ export const getNotificaciones = async () => {
   }
 };
 
+export const getUnreadNotificationsCount = async () => {
+  try {
+    const response = await api.get('/notificaciones');
+    return response.data.no_leidas || 0;
+  } catch (error) {
+    throw new Error(getErrorMessage(error, 'No se pudo cargar el conteo de notificaciones.'));
+  }
+};
+
 export const marcarNotificacionLeida = async (id) => {
   try {
     const response = await api.put(`/notificaciones/${id}/leer`);

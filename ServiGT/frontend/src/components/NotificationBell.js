@@ -9,10 +9,12 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { getNotificaciones, getUnreadNotificationsCount, marcarTodasLeidas } from '../services/api';
+import { useSession } from '../context/SessionContext';
+import { getNotificaciones, getUnreadNotificationsCount, loadStoredSession, marcarTodasLeidas } from '../services/api';
 import { T } from '../theme';
 
 export default function NotificationBell({ onPress }) {
+  const { user, sessionLoading } = useSession();
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
@@ -25,6 +27,13 @@ export default function NotificationBell({ onPress }) {
     let mounted = true;
 
     const loadCount = async () => {
+      if (sessionLoading) return;
+      if (!user || !loadStoredSession()) {
+        setUnreadCount(0);
+        setLoading(false);
+        return;
+      }
+
       try {
         const count = await getUnreadNotificationsCount();
         if (mounted) setUnreadCount(count);
@@ -38,13 +47,22 @@ export default function NotificationBell({ onPress }) {
     loadCount();
 
     return () => { mounted = false; };
-  }, []);
+  }, [sessionLoading, user]);
 
   const badgeText = unreadCount > 99 ? '99+' : String(unreadCount);
 
   const loadNotifications = async () => {
     setListLoading(true);
     setListError('');
+
+    if (!user || !loadStoredSession()) {
+      setNotifications([]);
+      setUnreadCount(0);
+      setListLoading(false);
+      setListError('No se encontro una sesion activa. Inicia sesion nuevamente.');
+      return;
+    }
+
     try {
       const data = await getNotificaciones();
       setNotifications(data.notificaciones || []);

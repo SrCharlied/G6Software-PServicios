@@ -14,6 +14,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useSession } from '../context/SessionContext';
 import Drawer from '../components/Drawer';
 import ServiGTLogo from '../components/ServiGTLogo';
+import NotificationBell from '../components/NotificationBell';
 import { getProviders, storageUrl } from '../services/api';
 import { mockProviders } from '../data/mockProviders';
 import { T } from '../theme';
@@ -33,7 +34,7 @@ function TopBar({ onMenuPress }) {
         </View>
       </TouchableOpacity>
       <ServiGTLogo size={18} mode="dark" />
-      <View style={styles.menuBtnPlaceholder} />
+      <NotificationBell />
     </View>
   );
 }

@@ -122,7 +122,7 @@ export default function PedidosAbiertosScreen({ navigation }) {
         data={pedidos}
         keyExtractor={(item) => String(item.id)}
         renderItem={({ item }) => (
-          <PedidoCard pedido={item} onPress={() => {}} />
+          <PedidoCard pedido={item} onPress={() => navigation.navigate('PedidoDetail', { pedidoId: item.id })} />
         )}
         ListHeaderComponent={ListHeader}
         ListEmptyComponent={

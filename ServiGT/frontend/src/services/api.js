@@ -475,6 +475,15 @@ export const getPedidosAbiertos = async ({ categoriaId = null, page = 1 } = {}) 
   }
 };
 
+export const getMiCredito = async () => {
+  try {
+    const response = await api.get('/mi-credito');
+    return response.data;
+  } catch (error) {
+    throw new Error(getErrorMessage(error, 'No se pudo obtener el saldo.'));
+  }
+};
+
 export const getPedidoDetalle = async (id) => {
   try {
     const response = await api.get(`/pedidos/${id}`);
@@ -490,6 +499,15 @@ export const enviarCotizacion = async (pedidoId, { monto, mensaje }) => {
     return response.data;
   } catch (error) {
     throw new Error(getErrorMessage(error, 'No se pudo enviar la cotización.'));
+  }
+};
+
+export const editarCotizacion = async (pedidoId, cotizacionId, { monto, mensaje }) => {
+  try {
+    const response = await api.put(`/pedidos/${pedidoId}/cotizaciones/${cotizacionId}`, { monto, mensaje });
+    return response.data;
+  } catch (error) {
+    throw new Error(getErrorMessage(error, 'No se pudo actualizar la cotización.'));
   }
 };
 

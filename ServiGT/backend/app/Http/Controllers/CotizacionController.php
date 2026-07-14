@@ -6,6 +6,7 @@ use App\Models\Cotizacion;
 use App\Models\CreditoProveedor;
 use App\Models\Pedido;
 use App\Models\Proveedor;
+use App\Models\Servicio;
 use App\Models\TransaccionCredito;
 use App\Traits\ApiResponse;
 use Illuminate\Http\JsonResponse;
@@ -102,5 +103,82 @@ class CotizacionController extends Controller
             'cotizacion'  => $cotizacion->fresh(),
             'nuevo_saldo' => $nuevoSaldo,
         ]);
+    }
+
+    /**
+     * POST /api/pedidos/{pedidoId}/cotizaciones/{cotizacionId}/aceptar
+     * El cliente propietario adjudica su pedido a una cotización enviada.
+     */
+    public function aceptar(Request $request, int $pedidoId, int $cotizacionId): JsonResponse
+    {
+        $resultado = DB::transaction(function () use ($request, $pedidoId, $cotizacionId) {
+            $pedido = Pedido::query()
+                ->lockForUpdate()
+                ->find($pedidoId);
+
+            if (!$pedido) {
+                return ['error' => 'Pedido no encontrado.', 'status' => 404];
+            }
+
+            if ($pedido->cliente_id !== $request->user()->id) {
+                return ['error' => 'No tienes permiso para aceptar cotizaciones de este pedido.', 'status' => 403];
+            }
+
+            $cotizacion = Cotizacion::query()
+                ->where('pedido_id', $pedido->id)
+                ->lockForUpdate()
+                ->find($cotizacionId);
+
+            if (!$cotizacion) {
+                return ['error' => 'Cotización no encontrada para este pedido.', 'status' => 404];
+            }
+
+            if ($pedido->estado !== 'abierto') {
+                return ['error' => 'Solo se pueden adjudicar pedidos abiertos.', 'status' => 422];
+            }
+
+            if ($pedido->fecha_expiracion->isPast()) {
+                $pedido->update(['estado' => 'expirado']);
+
+                return ['error' => 'El pedido ya expiró.', 'status' => 422];
+            }
+
+            if ($cotizacion->estado !== 'enviada') {
+                return ['error' => 'Solo se pueden aceptar cotizaciones enviadas.', 'status' => 422];
+            }
+
+            $servicio = Servicio::create([
+                'cliente_id'     => $pedido->cliente_id,
+                'proveedor_id'   => $cotizacion->proveedor_id,
+                'categoria_id'   => $pedido->categoria_id,
+                'direccion'      => $pedido->direccion,
+                'descripcion'    => $pedido->descripcion,
+                'monto_acordado' => $cotizacion->monto,
+                'estado'         => 'aceptado',
+                'codigo_inicio'  => str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT),
+            ]);
+
+            $cotizacion->update(['estado' => 'aceptada']);
+
+            Cotizacion::query()
+                ->where('pedido_id', $pedido->id)
+                ->where('id', '!=', $cotizacion->id)
+                ->where('estado', 'enviada')
+                ->update(['estado' => 'rechazada']);
+
+            $pedido->update(['estado' => 'adjudicado']);
+
+            return [
+                'pedido'     => $pedido->fresh(),
+                'cotizacion' => $cotizacion->fresh()->load('proveedor'),
+                'servicio'   => $servicio->load(['cliente', 'proveedor', 'categoria']),
+            ];
+        });
+
+        if (isset($resultado['error'])) {
+            return $this->error($resultado['error'], $resultado['status']);
+        }
+
+        return $this->success('Cotización aceptada y servicio creado correctamente.', $resultado);
     }
 }

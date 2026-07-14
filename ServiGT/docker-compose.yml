@@ -79,6 +79,53 @@ services:
     networks:
       - servigt_net
 
+  # PostgreSQL temporal y aislado para las pruebas automatizadas del backend.
+  db_test:
+    profiles: ["test"]
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: pservicios_test
+      POSTGRES_USER: pservicios_test_user
+      POSTGRES_PASSWORD: pservicios_test_secret
+    tmpfs:
+      - /var/lib/postgresql/data
+    volumes:
+      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pservicios_test_user -d pservicios_test"]
+      interval: 2s
+      timeout: 5s
+      retries: 15
+    networks:
+      - servigt_net
+
+  backend_test:
+    profiles: ["test"]
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    entrypoint: ["php", "artisan", "test"]
+    command: ["tests/Feature/CreditosYAceptacionTest.php"]
+    environment:
+      APP_ENV: testing
+      APP_KEY: base64:xR3TbPNBfz4mGU5MhKtp3HKDO+jMnaSj6UEahGkAjQo=
+      APP_DEBUG: "true"
+      DB_CONNECTION: pgsql
+      DB_HOST: db_test
+      DB_PORT: 5432
+      DB_DATABASE: pservicios_test
+      DB_USERNAME: pservicios_test_user
+      DB_PASSWORD: pservicios_test_secret
+      CACHE_STORE: array
+      SESSION_DRIVER: array
+    volumes:
+      - ./backend/tests:/app/tests:ro
+    depends_on:
+      db_test:
+        condition: service_healthy
+    networks:
+      - servigt_net
+
 volumes:
   pgdata:
   backend_storage:

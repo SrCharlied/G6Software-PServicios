@@ -559,4 +559,13 @@ export const getAdminProveedores = async () => {
   }
 };
 
+export const recargarCreditosProveedor = async (proveedorId, { monto, motivo }) => {
+  try {
+    const response = await api.post(`/admin/proveedores/${proveedorId}/creditos`, { monto, motivo });
+    return response.data;
+  } catch (error) {
+    throw new Error(getErrorMessage(error, 'No se pudo agregar creditos al proveedor.'));
+  }
+};
+
 export default api;

@@ -64,7 +64,7 @@ export default function Drawer({ isOpen, onClose }) {
             <>
               <Text style={styles.userName} numberOfLines={1}>{user.name}</Text>
               <Text style={styles.userRole}>
-                {user.role === 'proveedor' ? 'Proveedor' : 'Cliente'}
+                {user.role === 'admin' ? 'Admin' : user.role === 'proveedor' ? 'Proveedor' : 'Cliente'}
               </Text>
             </>
           ) : (

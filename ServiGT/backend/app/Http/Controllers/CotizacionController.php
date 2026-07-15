@@ -17,9 +17,16 @@ class CotizacionController extends Controller
 {
     use ApiResponse;
 
+    private const SLOTS_GRATIS = 3;
+    private const MAX_COTIZACIONES = 6;
+    private const COSTO_CREDITO = 1;
+
     /**
      * POST /api/pedidos/{pedidoId}/cotizaciones
      * El proveedor autenticado envía una cotización a un pedido abierto.
+     *
+     * Reglas de negocio (Sprint 5): las primeras 3 cotizaciones de un pedido son
+     * gratuitas, de la 4ta a la 6ta cuestan 1 crédito, y no se aceptan más de 6.
      */
     public function store(Request $request, int $pedidoId): JsonResponse
     {
@@ -42,16 +49,66 @@ class CotizacionController extends Controller
             return $this->error('Ya enviaste una cotización para este pedido.', 422);
         }
 
-        $cotizacion = Cotizacion::create([
-            'pedido_id'      => $pedidoId,
-            'proveedor_id'   => $proveedor->id,
-            'monto'          => $validated['monto'],
-            'mensaje'        => $validated['mensaje'],
-            'estado'         => 'enviada',
-            'costo_creditos' => 0,
-        ]);
+        $resultado = DB::transaction(function () use ($pedidoId, $proveedor, $validated) {
+            // Bloquea la fila del pedido para serializar el conteo de slots
+            // cuando llegan cotizaciones concurrentes de distintos proveedores.
+            Pedido::query()->lockForUpdate()->find($pedidoId);
 
-        return $this->success('Cotización enviada correctamente.', ['cotizacion' => $cotizacion], 201);
+            $numeroSlot = Cotizacion::where('pedido_id', $pedidoId)->count() + 1;
+
+            if ($numeroSlot > self::MAX_COTIZACIONES) {
+                return ['error' => 'Este pedido ya alcanzó el máximo de 6 cotizaciones.', 'status' => 422];
+            }
+
+            $esCobrable = $numeroSlot > self::SLOTS_GRATIS;
+            $nuevoSaldo = null;
+
+            if ($esCobrable) {
+                $credito = CreditoProveedor::where('proveedor_id', $proveedor->id)
+                    ->lockForUpdate()
+                    ->first();
+
+                if (!$credito) {
+                    $credito = CreditoProveedor::create([
+                        'proveedor_id' => $proveedor->id,
+                        'saldo'        => 0,
+                        'updated_at'   => now(),
+                    ]);
+                }
+
+                if ($credito->saldo < self::COSTO_CREDITO) {
+                    return ['error' => 'Saldo insuficiente para enviar esta cotización. Recarga créditos para continuar.', 'status' => 422];
+                }
+
+                $credito->decrement('saldo', self::COSTO_CREDITO);
+                $nuevoSaldo = $credito->fresh()->saldo;
+
+                TransaccionCredito::create([
+                    'proveedor_id'  => $proveedor->id,
+                    'tipo'          => 'gasto',
+                    'monto'         => self::COSTO_CREDITO,
+                    'motivo'        => "Cotización #{$numeroSlot} en pedido #{$pedidoId}",
+                    'referencia_id' => $pedidoId,
+                ]);
+            }
+
+            $cotizacion = Cotizacion::create([
+                'pedido_id'      => $pedidoId,
+                'proveedor_id'   => $proveedor->id,
+                'monto'          => $validated['monto'],
+                'mensaje'        => $validated['mensaje'],
+                'estado'         => 'enviada',
+                'costo_creditos' => $esCobrable ? self::COSTO_CREDITO : 0,
+            ]);
+
+            return ['cotizacion' => $cotizacion, 'nuevo_saldo' => $nuevoSaldo];
+        });
+
+        if (isset($resultado['error'])) {
+            return $this->error($resultado['error'], $resultado['status']);
+        }
+
+        return $this->success('Cotización enviada correctamente.', $resultado, 201);
     }
 
     /**

@@ -133,10 +133,6 @@ class CreditosYAceptacionTest extends TestCase
 
     public function test_cuarta_cotizacion_descuenta_un_credito_y_registra_transaccion(): void
     {
-        $this->markTestIncomplete(
-            'Pendiente de las tareas 3.1 y 3.2: cobro desde la cuarta cotizacion y registro del gasto.'
-        );
-
         for ($slot = 1; $slot <= 3; $slot++) {
             $this->crearCotizacion($this->crearProveedor(), 100 * $slot);
         }
@@ -162,6 +158,121 @@ class CreditosYAceptacionTest extends TestCase
             'tipo'          => 'gasto',
             'monto'         => 1,
             'referencia_id' => $this->pedido->id,
+        ]);
+    }
+
+    public function test_septima_cotizacion_se_bloquea_por_limite_maximo(): void
+    {
+        for ($slot = 1; $slot <= 6; $slot++) {
+            $this->crearCotizacion($this->crearProveedor(saldo: 2), 100 * $slot);
+        }
+
+        $proveedor = $this->crearProveedor(saldo: 2);
+        Sanctum::actingAs($proveedor->user);
+
+        $response = $this->postJson("/api/pedidos/{$this->pedido->id}/cotizaciones", [
+            'monto'   => 700,
+            'mensaje' => 'Septima cotizacion que debe ser rechazada por limite maximo.',
+        ]);
+
+        $response->assertStatus(422)->assertJsonPath('success', false);
+
+        $this->assertDatabaseCount('cotizaciones', 6);
+        $this->assertDatabaseHas('creditos_proveedor', [
+            'proveedor_id' => $proveedor->id,
+            'saldo'        => 2,
+        ]);
+    }
+
+    public function test_cotizacion_pagada_sin_saldo_se_bloquea(): void
+    {
+        for ($slot = 1; $slot <= 3; $slot++) {
+            $this->crearCotizacion($this->crearProveedor(), 100 * $slot);
+        }
+
+        $proveedor = $this->crearProveedor(saldo: 0);
+        Sanctum::actingAs($proveedor->user);
+
+        $response = $this->postJson("/api/pedidos/{$this->pedido->id}/cotizaciones", [
+            'monto'   => 450,
+            'mensaje' => 'Cuarta cotizacion sin saldo suficiente para cubrir el costo.',
+        ]);
+
+        $response->assertStatus(422)->assertJsonPath('success', false);
+
+        $this->assertDatabaseCount('cotizaciones', 3);
+        $this->assertDatabaseCount('transacciones_credito', 0);
+        $this->assertDatabaseHas('creditos_proveedor', [
+            'proveedor_id' => $proveedor->id,
+            'saldo'        => 0,
+        ]);
+    }
+
+    public function test_aceptar_cotizacion_pagada_crea_servicio_y_mantiene_credito_descontado(): void
+    {
+        for ($slot = 1; $slot <= 3; $slot++) {
+            $this->crearCotizacion($this->crearProveedor(), 100 * $slot);
+        }
+
+        $ganador = $this->crearProveedor(saldo: 2);
+        Sanctum::actingAs($ganador->user);
+
+        $envio = $this->postJson("/api/pedidos/{$this->pedido->id}/cotizaciones", [
+            'monto'   => 480,
+            'mensaje' => 'Cuarta cotizacion pagada que luego sera aceptada por el cliente.',
+        ]);
+
+        $envio->assertCreated()
+            ->assertJsonPath('cotizacion.costo_creditos', 1)
+            ->assertJsonPath('nuevo_saldo', 1);
+
+        $cotizacionGanadora = Cotizacion::where('pedido_id', $this->pedido->id)
+            ->where('proveedor_id', $ganador->id)
+            ->sole();
+
+        Sanctum::actingAs($this->cliente);
+
+        $aceptacion = $this->postJson(
+            "/api/pedidos/{$this->pedido->id}/cotizaciones/{$cotizacionGanadora->id}/aceptar"
+        );
+
+        $aceptacion->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('pedido.estado', 'adjudicado')
+            ->assertJsonPath('cotizacion.estado', 'aceptada')
+            ->assertJsonPath('servicio.proveedor_id', $ganador->id)
+            ->assertJsonPath('servicio.monto_acordado', '480.00');
+
+        $this->assertDatabaseCount('servicios', 1);
+        // El credito ya cobrado al enviar la cotizacion no se reembolsa al aceptarla.
+        $this->assertDatabaseHas('creditos_proveedor', [
+            'proveedor_id' => $ganador->id,
+            'saldo'        => 1,
+        ]);
+        $this->assertDatabaseCount('transacciones_credito', 1);
+    }
+
+    public function test_no_se_puede_aceptar_cotizacion_de_pedido_ya_adjudicado(): void
+    {
+        $primeraGanadora = $this->crearCotizacion($this->crearProveedor(), 300.00);
+        $segunda = $this->crearCotizacion($this->crearProveedor(), 350.00);
+
+        Sanctum::actingAs($this->cliente);
+
+        $this->postJson(
+            "/api/pedidos/{$this->pedido->id}/cotizaciones/{$primeraGanadora->id}/aceptar"
+        )->assertOk();
+
+        $response = $this->postJson(
+            "/api/pedidos/{$this->pedido->id}/cotizaciones/{$segunda->id}/aceptar"
+        );
+
+        $response->assertStatus(422)->assertJsonPath('success', false);
+
+        $this->assertDatabaseCount('servicios', 1);
+        $this->assertDatabaseHas('cotizaciones', [
+            'id'     => $segunda->id,
+            'estado' => 'rechazada',
         ]);
     }
 

@@ -520,6 +520,15 @@ export const editarCotizacion = async (pedidoId, cotizacionId, { monto, mensaje 
   }
 };
 
+export const aceptarCotizacion = async (pedidoId, cotizacionId) => {
+  try {
+    const response = await api.post(`/pedidos/${pedidoId}/cotizaciones/${cotizacionId}/aceptar`);
+    return response.data;
+  } catch (error) {
+    throw new Error(getErrorMessage(error, 'No se pudo aceptar la cotización.'));
+  }
+};
+
 export const getMisPedidos = async ({ page = 1 } = {}) => {
   try {
     const response = await api.get('/pedidos/mios', { params: { page } });

@@ -276,6 +276,73 @@ class CreditosYAceptacionTest extends TestCase
         ]);
     }
 
+    public function test_no_se_puede_aceptar_pedido_inexistente(): void
+    {
+        $cotizacion = $this->crearCotizacion($this->crearProveedor(), 300.00);
+
+        Sanctum::actingAs($this->cliente);
+
+        $this->postJson(
+            "/api/pedidos/999999/cotizaciones/{$cotizacion->id}/aceptar"
+        )->assertStatus(404);
+
+        $this->assertDatabaseCount('servicios', 0);
+    }
+
+    public function test_no_se_puede_aceptar_cotizacion_de_otro_pedido(): void
+    {
+        $otroPedido = Pedido::create([
+            'cliente_id'       => $this->cliente->id,
+            'categoria_id'     => $this->categoria->id,
+            'descripcion'      => 'Otro pedido distinto para probar aislamiento entre pedidos',
+            'direccion'        => 'Zona 4, Ciudad de Guatemala',
+            'urgencia'         => 'baja',
+            'estado'           => 'abierto',
+            'fecha_expiracion' => now()->addDays(7),
+        ]);
+
+        $cotizacionDeOtroPedido = Cotizacion::create([
+            'pedido_id'      => $otroPedido->id,
+            'proveedor_id'   => $this->crearProveedor()->id,
+            'monto'          => 300,
+            'mensaje'        => 'Cotizacion enviada al otro pedido, no al pedido principal de la prueba.',
+            'estado'         => 'enviada',
+            'costo_creditos' => 0,
+        ]);
+
+        Sanctum::actingAs($this->cliente);
+
+        $this->postJson(
+            "/api/pedidos/{$this->pedido->id}/cotizaciones/{$cotizacionDeOtroPedido->id}/aceptar"
+        )->assertStatus(404);
+
+        $this->assertDatabaseCount('servicios', 0);
+        $this->assertDatabaseHas('cotizaciones', [
+            'id'     => $cotizacionDeOtroPedido->id,
+            'estado' => 'enviada',
+        ]);
+    }
+
+    public function test_no_se_puede_aceptar_cotizacion_que_no_esta_enviada(): void
+    {
+        $cotizacion = $this->crearCotizacion($this->crearProveedor(), 300.00);
+        $cotizacion->update(['estado' => 'retirada']);
+
+        Sanctum::actingAs($this->cliente);
+
+        $response = $this->postJson(
+            "/api/pedidos/{$this->pedido->id}/cotizaciones/{$cotizacion->id}/aceptar"
+        );
+
+        $response->assertStatus(422)->assertJsonPath('success', false);
+
+        $this->assertDatabaseCount('servicios', 0);
+        $this->assertDatabaseHas('cotizaciones', [
+            'id'     => $cotizacion->id,
+            'estado' => 'retirada',
+        ]);
+    }
+
     private function crearUsuario(string $role): User
     {
         $this->secuencia++;

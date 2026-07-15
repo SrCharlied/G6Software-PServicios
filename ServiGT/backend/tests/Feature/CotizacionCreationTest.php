@@ -102,6 +102,19 @@ class CotizacionCreationTest extends TestCase
         ])->assertStatus(404);
     }
 
+    public function test_no_se_puede_cotizar_un_pedido_inexistente(): void
+    {
+        $proveedor = $this->crearProveedor();
+        Sanctum::actingAs($proveedor->user);
+
+        $this->postJson('/api/pedidos/999999/cotizaciones', [
+            'monto'   => 300,
+            'mensaje' => 'Intento de cotizar un pedido que no existe en la base de datos.',
+        ])->assertStatus(404);
+
+        $this->assertDatabaseCount('cotizaciones', 0);
+    }
+
     public function test_mensaje_demasiado_corto_falla_validacion(): void
     {
         $proveedor = $this->crearProveedor();

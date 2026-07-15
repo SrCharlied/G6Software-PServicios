@@ -121,5 +121,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/stats',       [AdminController::class, 'stats']);
         Route::get('/usuarios',    [AdminController::class, 'listUsers']);
         Route::get('/proveedores', [AdminController::class, 'listProviders']);
+        Route::post('/proveedores/{proveedorId}/creditos', [AdminController::class, 'recargarCreditos'])
+            ->where('proveedorId', '[0-9]+');
     });
 });

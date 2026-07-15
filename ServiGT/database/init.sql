@@ -239,14 +239,14 @@ CREATE INDEX IF NOT EXISTS idx_notif_destinatario ON notificaciones (destinatari
 -- Seed: Categorias iniciales
 -- ============================================================
 INSERT INTO categorias (nombre, descripcion, icono) VALUES
-    ('Plomeria',      'Servicios de plomeria y fontaneria',          'wrench'),
-    ('Electricidad',  'Instalaciones y reparaciones electricas',     'zap'),
+    ('Plomería',      'Servicios de plomería y fontanería',          'wrench'),
+    ('Electricidad',  'Instalaciones y reparaciones eléctricas',     'zap'),
     ('Pintura',       'Pintura de interiores y exteriores',          'brush'),
-    ('Carpinteria',   'Trabajos en madera y muebles',                'hammer'),
+    ('Carpintería',   'Trabajos en madera y muebles',                'hammer'),
     ('Limpieza',      'Servicios de limpieza del hogar y oficina',   'sparkles'),
-    ('Jardineria',    'Mantenimiento de jardines y areas verdes',    'leaf'),
-    ('Albanileria',   'Construccion y reparaciones de obra civil',   'building'),
-    ('Mecanica',      'Reparacion de vehiculos y maquinaria',        'settings'),
-    ('Tecnologia',    'Soporte tecnico y reparacion de equipos',     'monitor'),
-    ('Ensenanza',     'Clases particulares y tutoria academica',     'book')
+    ('Jardinería',    'Mantenimiento de jardines y áreas verdes',    'leaf'),
+    ('Albañilería',   'Construcción y reparaciones de obra civil',   'building'),
+    ('Mecánica',      'Reparación de vehículos y maquinaria',        'settings'),
+    ('Tecnología',    'Soporte técnico y reparación de equipos',     'monitor'),
+    ('Enseñanza',     'Clases particulares y tutoría académica',     'book')
 ON CONFLICT (nombre) DO NOTHING;

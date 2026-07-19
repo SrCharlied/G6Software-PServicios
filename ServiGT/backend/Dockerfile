@@ -35,6 +35,14 @@ COPY lang/ /app/lang/
 COPY docker/entrypoint.sh /app/docker/entrypoint.sh
 COPY docker/sync_schema.php /app/docker/sync_schema.php
 
+# Infraestructura de pruebas automatizadas (PHPUnit)
+# migraciones y factories solo se usan en el entorno de testing (SQLite en memoria);
+# el esquema de produccion lo crea database/init.sql en PostgreSQL.
+COPY database/migrations/ /app/database/migrations/
+COPY database/factories/ /app/database/factories/
+COPY tests/ /app/tests/
+COPY phpunit.xml /app/phpunit.xml
+
 RUN sed -i 's/\r$//' /app/docker/entrypoint.sh \
     && chmod +x /app/docker/entrypoint.sh
 

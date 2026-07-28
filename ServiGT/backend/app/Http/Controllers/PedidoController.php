@@ -124,6 +124,7 @@ class PedidoController extends Controller
     {
         $query = Pedido::query()
             ->with(['cliente', 'categoria'])
+            ->withCount('cotizaciones')
             ->where('estado', 'abierto')
             ->where('fecha_expiracion', '>', now())
             ->orderByDesc('created_at');

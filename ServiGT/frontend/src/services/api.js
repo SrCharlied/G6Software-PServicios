@@ -520,6 +520,15 @@ export const editarCotizacion = async (pedidoId, cotizacionId, { monto, mensaje 
   }
 };
 
+export const aceptarCotizacion = async (pedidoId, cotizacionId) => {
+  try {
+    const response = await api.post(`/pedidos/${pedidoId}/cotizaciones/${cotizacionId}/aceptar`);
+    return response.data;
+  } catch (error) {
+    throw new Error(getErrorMessage(error, 'No se pudo aceptar la cotización.'));
+  }
+};
+
 export const getMisPedidos = async ({ page = 1 } = {}) => {
   try {
     const response = await api.get('/pedidos/mios', { params: { page } });
@@ -556,6 +565,15 @@ export const getAdminProveedores = async () => {
     return response.data;
   } catch (error) {
     throw new Error(getErrorMessage(error, 'No se pudieron cargar los proveedores.'));
+  }
+};
+
+export const recargarCreditosProveedor = async (proveedorId, { monto, motivo }) => {
+  try {
+    const response = await api.post(`/admin/proveedores/${proveedorId}/creditos`, { monto, motivo });
+    return response.data;
+  } catch (error) {
+    throw new Error(getErrorMessage(error, 'No se pudo agregar creditos al proveedor.'));
   }
 };
 

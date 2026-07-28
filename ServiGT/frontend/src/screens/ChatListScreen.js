@@ -5,27 +5,38 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { getMisConversaciones } from '../services/api';
 import { useToast } from '../context/ToastContext';
+import { T } from '../theme';
+import ChatScreen from './ChatScreen';
 
 export default function ChatListScreen({ navigation, user }) {
   const toast = useToast();
+  const { width } = useWindowDimensions();
+  const isDesktop = width >= 900;
   const [conversaciones, setConversaciones] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [selectedUserId, setSelectedUserId] = useState(null);
 
   const fetchConversaciones = useCallback(async () => {
     setLoading(true);
     try {
       const data = await getMisConversaciones();
-      setConversaciones(data.conversaciones || []);
+      const items = data.conversaciones || [];
+      setConversaciones(items);
+      if (isDesktop && !selectedUserId && items.length > 0) {
+        const primera = getOtraPersona(items[0], user);
+        setSelectedUserId(primera?.id ?? null);
+      }
     } catch (error) {
       toast(error.message, 'error');
     } finally {
       setLoading(false);
     }
-  }, [toast]);
+  }, [isDesktop, selectedUserId, toast, user]);
 
   useEffect(() => {
     fetchConversaciones();
@@ -44,151 +55,259 @@ export default function ChatListScreen({ navigation, user }) {
     }
   };
 
+  const openConversation = (otraPersona) => {
+    if (!otraPersona) return;
+    if (isDesktop) {
+      setSelectedUserId(otraPersona.id);
+      return;
+    }
+    navigation.navigate('ChatDetail', { userId: otraPersona.id, name: otraPersona.name });
+  };
+
   const renderItem = ({ item }) => {
-    // Determinar quién es la otra persona en la conversación
-    const otraPersona = item.emisor_id === user.id ? item.receptor : item.emisor;
+    const otraPersona = getOtraPersona(item, user);
     const esMio = item.emisor_id === user.id;
-    const noLeido = !esMio && !item.leido; // Mensaje nuevo para mi
+    const noLeido = !esMio && !item.leido;
+    const active = isDesktop && otraPersona?.id === selectedUserId;
 
     return (
       <TouchableOpacity
-        style={styles.chatCard}
-        onPress={() => navigation.navigate('ChatDetail', { userId: otraPersona.id, name: otraPersona.name })}
-        activeOpacity={0.7}
+        style={[styles.chatCard, active && styles.chatCardActive]}
+        onPress={() => openConversation(otraPersona)}
+        activeOpacity={0.78}
       >
-        <View style={styles.avatar}>
+        <View style={[styles.avatar, noLeido && styles.avatarUnread]}>
           <Text style={styles.avatarText}>
-            {otraPersona.name ? otraPersona.name.charAt(0).toUpperCase() : '?'}
+            {otraPersona?.name ? otraPersona.name.charAt(0).toUpperCase() : '?'}
           </Text>
         </View>
         <View style={styles.chatInfo}>
           <View style={styles.chatHeader}>
-            <Text style={[styles.chatName, noLeido && styles.textBold]}>
-              {otraPersona.name}
+            <Text style={[styles.chatName, noLeido && styles.textBold]} numberOfLines={1}>
+              {otraPersona?.name || 'Usuario'}
             </Text>
             <Text style={[styles.chatTime, noLeido && styles.timeUnread]}>
               {formatTime(item.created_at)}
             </Text>
           </View>
           <View style={styles.chatFooter}>
-            {esMio && (
+            {esMio ? (
               <Text style={[styles.checkMarks, item.leido ? styles.checkRead : styles.checkUnread]}>
                 {item.leido ? '✓✓ ' : '✓ '}
               </Text>
-            )}
+            ) : null}
             <Text
               style={[styles.chatSnippet, noLeido && styles.textBold, noLeido && styles.textUnread]}
               numberOfLines={1}
             >
               {item.contenido}
             </Text>
-            {noLeido && <View style={styles.unreadBadge}><Text style={styles.unreadBadgeText}>1</Text></View>}
+            {noLeido ? (
+              <View style={styles.unreadBadge}>
+                <Text style={styles.unreadBadgeText}>1</Text>
+              </View>
+            ) : null}
           </View>
         </View>
       </TouchableOpacity>
     );
   };
 
+  const selectedConversation = conversaciones.find((item) => {
+    const otraPersona = getOtraPersona(item, user);
+    return otraPersona?.id === selectedUserId;
+  });
+  const selectedPersona = selectedConversation ? getOtraPersona(selectedConversation, user) : null;
+
   if (loading && conversaciones.length === 0) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator size="large" color="#075E54" />
-        <Text style={styles.loadingText}>Cargando chats...</Text>
+        <ActivityIndicator size="large" color={T.blue} />
+        <Text style={styles.loadingText}>Cargando mensajes...</Text>
       </View>
     );
   }
 
+  const list = (
+    <FlatList
+      data={conversaciones}
+      keyExtractor={(item) => String(item.id)}
+      renderItem={renderItem}
+      contentContainerStyle={styles.listContent}
+      refreshing={loading}
+      onRefresh={fetchConversaciones}
+      ListEmptyComponent={
+        <View style={styles.emptyContainer}>
+          <Text style={styles.emptyTitle}>Bandeja vacia</Text>
+          <Text style={styles.emptyDesc}>
+            Las conversaciones iniciadas apareceran aqui.
+          </Text>
+        </View>
+      }
+    />
+  );
+
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
+      <View style={[styles.header, isDesktop && styles.headerDesktop]}>
         <TouchableOpacity style={styles.backBtn} onPress={() => navigation.navigate('Home')}>
           <Text style={styles.backBtnText}>←</Text>
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Chats</Text>
+        <View style={styles.headerCopy}>
+          <Text style={styles.headerTitle}>Mensajes</Text>
+          <Text style={styles.headerSubtitle}>Conversaciones de servicios y cotizaciones</Text>
+        </View>
         <TouchableOpacity style={styles.refreshBtn} onPress={fetchConversaciones}>
           <Text style={styles.refreshBtnText}>↻</Text>
         </TouchableOpacity>
       </View>
 
-      <FlatList
-        data={conversaciones}
-        keyExtractor={(item) => String(item.id)}
-        renderItem={renderItem}
-        contentContainerStyle={styles.listContent}
-        refreshing={loading}
-        onRefresh={fetchConversaciones}
-        ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <Text style={styles.emptyIcon}>📭</Text>
-            <Text style={styles.emptyTitle}>Bandeja vacía</Text>
-            <Text style={styles.emptyDesc}>
-              Aún no tienes mensajes. Las conversaciones iniciadas aparecerán aquí.
-            </Text>
+      {isDesktop ? (
+        <View style={styles.desktopShell}>
+          <View style={styles.desktopListPane}>{list}</View>
+          <View style={styles.desktopChatPane}>
+            {selectedPersona ? (
+              <ChatScreen
+                navigation={navigation}
+                user={user}
+                chatWithUserId={selectedPersona.id}
+                chatWithName={selectedPersona.name}
+                embedded
+              />
+            ) : (
+              <View style={styles.desktopEmpty}>
+                <Text style={styles.desktopEmptyTitle}>Selecciona una conversacion</Text>
+                <Text style={styles.desktopEmptyText}>
+                  El detalle del chat aparecera aqui en pantallas grandes.
+                </Text>
+              </View>
+            )}
           </View>
-        }
-      />
+        </View>
+      ) : (
+        list
+      )}
     </View>
   );
 }
 
+function getOtraPersona(item, user) {
+  if (!item || !user) return null;
+  return item.emisor_id === user.id ? item.receptor : item.emisor;
+}
+
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff' },
+  container: { flex: 1, backgroundColor: T.canvas },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#075E54', // WhatsApp dark green
+    backgroundColor: T.paper,
     paddingTop: 16,
-    paddingBottom: 16,
-    paddingHorizontal: 8,
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
+    paddingBottom: 14,
+    paddingHorizontal: T.s3,
+    borderBottomWidth: 1,
+    borderBottomColor: T.border,
+    gap: T.s2,
   },
-  backBtn: { padding: 8 },
-  backBtnText: { color: '#fff', fontSize: 24, fontWeight: 'bold' },
-  headerTitle: { fontSize: 20, fontWeight: '600', color: '#fff', flex: 1, marginLeft: 8 },
-  refreshBtn: { padding: 8 },
-  refreshBtnText: { color: '#fff', fontSize: 22, fontWeight: 'bold' },
+  headerDesktop: { paddingHorizontal: T.s5 },
+  backBtn: { width: 38, height: 38, borderRadius: T.rSm, alignItems: 'center', justifyContent: 'center' },
+  backBtnText: { color: T.blue, fontSize: 24, fontWeight: '900' },
+  headerCopy: { flex: 1 },
+  headerTitle: { fontSize: 21, fontWeight: '900', color: T.ink },
+  headerSubtitle: { fontSize: 12, color: T.muted, marginTop: 1 },
+  refreshBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: T.rSm,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: T.white,
+    borderWidth: 1,
+    borderColor: T.inputBorder,
+  },
+  refreshBtnText: { color: T.blue, fontSize: 20, fontWeight: '900' },
 
-  listContent: { padding: 0 },
+  desktopShell: {
+    flex: 1,
+    flexDirection: 'row',
+    width: '100%',
+    maxWidth: 1180,
+    alignSelf: 'center',
+    padding: T.s4,
+    gap: T.s4,
+  },
+  desktopListPane: {
+    width: 360,
+    backgroundColor: T.paper,
+    borderRadius: T.rMd,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: T.border,
+  },
+  desktopChatPane: {
+    flex: 1,
+    minWidth: 0,
+    backgroundColor: T.white,
+    borderRadius: T.rMd,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: T.border,
+  },
+
+  listContent: { padding: T.s2 },
   chatCard: {
     flexDirection: 'row',
-    backgroundColor: '#fff',
-    padding: 14,
+    backgroundColor: T.white,
+    borderRadius: T.rSm,
+    padding: T.s3,
     alignItems: 'center',
+    marginBottom: T.s2,
+    borderWidth: 1,
+    borderColor: T.border,
   },
+  chatCardActive: { borderColor: T.blue, backgroundColor: '#eef4ff' },
   avatar: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    backgroundColor: '#dfe5e7',
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#eef4ff',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 14,
+    marginRight: T.s3,
+    borderWidth: 1,
+    borderColor: T.inputBorder,
   },
-  avatarText: { fontSize: 22, fontWeight: 'bold', color: '#075E54' },
-  chatInfo: { flex: 1, borderBottomWidth: 1, borderBottomColor: '#f2f2f2', paddingBottom: 14, marginTop: 4 },
-  chatHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 },
-  chatName: { fontSize: 16, color: '#000', fontWeight: '500' },
-  chatTime: { fontSize: 12, color: '#888' },
-  chatFooter: { flexDirection: 'row', alignItems: 'center' },
-  chatSnippet: { fontSize: 15, color: '#667085', flex: 1, marginRight: 8 },
-  textBold: { fontWeight: '700' },
-  textUnread: { color: '#000' },
-  timeUnread: { color: '#25D366', fontWeight: '600' }, // WhatsApp light green
-  
-  checkMarks: { fontSize: 14 },
-  checkRead: { color: '#34B7F1' }, // WhatsApp Blue ticks
-  checkUnread: { color: '#999' },
-  
-  unreadBadge: { width: 20, height: 20, borderRadius: 10, backgroundColor: '#25D366', justifyContent: 'center', alignItems: 'center' },
-  unreadBadgeText: { color: '#fff', fontSize: 10, fontWeight: 'bold' },
+  avatarUnread: { backgroundColor: T.blue, borderColor: T.blue },
+  avatarText: { fontSize: 19, fontWeight: '900', color: T.deep },
+  chatInfo: { flex: 1, minWidth: 0 },
+  chatHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: T.s2 },
+  chatName: { fontSize: 15, color: T.ink, fontWeight: '800', flex: 1 },
+  chatTime: { fontSize: 11, color: T.faint, fontWeight: '700' },
+  chatFooter: { flexDirection: 'row', alignItems: 'center', marginTop: 5 },
+  chatSnippet: { fontSize: 13, color: T.muted, flex: 1, marginRight: T.s2 },
+  textBold: { fontWeight: '900' },
+  textUnread: { color: T.ink },
+  timeUnread: { color: T.blue },
+  checkMarks: { fontSize: 12, fontWeight: '900' },
+  checkRead: { color: T.blue },
+  checkUnread: { color: T.faint },
+  unreadBadge: {
+    minWidth: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: T.blue,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 5,
+  },
+  unreadBadgeText: { color: T.white, fontSize: 10, fontWeight: '900' },
 
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  loadingText: { marginTop: 12, color: '#667085' },
-  emptyContainer: { alignItems: 'center', paddingVertical: 60 },
-  emptyIcon: { fontSize: 48, marginBottom: 16 },
-  emptyTitle: { fontSize: 18, fontWeight: 'bold', color: '#333', marginBottom: 8 },
-  emptyDesc: { fontSize: 14, color: '#667085', textAlign: 'center', paddingHorizontal: 30 },
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: T.canvas },
+  loadingText: { marginTop: T.s3, color: T.muted },
+  emptyContainer: { alignItems: 'center', paddingVertical: 60, paddingHorizontal: T.s5 },
+  emptyTitle: { fontSize: 18, fontWeight: '900', color: T.ink, marginBottom: 8 },
+  emptyDesc: { fontSize: 14, color: T.muted, textAlign: 'center' },
+  desktopEmpty: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: T.s6 },
+  desktopEmptyTitle: { fontSize: 20, fontWeight: '900', color: T.ink, marginBottom: 6 },
+  desktopEmptyText: { fontSize: 14, color: T.muted, textAlign: 'center' },
 });

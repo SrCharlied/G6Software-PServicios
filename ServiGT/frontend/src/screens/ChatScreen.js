@@ -13,12 +13,14 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getConversacion, sendMensaje } from '../services/api';
 import { useToast } from '../context/ToastContext';
+import { T } from '../theme';
 
 export default function ChatScreen({
   navigation,
   user,
   chatWithUserId,
   chatWithName,
+  embedded = false,
 }) {
   const toast = useToast();
   const [mensajes, setMensajes] = useState([]);
@@ -38,7 +40,6 @@ export default function ChatScreen({
   useEffect(() => {
     if (!chatWithUserId) return undefined;
     loadMensajes();
-    // Polling cada 5 segundos para nuevos mensajes
     pollRef.current = setInterval(loadMensajesSilencioso, 5000);
     return () => clearInterval(pollRef.current);
   }, [chatWithUserId]);
@@ -61,22 +62,24 @@ export default function ChatScreen({
       if (localData) {
         locales = JSON.parse(localData);
         setMensajes(locales);
-        setLoading(false); // Mostramos los locales instantaneamente
+        setLoading(false);
       }
-    } catch (e) { console.log('Error AsyncStorage', e); }
+    } catch (e) {
+      console.log('Error AsyncStorage', e);
+    }
 
     if (locales.length === 0) setLoading(true);
 
     try {
       let lastId = null;
       if (locales.length > 0) {
-        const validIds = locales.filter(m => !String(m.id).startsWith('temp-')).map(m => m.id);
+        const validIds = locales.filter((m) => !String(m.id).startsWith('temp-')).map((m) => m.id);
         if (validIds.length > 0) lastId = Math.max(...validIds);
       }
 
       const data = await getConversacion(chatWithUserId, lastId);
       if (data.mensajes && data.mensajes.length > 0) {
-        const filtrados = locales.filter(m => !String(m.id).startsWith('temp-'));
+        const filtrados = locales.filter((m) => !String(m.id).startsWith('temp-'));
         const finales = [...filtrados, ...data.mensajes];
         setMensajes(finales);
         AsyncStorage.setItem(getStorageKey(), JSON.stringify(finales));
@@ -93,17 +96,19 @@ export default function ChatScreen({
       const actuales = mensajesRef.current;
       let lastId = null;
       if (actuales.length > 0) {
-        const validIds = actuales.filter(m => !String(m.id).startsWith('temp-')).map(m => m.id);
+        const validIds = actuales.filter((m) => !String(m.id).startsWith('temp-')).map((m) => m.id);
         if (validIds.length > 0) lastId = Math.max(...validIds);
       }
       const data = await getConversacion(chatWithUserId, lastId);
       if (data.mensajes && data.mensajes.length > 0) {
-        const filtrados = actuales.filter(m => !String(m.id).startsWith('temp-'));
+        const filtrados = actuales.filter((m) => !String(m.id).startsWith('temp-'));
         const nuevos = [...filtrados, ...data.mensajes];
         setMensajes(nuevos);
         AsyncStorage.setItem(getStorageKey(), JSON.stringify(nuevos));
       }
-    } catch { /* ignorar */ }
+    } catch {
+      // Evita ruido visual durante polling.
+    }
   };
 
   const handleSend = async () => {
@@ -112,7 +117,6 @@ export default function ChatScreen({
     const contenido = texto.trim();
     setTexto('');
 
-    // Optimistic update
     const tempMsg = {
       id: `temp-${Date.now()}`,
       emisor_id: user.id,
@@ -133,7 +137,6 @@ export default function ChatScreen({
         return nuevos;
       });
     } catch (error) {
-      // Revertir mensaje temporal en caso de error
       setMensajes((prev) => prev.filter((m) => m.id !== tempMsg.id));
       toast(error.message, 'error');
     } finally {
@@ -144,19 +147,22 @@ export default function ChatScreen({
   const formatTime = (iso) => {
     try {
       return new Date(iso).toLocaleTimeString('es-GT', {
-        hour: '2-digit', minute: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
       });
-    } catch { return ''; }
+    } catch {
+      return '';
+    }
   };
 
   const getCheckMark = (item) => {
     if (String(item.id).startsWith('temp-')) {
-      return <Text style={[styles.checkMarks, styles.checkPending]}> 🕒</Text>;
+      return <Text style={[styles.checkMarks, styles.checkPending]}>...</Text>;
     }
     if (item.leido) {
-      return <Text style={[styles.checkMarks, styles.checkRead]}> ✓✓</Text>;
+      return <Text style={[styles.checkMarks, styles.checkRead]}>✓✓</Text>;
     }
-    return <Text style={[styles.checkMarks, styles.checkUnread]}> ✓</Text>;
+    return <Text style={[styles.checkMarks, styles.checkUnread]}>✓</Text>;
   };
 
   const renderMensaje = ({ item }) => {
@@ -180,32 +186,32 @@ export default function ChatScreen({
 
   return (
     <KeyboardAvoidingView
-      style={styles.container}
+      style={[styles.container, embedded && styles.containerEmbedded]}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       keyboardVerticalOffset={80}
     >
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.navigate('Home')} style={styles.backBtn}>
-          <Text style={styles.backText}>←</Text>
-        </TouchableOpacity>
+      <View style={[styles.header, embedded && styles.headerEmbedded]}>
+        {!embedded ? (
+          <TouchableOpacity onPress={() => navigation.navigate('Home')} style={styles.backBtn}>
+            <Text style={styles.backText}>←</Text>
+          </TouchableOpacity>
+        ) : null}
         <View style={styles.headerInfo}>
           <View style={styles.avatarSmall}>
-            <Text style={styles.avatarSmallText}>
-              {(chatWithName || '?')[0].toUpperCase()}
-            </Text>
+            <Text style={styles.avatarSmallText}>{(chatWithName || '?')[0].toUpperCase()}</Text>
           </View>
           <View>
-            <Text style={styles.headerName}>{chatWithName}</Text>
-            <Text style={styles.headerStatus}>En linea</Text>
+            <Text style={[styles.headerName, embedded && styles.headerNameEmbedded]}>{chatWithName}</Text>
+            <Text style={[styles.headerStatus, embedded && styles.headerStatusEmbedded]}>
+              Conversacion activa
+            </Text>
           </View>
         </View>
       </View>
 
-      {/* Messages */}
       {loading ? (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#4589d4" />
+          <ActivityIndicator size="large" color={T.blue} />
         </View>
       ) : (
         <FlatList
@@ -217,21 +223,18 @@ export default function ChatScreen({
           onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
-              <Text style={styles.emptyText}>
-                Inicia la conversacion con {chatWithName}.
-              </Text>
+              <Text style={styles.emptyText}>Inicia la conversacion con {chatWithName}.</Text>
             </View>
           }
         />
       )}
 
-      {/* Input */}
       <View style={styles.inputRow}>
         <View style={styles.inputContainer}>
           <TextInput
             style={styles.textInput}
-            placeholder="Mensaje"
-            placeholderTextColor="#999"
+            placeholder="Escribe un mensaje"
+            placeholderTextColor={T.faint}
             value={texto}
             onChangeText={setTexto}
             multiline
@@ -247,9 +250,9 @@ export default function ChatScreen({
           disabled={!texto.trim() || sending}
         >
           {sending ? (
-            <ActivityIndicator color="#fff" size="small" />
+            <ActivityIndicator color={T.white} size="small" />
           ) : (
-            <Text style={styles.sendBtnIcon}>➤</Text>
+            <Text style={styles.sendBtnIcon}>›</Text>
           )}
         </TouchableOpacity>
       </View>
@@ -258,100 +261,119 @@ export default function ChatScreen({
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#ece5dd' }, // WhatsApp background color
+  container: { flex: 1, backgroundColor: T.canvas },
+  containerEmbedded: { backgroundColor: T.white },
 
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#075E54', // WhatsApp dark green
+    backgroundColor: T.paper,
     paddingTop: 20,
     paddingBottom: 12,
-    paddingHorizontal: 8,
-    gap: 8,
-    elevation: 3,
+    paddingHorizontal: T.s3,
+    gap: T.s2,
+    borderBottomWidth: 1,
+    borderBottomColor: T.border,
   },
-  backBtn: { padding: 8 },
-  backText: { color: '#fff', fontSize: 22, fontWeight: 'bold' },
-  headerInfo: { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 },
+  headerEmbedded: { paddingTop: T.s4, paddingHorizontal: T.s4, backgroundColor: T.white },
+  backBtn: { padding: T.s2 },
+  backText: { color: T.blue, fontSize: 24, fontWeight: '900' },
+  headerInfo: { flexDirection: 'row', alignItems: 'center', gap: T.s3, flex: 1 },
   avatarSmall: {
-    width: 40, height: 40, borderRadius: 20,
-    backgroundColor: '#dfe5e7',
-    justifyContent: 'center', alignItems: 'center',
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: '#eef4ff',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: T.inputBorder,
   },
-  avatarSmallText: { color: '#075E54', fontWeight: 'bold', fontSize: 18 },
-  headerName: { color: '#fff', fontWeight: '600', fontSize: 17 },
-  headerStatus: { color: 'rgba(255,255,255,0.8)', fontSize: 13 },
+  avatarSmallText: { color: T.deep, fontWeight: '900', fontSize: 17 },
+  headerName: { color: T.ink, fontWeight: '900', fontSize: 17 },
+  headerNameEmbedded: { fontSize: 18 },
+  headerStatus: { color: T.muted, fontSize: 12, marginTop: 1 },
+  headerStatusEmbedded: { color: T.muted },
 
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   backHomeBtn: {
-    marginTop: 16,
-    backgroundColor: '#075E54',
-    paddingHorizontal: 16,
+    marginTop: T.s4,
+    backgroundColor: T.blue,
+    paddingHorizontal: T.s4,
     paddingVertical: 10,
-    borderRadius: 20,
+    borderRadius: T.rSm,
   },
-  backHomeBtnText: { color: '#fff', fontWeight: '700', fontSize: 14 },
-  listContent: { padding: 12, paddingBottom: 16 },
+  backHomeBtnText: { color: T.white, fontWeight: '800', fontSize: 14 },
+  listContent: { padding: T.s4, paddingBottom: T.s5 },
   emptyContainer: { paddingTop: 60, alignItems: 'center', paddingHorizontal: 40 },
-  emptyText: { color: '#555', fontSize: 15, textAlign: 'center', backgroundColor: '#fff', padding: 12, borderRadius: 8, elevation: 1 },
+  emptyText: {
+    color: T.muted,
+    fontSize: 14,
+    textAlign: 'center',
+    backgroundColor: T.paper,
+    padding: T.s3,
+    borderRadius: T.rSm,
+  },
 
-  bubbleContainer: { marginBottom: 12, maxWidth: '85%' },
+  bubbleContainer: { marginBottom: 12, maxWidth: '82%' },
   bubbleLeft: { alignSelf: 'flex-start' },
   bubbleRight: { alignSelf: 'flex-end' },
-  bubble: { 
-    borderRadius: 12, 
-    paddingHorizontal: 12, 
-    paddingVertical: 8, 
-    elevation: 1,
-    shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 1, shadowOffset: { width: 0, height: 1 } 
+  bubble: {
+    borderRadius: T.rMd,
+    paddingHorizontal: T.s3,
+    paddingVertical: 9,
+    borderWidth: 1,
+    borderColor: T.border,
   },
-  bubbleMio: { backgroundColor: '#dcf8c6', borderTopRightRadius: 0 },
-  bubbleOtro: { backgroundColor: '#fff', borderTopLeftRadius: 0 },
-  bubbleText: { fontSize: 15, lineHeight: 20 },
-  bubbleTextMio: { color: '#111' },
-  bubbleTextOtro: { color: '#111' },
-  timeRow: { flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', marginTop: 4, gap: 4 },
+  bubbleMio: { backgroundColor: '#eef4ff', borderTopRightRadius: 4 },
+  bubbleOtro: { backgroundColor: T.paper, borderTopLeftRadius: 4 },
+  bubbleText: { fontSize: 15, lineHeight: 21 },
+  bubbleTextMio: { color: T.deep },
+  bubbleTextOtro: { color: T.text },
+  timeRow: { flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', marginTop: 5, gap: 5 },
   bubbleTime: { fontSize: 11 },
-  bubbleTimeMio: { color: 'rgba(0,0,0,0.45)' },
-  bubbleTimeOtro: { color: 'rgba(0,0,0,0.45)' },
-  checkMarks: { fontSize: 12 },
-  checkRead: { color: '#34B7F1' }, // WhatsApp Blue ticks
-  checkUnread: { color: 'rgba(0,0,0,0.3)' },
-  checkPending: { color: 'rgba(0,0,0,0.3)', fontSize: 10 },
+  bubbleTimeMio: { color: T.muted },
+  bubbleTimeOtro: { color: T.muted },
+  checkMarks: { fontSize: 11, fontWeight: '800' },
+  checkRead: { color: T.blue },
+  checkUnread: { color: T.faint },
+  checkPending: { color: T.faint, fontSize: 10 },
 
   inputRow: {
     flexDirection: 'row',
     alignItems: 'flex-end',
-    backgroundColor: 'transparent',
-    paddingHorizontal: 8,
-    paddingVertical: 8,
-    gap: 8,
+    backgroundColor: T.paper,
+    borderTopWidth: 1,
+    borderTopColor: T.border,
+    paddingHorizontal: T.s3,
+    paddingVertical: T.s3,
+    gap: T.s2,
   },
   inputContainer: {
     flex: 1,
-    backgroundColor: '#fff',
-    borderRadius: 24,
-    minHeight: 48,
+    backgroundColor: T.white,
+    borderRadius: T.rSm,
+    minHeight: 46,
     justifyContent: 'center',
-    paddingHorizontal: 16,
-    elevation: 1,
+    paddingHorizontal: T.s3,
+    borderWidth: 1,
+    borderColor: T.inputBorder,
   },
   textInput: {
-    fontSize: 16,
-    color: '#000',
+    fontSize: 15,
+    color: T.text,
     maxHeight: 120,
-    paddingTop: 12,
-    paddingBottom: 12,
+    paddingTop: 11,
+    paddingBottom: 11,
   },
   sendBtn: {
-    backgroundColor: '#128C7E',
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    backgroundColor: T.blue,
+    width: 46,
+    height: 46,
+    borderRadius: T.rSm,
     justifyContent: 'center',
     alignItems: 'center',
-    elevation: 1,
   },
-  sendBtnDisabled: { backgroundColor: '#a5d6d1' },
-  sendBtnIcon: { color: '#fff', fontSize: 20, paddingLeft: 2 },
+  sendBtnDisabled: { backgroundColor: T.soft },
+  sendBtnIcon: { color: T.white, fontSize: 28, fontWeight: '900', lineHeight: 28 },
 });

@@ -47,13 +47,13 @@ export default function PublicarPedidoScreen({ navigation }) {
   const validate = () => {
     const errs = {};
     if (!descripcion.trim() || descripcion.trim().length < 10) {
-      errs.descripcion = 'La descripcion debe tener al menos 10 caracteres.';
+      errs.descripcion = 'La descripción debe tener al menos 10 caracteres.';
     }
     if (!categoriaId) {
-      errs.categoriaId = 'Selecciona una categoria.';
+      errs.categoriaId = 'Selecciona una categoría.';
     }
     if (!direccion.trim()) {
-      errs.direccion = 'La direccion es obligatoria.';
+      errs.direccion = 'La dirección es obligatoria.';
     }
     if (!urgencia) {
       errs.urgencia = 'Selecciona la urgencia.';
@@ -90,8 +90,8 @@ export default function PublicarPedidoScreen({ navigation }) {
       <Text style={styles.title}>Publicar pedido</Text>
       <Text style={styles.subtitle}>Describe tu problema y recibe propuestas de proveedores.</Text>
 
-      {/* Descripcion */}
-      <Text style={styles.label}>Descripcion <Text style={styles.required}>*</Text></Text>
+      {/* Descripción */}
+      <Text style={styles.label}>Descripción <Text style={styles.required}>*</Text></Text>
       <TextInput
         style={[styles.input, styles.textArea, errors.descripcion && styles.inputError]}
         placeholder="Describe detalladamente el problema o servicio que necesitas..."
@@ -104,8 +104,8 @@ export default function PublicarPedidoScreen({ navigation }) {
       />
       <FieldError message={errors.descripcion} />
 
-      {/* Categoria */}
-      <Text style={styles.label}>Categoria <Text style={styles.required}>*</Text></Text>
+      {/* Categoría */}
+      <Text style={styles.label}>Categoría <Text style={styles.required}>*</Text></Text>
       {loadingCats ? (
         <ActivityIndicator size="small" color={T.blue} style={{ marginBottom: 16 }} />
       ) : (
@@ -125,8 +125,8 @@ export default function PublicarPedidoScreen({ navigation }) {
       )}
       <FieldError message={errors.categoriaId} />
 
-      {/* Direccion */}
-      <Text style={styles.label}>Direccion <Text style={styles.required}>*</Text></Text>
+      {/* Dirección */}
+      <Text style={styles.label}>Dirección <Text style={styles.required}>*</Text></Text>
       <TextInput
         style={[styles.input, errors.direccion && styles.inputError]}
         placeholder="Zona 10, Ciudad de Guatemala..."
@@ -169,7 +169,7 @@ export default function PublicarPedidoScreen({ navigation }) {
           : <Text style={styles.submitText}>Publicar pedido</Text>}
       </TouchableOpacity>
 
-      <Text style={styles.hint}>Tu pedido estara visible para proveedores durante 7 dias.</Text>
+      <Text style={styles.hint}>Tu pedido estará visible para proveedores durante 7 días.</Text>
     </ScrollView>
   );
 }
@@ -182,17 +182,15 @@ const styles = StyleSheet.create({
   label:       { fontSize: 14, fontWeight: '600', color: T.ink, marginBottom: 6 },
   required:    { color: T.danger },
   input:       {
-    backgroundColor: T.white, borderWidth: 1, borderColor: T.inputBorder,
-    borderRadius: T.rMd, paddingHorizontal: 14, paddingVertical: 12,
-    fontSize: 15, color: T.text, marginBottom: 4,
+    ...T.input,
+    marginBottom: 4,
   },
   textArea:    { height: 100, textAlignVertical: 'top' },
   inputError:  { borderColor: T.danger },
   fieldError:  { fontSize: 12, color: T.danger, marginBottom: 12 },
   chipRow:     { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 4 },
   chip:        {
-    paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20,
-    borderWidth: 1, borderColor: T.border, backgroundColor: T.white,
+    ...T.chip,
   },
   chipSelected:     { borderColor: T.blue, backgroundColor: '#eef4ff' },
   chipText:         { fontSize: 13, color: T.muted },
@@ -204,12 +202,13 @@ const styles = StyleSheet.create({
   },
   urgenciaBtnText: { fontSize: 14, color: T.muted },
   submitBtn:   {
-    backgroundColor: T.blue, paddingVertical: 16, borderRadius: T.rMd,
-    alignItems: 'center', marginTop: 24,
+    ...T.primaryButton,
+    paddingVertical: 16,
+    marginTop: 24,
     ...T.sh2,
   },
   submitBtnDisabled: { opacity: 0.6 },
-  submitText:  { color: '#fff', fontSize: 16, fontWeight: '700' },
+  submitText:  { ...T.primaryButtonText, fontSize: 16 },
   hint:        { marginTop: 14, fontSize: 12, color: T.faint, textAlign: 'center' },
   backRow:     { marginBottom: 16 },
   backText:    { fontSize: 15, color: T.blue, fontWeight: '600' },

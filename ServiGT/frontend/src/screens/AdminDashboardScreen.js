@@ -1,14 +1,22 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Modal,
   RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
+  useWindowDimensions,
   View,
 } from 'react-native';
-import { getAdminProveedores, getAdminStats, getAdminUsuarios } from '../services/api';
+import {
+  getAdminProveedores,
+  getAdminStats,
+  getAdminUsuarios,
+  recargarCreditosProveedor,
+} from '../services/api';
 import { useToast } from '../context/ToastContext';
 import { T } from '../theme';
 
@@ -61,6 +69,8 @@ function RoleBadge({ role }) {
 
 export default function AdminDashboardScreen({ navigation, user }) {
   const toast = useToast();
+  const { width } = useWindowDimensions();
+  const isDesktop = width >= 900;
 
   const [activeTab, setActiveTab] = useState('stats');
   const [stats, setStats] = useState(null);
@@ -71,7 +81,12 @@ export default function AdminDashboardScreen({ navigation, user }) {
   const [loadingStats, setLoadingStats] = useState(true);
   const [loadingUsuarios, setLoadingUsuarios] = useState(false);
   const [loadingProveedores, setLoadingProveedores] = useState(false);
+  const [savingRecarga, setSavingRecarga] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [recargaModalVisible, setRecargaModalVisible] = useState(false);
+  const [selectedProveedorId, setSelectedProveedorId] = useState(null);
+  const [recargaMonto, setRecargaMonto] = useState('');
+  const [recargaMotivo, setRecargaMotivo] = useState('');
 
   const fetchStats = useCallback(async () => {
     setLoadingStats(true);
@@ -121,6 +136,51 @@ export default function AdminDashboardScreen({ navigation, user }) {
     setRefreshing(false);
   };
 
+  const openRecargaModal = async (proveedor = null) => {
+    if (proveedor) setSelectedProveedorId(proveedor.id);
+    setRecargaMonto('');
+    setRecargaMotivo('');
+    setRecargaModalVisible(true);
+    if (proveedores.length === 0) {
+      await fetchProveedores();
+    }
+  };
+
+  const closeRecargaModal = () => {
+    if (!savingRecarga) setRecargaModalVisible(false);
+  };
+
+  const handleRecargaSubmit = async () => {
+    const monto = Number.parseInt(recargaMonto, 10);
+    if (!selectedProveedorId) {
+      toast('Selecciona un proveedor.', 'error');
+      return;
+    }
+    if (!Number.isInteger(monto) || monto < 1) {
+      toast('Ingresa una cantidad valida de creditos.', 'error');
+      return;
+    }
+    if (recargaMotivo.trim().length < 5) {
+      toast('Agrega un motivo de al menos 5 caracteres.', 'error');
+      return;
+    }
+
+    setSavingRecarga(true);
+    try {
+      const data = await recargarCreditosProveedor(selectedProveedorId, {
+        monto,
+        motivo: recargaMotivo.trim(),
+      });
+      toast(data.message || 'Creditos agregados correctamente.', 'success');
+      setRecargaModalVisible(false);
+      await Promise.all([fetchStats(), fetchProveedores()]);
+    } catch (error) {
+      toast(error.message, 'error');
+    } finally {
+      setSavingRecarga(false);
+    }
+  };
+
   const renderStats = () => {
     if (loadingStats && !stats) {
       return (
@@ -134,6 +194,19 @@ export default function AdminDashboardScreen({ navigation, user }) {
 
     return (
       <View>
+        <View style={styles.heroPanel}>
+          <View style={styles.heroCopy}>
+            <Text style={styles.heroEyebrow}>Dashboard operativo</Text>
+            <Text style={styles.heroTitle}>Control de ServiGT</Text>
+            <Text style={styles.heroText}>
+              Supervisa usuarios, proveedores, servicios y creditos desde el mismo entorno de la app.
+            </Text>
+          </View>
+          <TouchableOpacity style={styles.heroButton} onPress={() => openRecargaModal()}>
+            <Text style={styles.heroButtonText}>+ Agregar creditos</Text>
+          </TouchableOpacity>
+        </View>
+
         <Text style={styles.sectionTitle}>Usuarios</Text>
         <View style={styles.grid}>
           <MetricCard label="Total"          value={stats.usuarios.total}        color={T.blue} />
@@ -150,6 +223,16 @@ export default function AdminDashboardScreen({ navigation, user }) {
             label="Calif. promedio"
             value={Number(stats.proveedores.calificacion_promedio_global ?? 0).toFixed(2)}
             color={T.amber}
+          />
+          <MetricCard
+            label="Creditos disponibles"
+            value={stats.proveedores.creditos_disponibles ?? 0}
+            color={T.deep}
+          />
+          <MetricCard
+            label="Recargas manuales"
+            value={stats.proveedores.creditos_recargados ?? 0}
+            color={T.success}
           />
         </View>
 
@@ -242,19 +325,111 @@ export default function AdminDashboardScreen({ navigation, user }) {
               <Text style={styles.metaText}>
                 ★ {Number(p.calificacion_promedio ?? 0).toFixed(1)}
               </Text>
+              <Text style={styles.metaText}>Creditos: {p.credito?.saldo ?? 0}</Text>
               {p.tarifa_hora ? <Text style={styles.metaText}>Q{Number(p.tarifa_hora).toFixed(2)}/hr</Text> : null}
               {p.nivel ? <Text style={styles.metaText}>Nivel: {p.nivel}</Text> : null}
             </View>
+            <TouchableOpacity style={styles.inlineAction} onPress={() => openRecargaModal(p)}>
+              <Text style={styles.inlineActionText}>Agregar creditos</Text>
+            </TouchableOpacity>
           </View>
         ))
       )}
     </View>
   );
 
+  const selectedProveedor = proveedores.find((p) => p.id === selectedProveedorId);
+
+  const renderRecargaModal = () => (
+    <Modal transparent visible={recargaModalVisible} animationType="fade" onRequestClose={closeRecargaModal}>
+      <View style={styles.modalOverlay}>
+        <View style={styles.modalCard}>
+          <View style={styles.modalHead}>
+            <View>
+              <Text style={styles.modalTitle}>Agregar creditos</Text>
+              <Text style={styles.modalSubtitle}>Recarga manual sin pagos reales.</Text>
+            </View>
+            <TouchableOpacity onPress={closeRecargaModal} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <Text style={styles.modalClose}>x</Text>
+            </TouchableOpacity>
+          </View>
+
+          <Text style={styles.inputLabel}>Proveedor</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.providerPicker}>
+            {proveedores.map((p) => {
+              const active = selectedProveedorId === p.id;
+              return (
+                <TouchableOpacity
+                  key={p.id}
+                  style={[styles.providerChip, active && styles.providerChipActive]}
+                  onPress={() => setSelectedProveedorId(p.id)}
+                >
+                  <Text style={[styles.providerChipName, active && styles.providerChipNameActive]} numberOfLines={1}>
+                    {p.nombre}
+                  </Text>
+                  <Text style={[styles.providerChipSaldo, active && styles.providerChipSaldoActive]}>
+                    {p.credito?.saldo ?? 0} cred.
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+
+          {selectedProveedor ? (
+            <View style={styles.selectedBox}>
+              <Text style={styles.selectedName}>{selectedProveedor.nombre}</Text>
+              <Text style={styles.selectedMeta}>
+                Saldo actual: {selectedProveedor.credito?.saldo ?? 0} creditos
+              </Text>
+            </View>
+          ) : null}
+
+          <Text style={styles.inputLabel}>Cantidad de creditos</Text>
+          <TextInput
+            style={styles.input}
+            value={recargaMonto}
+            onChangeText={setRecargaMonto}
+            keyboardType="number-pad"
+            placeholder="Ej. 5"
+            placeholderTextColor={T.faint}
+          />
+
+          <Text style={styles.inputLabel}>Motivo</Text>
+          <TextInput
+            style={[styles.input, styles.textArea]}
+            value={recargaMotivo}
+            onChangeText={setRecargaMotivo}
+            multiline
+            maxLength={255}
+            placeholder="Ej. Recarga manual validada por administracion"
+            placeholderTextColor={T.faint}
+          />
+
+          <View style={styles.modalActions}>
+            <TouchableOpacity style={styles.secondaryBtn} onPress={closeRecargaModal} disabled={savingRecarga}>
+              <Text style={styles.secondaryBtnText}>Cancelar</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.primaryBtn, savingRecarga && styles.primaryBtnDisabled]}
+              onPress={handleRecargaSubmit}
+              disabled={savingRecarga}
+            >
+              {savingRecarga ? (
+                <ActivityIndicator color={T.white} size="small" />
+              ) : (
+                <Text style={styles.primaryBtnText}>Guardar recarga</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+
   return (
     <ScrollView
       style={styles.container}
-      contentContainerStyle={styles.content}
+      contentContainerStyle={[styles.content, isDesktop && styles.contentDesktop]}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
     >
       <View style={styles.topBar}>
@@ -267,7 +442,7 @@ export default function AdminDashboardScreen({ navigation, user }) {
 
       <Text style={styles.subtitle}>Hola, {user?.name || 'Admin'}</Text>
 
-      <View style={styles.tabsRow}>
+      <View style={[styles.tabsRow, isDesktop && styles.tabsRowDesktop]}>
         {TABS.map((tab) => {
           const active = activeTab === tab.key;
           return (
@@ -287,6 +462,7 @@ export default function AdminDashboardScreen({ navigation, user }) {
         {activeTab === 'usuarios'    && renderUsuarios()}
         {activeTab === 'proveedores' && renderProveedores()}
       </View>
+      {renderRecargaModal()}
     </ScrollView>
   );
 }
@@ -294,6 +470,7 @@ export default function AdminDashboardScreen({ navigation, user }) {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: T.canvas },
   content:   { padding: T.s4, paddingBottom: 40 },
+  contentDesktop: { width: '100%', maxWidth: 1120, alignSelf: 'center', paddingHorizontal: T.s6 },
 
   topBar: {
     flexDirection: 'row',
@@ -312,6 +489,7 @@ const styles = StyleSheet.create({
     gap: T.s2,
     marginBottom: T.s4,
   },
+  tabsRowDesktop: { maxWidth: 520 },
   tabBtn: {
     flex: 1,
     paddingVertical: 11,
@@ -328,6 +506,30 @@ const styles = StyleSheet.create({
   tabContent: { gap: T.s2 },
 
   sectionTitle: { fontSize: 15, fontWeight: '700', color: T.ink, marginTop: T.s3, marginBottom: T.s2 },
+
+  heroPanel: {
+    backgroundColor: T.ink,
+    borderRadius: T.rMd,
+    padding: T.s5,
+    marginBottom: T.s4,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: T.s4,
+    ...T.sh2,
+  },
+  heroCopy: { flex: 1 },
+  heroEyebrow: { color: T.soft, fontSize: 12, fontWeight: '800', textTransform: 'uppercase', marginBottom: 6 },
+  heroTitle: { color: T.white, fontSize: 24, fontWeight: '900' },
+  heroText: { color: 'rgba(255,255,255,0.72)', fontSize: 13, lineHeight: 19, marginTop: 4 },
+  heroButton: {
+    backgroundColor: T.blue,
+    borderRadius: T.rSm,
+    paddingHorizontal: T.s4,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  heroButtonText: { color: T.white, fontSize: 13, fontWeight: '800' },
 
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: T.s3, marginBottom: T.s2 },
   metricCard: {
@@ -367,6 +569,15 @@ const styles = StyleSheet.create({
   listCardSub: { fontSize: 13, color: T.muted, marginTop: 4 },
   listCardMeta: { flexDirection: 'row', flexWrap: 'wrap', gap: 14, marginTop: T.s2 },
   metaText: { fontSize: 12, color: T.muted, fontWeight: '600' },
+  inlineAction: {
+    alignSelf: 'flex-start',
+    marginTop: T.s3,
+    backgroundColor: T.blue,
+    borderRadius: T.rSm,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+  },
+  inlineActionText: { color: T.white, fontSize: 12, fontWeight: '800' },
 
   badge:      { paddingHorizontal: 10, paddingVertical: 3, borderRadius: 10 },
   badgeText:  { fontSize: 11, fontWeight: '700' },
@@ -374,4 +585,81 @@ const styles = StyleSheet.create({
   emptyText: { fontSize: 14, color: T.muted, textAlign: 'center', padding: T.s6 },
   center:    { paddingVertical: T.s6, alignItems: 'center' },
   loadingText: { marginTop: T.s2, color: T.muted, fontSize: 14 },
+
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(14,20,36,0.46)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: T.s4,
+  },
+  modalCard: {
+    width: '100%',
+    maxWidth: 560,
+    backgroundColor: T.paper,
+    borderRadius: T.rMd,
+    padding: T.s5,
+    ...T.sh3,
+  },
+  modalHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: T.s3 },
+  modalTitle: { fontSize: 20, fontWeight: '900', color: T.ink },
+  modalSubtitle: { marginTop: 2, fontSize: 13, color: T.muted },
+  modalClose: { fontSize: 20, color: T.muted, fontWeight: '900' },
+  inputLabel: { marginTop: T.s4, marginBottom: 6, fontSize: 12, fontWeight: '800', color: T.ink },
+  providerPicker: { gap: T.s2, paddingVertical: 2 },
+  providerChip: {
+    width: 150,
+    borderWidth: 1,
+    borderColor: T.inputBorder,
+    backgroundColor: T.white,
+    borderRadius: T.rSm,
+    paddingHorizontal: T.s3,
+    paddingVertical: 10,
+  },
+  providerChipActive: { borderColor: T.blue, backgroundColor: '#eef4ff' },
+  providerChipName: { color: T.ink, fontSize: 13, fontWeight: '800' },
+  providerChipNameActive: { color: T.deep },
+  providerChipSaldo: { color: T.muted, fontSize: 11, marginTop: 2, fontWeight: '700' },
+  providerChipSaldoActive: { color: T.deep },
+  selectedBox: {
+    marginTop: T.s3,
+    borderWidth: 1,
+    borderColor: T.border,
+    backgroundColor: T.white,
+    borderRadius: T.rSm,
+    padding: T.s3,
+  },
+  selectedName: { color: T.ink, fontSize: 13, fontWeight: '900' },
+  selectedMeta: { color: T.muted, fontSize: 12, marginTop: 2 },
+  input: {
+    backgroundColor: T.white,
+    borderWidth: 1,
+    borderColor: T.inputBorder,
+    borderRadius: T.rSm,
+    color: T.text,
+    fontSize: 15,
+    paddingHorizontal: T.s3,
+    paddingVertical: 11,
+  },
+  textArea: { minHeight: 86, textAlignVertical: 'top' },
+  modalActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: T.s2, marginTop: T.s5 },
+  secondaryBtn: {
+    borderWidth: 1,
+    borderColor: T.inputBorder,
+    borderRadius: T.rSm,
+    paddingHorizontal: T.s4,
+    paddingVertical: 11,
+    backgroundColor: T.white,
+  },
+  secondaryBtnText: { color: T.muted, fontSize: 13, fontWeight: '800' },
+  primaryBtn: {
+    minWidth: 150,
+    borderRadius: T.rSm,
+    paddingHorizontal: T.s4,
+    paddingVertical: 11,
+    backgroundColor: T.blue,
+    alignItems: 'center',
+  },
+  primaryBtnDisabled: { backgroundColor: T.soft },
+  primaryBtnText: { color: T.white, fontSize: 13, fontWeight: '900' },
 });

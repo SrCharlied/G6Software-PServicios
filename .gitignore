@@ -11,3 +11,4 @@ ServiGT/backend/vendor/
 .idea/
 *.swp
 .DS_Store
+_zip_extract/

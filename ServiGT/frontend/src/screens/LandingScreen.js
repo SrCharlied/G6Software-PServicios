@@ -1,145 +1,15 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef } from 'react';
 import {
   Animated,
-  Modal,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
-  TouchableOpacity,
   View,
   useWindowDimensions,
 } from 'react-native';
 import ServiGTLogo from '../components/ServiGTLogo';
-
-const C = {
-  blue:   '#4589d4',
-  deep:   '#1b5499',
-  soft:   '#b3cfe8',
-  ink:    '#0e1424',
-  paper:  '#f6f4ee',
-  canvas: '#f0eee9',
-  muted:  '#64748b',
-  border: 'rgba(14,20,36,0.09)',
-  heroBg: '#0e1424',
-};
-
-const MD = 768;
-const DRAWER_WIDTH = 300;
-
-// ── Animated scale button ──────────────────────────────────────────────────
-// Wraps any button style with a spring scale on press.
-function ScaleBtn({ label, onPress, style, textStyle }) {
-  const scale = useRef(new Animated.Value(1)).current;
-  const pressIn  = () => Animated.spring(scale, { toValue: 0.95, speed: 50, bounciness: 2, useNativeDriver: true }).start();
-  const pressOut = () => Animated.spring(scale, { toValue: 1,    speed: 25, bounciness: 4, useNativeDriver: true }).start();
-  return (
-    <Animated.View style={[style, { transform: [{ scale }] }]}>
-      <TouchableOpacity
-        onPressIn={pressIn}
-        onPressOut={pressOut}
-        onPress={onPress}
-        activeOpacity={1}
-        style={s.scaleBtnInner}
-      >
-        <Text style={textStyle}>{label}</Text>
-      </TouchableOpacity>
-    </Animated.View>
-  );
-}
-
-function SolidBtn({ label, onPress, style }) {
-  return <ScaleBtn label={label} onPress={onPress} style={[s.solidBtn, style]} textStyle={s.solidBtnText} />;
-}
-
-function OutlineBtn({ label, onPress, style, textStyle }) {
-  return <ScaleBtn label={label} onPress={onPress} style={[s.outlineBtn, style]} textStyle={[s.outlineBtnText, textStyle]} />;
-}
-
-// ── Web header ─────────────────────────────────────────────────────────────
-function WebHeader({ onLogin, onRegister }) {
-  return (
-    <View style={s.webHeader}>
-      <ServiGTLogo size={22} mode="dark" />
-      <View style={s.webNav}>
-        {['Inicio', 'Servicios', 'Nosotros'].map((item) => (
-          <Text key={item} style={s.navLink}>{item}</Text>
-        ))}
-      </View>
-      <View style={s.webCtas}>
-        <OutlineBtn label="Iniciar Sesión" onPress={onLogin} />
-        <SolidBtn   label="Crear Cuenta"   onPress={onRegister} />
-      </View>
-    </View>
-  );
-}
-
-// ── Mobile header + slide drawer ───────────────────────────────────────────
-function MobileHeader({ onLogin, onRegister }) {
-  const [visible, setVisible] = useState(false);
-  const drawerX   = useRef(new Animated.Value(DRAWER_WIDTH)).current;
-  const backdropO = useRef(new Animated.Value(0)).current;
-
-  const open = () => {
-    setVisible(true);
-    Animated.parallel([
-      Animated.spring(drawerX,   { toValue: 0, tension: 80, friction: 10, useNativeDriver: true }),
-      Animated.timing(backdropO, { toValue: 1, duration: 220, useNativeDriver: true }),
-    ]).start();
-  };
-
-  const close = (cb) => {
-    Animated.parallel([
-      Animated.timing(drawerX,   { toValue: DRAWER_WIDTH, duration: 220, useNativeDriver: true }),
-      Animated.timing(backdropO, { toValue: 0,            duration: 200, useNativeDriver: true }),
-    ]).start(() => { setVisible(false); cb?.(); });
-  };
-
-  return (
-    <>
-      <View style={s.mobileHeader}>
-        <ServiGTLogo size={20} mode="dark" />
-        <TouchableOpacity
-          onPress={open}
-          style={s.hamburger}
-          hitSlop={{ top: 12, right: 12, bottom: 12, left: 12 }}
-        >
-          <View style={s.hLine} />
-          <View style={[s.hLine, { width: 17 }]} />
-          <View style={s.hLine} />
-        </TouchableOpacity>
-      </View>
-
-      <Modal visible={visible} transparent statusBarTranslucent onRequestClose={close}>
-        <View style={s.drawerModal}>
-          {/* Backdrop — tap to close */}
-          <Pressable style={{ flex: 1 }} onPress={close}>
-            <Animated.View style={[StyleSheet.absoluteFill, s.drawerBackdrop, { opacity: backdropO }]} />
-          </Pressable>
-
-          {/* Sliding panel */}
-          <Animated.View style={[s.drawer, { transform: [{ translateX: drawerX }] }]}>
-            <View style={s.drawerTop}>
-              <ServiGTLogo size={20} mode="dark" />
-              <TouchableOpacity onPress={close} hitSlop={{ top: 10, right: 10, bottom: 10, left: 10 }}>
-                <Text style={s.closeX}>✕</Text>
-              </TouchableOpacity>
-            </View>
-            <View style={s.drawerNav}>
-              {['Inicio', 'Servicios', 'Nosotros'].map((item) => (
-                <TouchableOpacity key={item} style={s.drawerItem} onPress={close}>
-                  <Text style={s.drawerItemText}>{item}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-            <SolidBtn   label="Crear Cuenta"   onPress={() => close(onRegister)} />
-            <OutlineBtn label="Iniciar Sesión"  onPress={() => close(onLogin)}    style={{ marginTop: 12 }} />
-          </Animated.View>
-        </View>
-      </Modal>
-    </>
-  );
-}
+import PublicHeader from '../components/PublicHeader';
+import { C, MD, PublicFooter, ScaleBtn } from '../components/publicUI';
 
 // ── Feature card (accepts entrance animation value) ────────────────────────
 function FeatureCard({ icon, title, desc, web, anim }) {
@@ -223,9 +93,7 @@ export default function LandingScreen({ navigation }) {
 
       {/* ── Sticky header ── */}
       <View>
-        {isWeb
-          ? <WebHeader onLogin={onLogin} onRegister={onRegister} />
-          : <MobileHeader onLogin={onLogin} onRegister={onRegister} />}
+        <PublicHeader active="Inicio" navigation={navigation} />
       </View>
 
       {/* ── Hero ── */}
@@ -312,111 +180,23 @@ export default function LandingScreen({ navigation }) {
             label="Ya tengo cuenta"
             onPress={onLogin}
             style={[s.ctaOutline, !isWeb && { width: '100%' }]}
-            textStyle={[s.outlineBtnText, { color: C.deep }]}
+            textStyle={s.ctaOutlineText}
           />
         </View>
       </Animated.View>
 
-      {/* ── Footer ── */}
-      <View style={s.footer}>
-        <ServiGTLogo size={18} mode="light" />
-        <Text style={s.footerText}>
-          © 2026 ServiGT · Guatemala · Todos los derechos reservados
-        </Text>
-      </View>
+      <PublicFooter />
 
     </ScrollView>
   );
 }
 
 // ── Styles ─────────────────────────────────────────────────────────────────
+// El header, los botones base y el footer viven en components/publicUI.js y
+// components/PublicHeader.js, compartidos con las pantallas de servicios y
+// nosotros.
 const s = StyleSheet.create({
   root: { flex: 1, backgroundColor: C.canvas },
-
-  scaleBtnInner: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-
-  // Web header
-  webHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 48,
-    paddingVertical: 14,
-    backgroundColor: C.paper,
-    borderBottomWidth: 1,
-    borderBottomColor: C.border,
-    shadowColor: C.ink,
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  webNav: { flexDirection: 'row', alignItems: 'center', gap: 36 },
-  navLink: { fontSize: 14, color: 'rgba(14,20,36,0.65)', fontWeight: '500', letterSpacing: 0.1 },
-  webCtas: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-
-  // Mobile header
-  mobileHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 13,
-    backgroundColor: C.paper,
-    borderBottomWidth: 1,
-    borderBottomColor: C.border,
-    shadowColor: C.ink,
-    shadowOpacity: 0.04,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  hamburger: { paddingVertical: 4, alignItems: 'flex-end' },
-  hLine: { width: 22, height: 2.5, borderRadius: 2, backgroundColor: C.ink, marginVertical: 3 },
-
-  // Mobile drawer
-  drawerModal: { flex: 1, flexDirection: 'row' },
-  drawerBackdrop: { backgroundColor: 'rgba(14,20,36,0.52)' },
-  drawer: {
-    width: DRAWER_WIDTH,
-    height: '100%',
-    backgroundColor: C.paper,
-    padding: 24,
-    paddingTop: 56,
-    shadowColor: C.ink,
-    shadowOpacity: 0.2,
-    shadowRadius: 16,
-    elevation: 20,
-  },
-  drawerTop: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 36,
-  },
-  closeX: { fontSize: 18, color: C.muted, fontWeight: '600' },
-  drawerNav: { marginBottom: 36 },
-  drawerItem: { paddingVertical: 15, borderBottomWidth: 1, borderBottomColor: C.border },
-  drawerItemText: { fontSize: 16, color: C.ink, fontWeight: '500' },
-
-  // Shared buttons
-  solidBtn: {
-    backgroundColor: C.blue,
-    paddingHorizontal: 20,
-    paddingVertical: 11,
-    borderRadius: 8,
-    alignItems: 'center',
-    height: 42,
-  },
-  solidBtnText: { color: C.paper, fontWeight: '600', fontSize: 14 },
-  outlineBtn: {
-    borderWidth: 1.5,
-    borderColor: C.blue,
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 8,
-    alignItems: 'center',
-    height: 42,
-  },
-  outlineBtnText: { color: C.blue, fontWeight: '600', fontSize: 14 },
 
   // Hero
   hero: {
@@ -461,7 +241,7 @@ const s = StyleSheet.create({
   },
   heroCtasMobile: { flexDirection: 'column', gap: 12, alignItems: 'stretch' },
   heroAccent: {
-    backgroundColor: '#e07b18',
+    backgroundColor: C.accent,
     paddingHorizontal: 28,
     paddingVertical: 15,
     borderRadius: 10,
@@ -557,14 +337,5 @@ const s = StyleSheet.create({
     minWidth: 180,
     height: 52,
   },
-
-  // Footer
-  footer: {
-    backgroundColor: C.ink,
-    paddingVertical: 36,
-    paddingHorizontal: 24,
-    alignItems: 'center',
-    gap: 12,
-  },
-  footerText: { color: 'rgba(246,244,238,0.4)', fontSize: 12, marginTop: 10, textAlign: 'center', letterSpacing: 0.2 },
+  ctaOutlineText: { color: C.deep, fontWeight: '600', fontSize: 14 },
 });

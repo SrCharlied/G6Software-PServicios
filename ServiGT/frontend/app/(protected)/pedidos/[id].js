@@ -5,7 +5,13 @@ export default function PedidoDetailRoute() {
   const router = useRouter();
   const { id } = useLocalSearchParams();
 
-  const navigation = { goBack: () => router.back() };
+  const navigation = {
+    navigate: (name) => {
+      if (name.toLowerCase() === 'solicitudes') { router.push('/solicitudes'); return; }
+      router.back();
+    },
+    goBack: () => router.back(),
+  };
 
   return <PedidoDetailScreen pedidoId={Number(id)} navigation={navigation} />;
 }

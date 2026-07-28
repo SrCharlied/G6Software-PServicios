@@ -1,5 +1,27 @@
 -- ============================================================
--- ServiGT Guatemala — Schema completo
+-- ServiGT Guatemala — Esquema PostgreSQL (fuente unica de verdad)
+-- ============================================================
+--
+-- Este archivo es el UNICO lugar donde se define el esquema.
+-- Lo aplica backend/docker/sync_schema.php en CADA arranque del
+-- contenedor backend, dentro de una sola transaccion.
+--
+-- Reglas para editarlo:
+--   1. Todo statement debe ser IDEMPOTENTE (IF NOT EXISTS, bloques
+--      DO con guarda). Se ejecuta en cada arranque, no solo el primero.
+--   2. Nunca borrar datos. Nada de DROP TABLE / DELETE / TRUNCATE.
+--   3. Para columnas nuevas sobre tablas ya desplegadas, agregarlas
+--      al CREATE TABLE de la seccion 1 *y* como ALTER ... ADD COLUMN
+--      IF NOT EXISTS en la seccion 2, para que las BD existentes
+--      converjan al mismo esquema sin recrear el volumen.
+--
+-- Los seeds que requieren hash bcrypt (admin, proveedores de ejemplo)
+-- viven en sync_schema.php porque SQL puro no puede generarlos.
+-- ============================================================
+
+
+-- ============================================================
+-- 1. Tablas base (en orden de dependencias de llave foranea)
 -- ============================================================
 
 -- Sanctum tokens
@@ -235,8 +257,93 @@ CREATE TABLE IF NOT EXISTS notificaciones (
 );
 CREATE INDEX IF NOT EXISTS idx_notif_destinatario ON notificaciones (destinatario_id, leida);
 
+
 -- ============================================================
--- Seed: Categorias iniciales
+-- 2. Convergencia de BD preexistentes
+-- ============================================================
+-- Los CREATE TABLE de arriba no tocan una tabla que ya existe. Estos
+-- statements alinean bases creadas por versiones anteriores del esquema
+-- (o por migraciones de Laravel) sin destruir datos.
+
+ALTER TABLE users ADD COLUMN IF NOT EXISTS role VARCHAR(20) NOT NULL DEFAULT 'cliente';
+ALTER TABLE users ADD COLUMN IF NOT EXISTS telefono VARCHAR(20);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS foto_perfil VARCHAR(500);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS documento_verificado BOOLEAN NOT NULL DEFAULT FALSE;
+
+ALTER TABLE proveedores ADD COLUMN IF NOT EXISTS user_id BIGINT;
+ALTER TABLE proveedores ADD COLUMN IF NOT EXISTS foto_perfil VARCHAR(500);
+ALTER TABLE proveedores ADD COLUMN IF NOT EXISTS tarifa_hora DECIMAL(10,2);
+ALTER TABLE proveedores ADD COLUMN IF NOT EXISTS tarifa_proyecto DECIMAL(10,2);
+ALTER TABLE proveedores ADD COLUMN IF NOT EXISTS calificacion_promedio DECIMAL(3,2) NOT NULL DEFAULT 0.00;
+ALTER TABLE proveedores ADD COLUMN IF NOT EXISTS total_calificaciones INT NOT NULL DEFAULT 0;
+ALTER TABLE proveedores ADD COLUMN IF NOT EXISTS nivel VARCHAR(20) NOT NULL DEFAULT 'novato';
+
+-- Un proveedor como maximo por usuario. Indice parcial: admite varios
+-- proveedores heredados sin user_id, pero impide duplicar el vinculo.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_proveedores_user_id_unique
+    ON proveedores (user_id) WHERE user_id IS NOT NULL;
+
+-- FK proveedores.user_id -> users.id. Se busca por columna y no por
+-- nombre: el CREATE TABLE la nombra "proveedores_user_id_fkey" y una
+-- version previa de este script la creaba como "..._foreign", con lo
+-- que se llegaban a tener las dos apuntando a lo mismo.
+DO $$
+DECLARE
+    duplicada TEXT;
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1
+        FROM pg_constraint
+        WHERE conrelid = 'proveedores'::regclass
+          AND contype = 'f'
+          AND conkey = ARRAY[(
+              SELECT attnum FROM pg_attribute
+              WHERE attrelid = 'proveedores'::regclass AND attname = 'user_id'
+          )]::smallint[]
+    ) THEN
+        ALTER TABLE proveedores
+            ADD CONSTRAINT proveedores_user_id_fkey
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE;
+    END IF;
+
+    -- Limpiar la FK redundante que dejo la version anterior.
+    FOR duplicada IN
+        SELECT conname
+        FROM pg_constraint
+        WHERE conrelid = 'proveedores'::regclass
+          AND contype = 'f'
+          AND conname = 'proveedores_user_id_foreign'
+          AND EXISTS (
+              SELECT 1 FROM pg_constraint otra
+              WHERE otra.conrelid = 'proveedores'::regclass
+                AND otra.contype = 'f'
+                AND otra.conname = 'proveedores_user_id_fkey'
+          )
+    LOOP
+        EXECUTE format('ALTER TABLE proveedores DROP CONSTRAINT %I', duplicada);
+    END LOOP;
+END $$;
+
+-- servicios.estado gano el valor 'por_confirmar'. Solo se recrea el CHECK
+-- si al actual le falta: recrearlo en cada arranque tomaria un lock
+-- exclusivo y reescanearia la tabla completa sin necesidad.
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint
+        WHERE conrelid = 'servicios'::regclass
+          AND conname = 'servicios_estado_check'
+          AND pg_get_constraintdef(oid) LIKE '%por_confirmar%'
+    ) THEN
+        ALTER TABLE servicios DROP CONSTRAINT IF EXISTS servicios_estado_check;
+        ALTER TABLE servicios ADD CONSTRAINT servicios_estado_check
+            CHECK (estado IN ('pendiente','aceptado','en_camino','en_progreso','por_confirmar','completado','cancelado','rechazado'));
+    END IF;
+END $$;
+
+
+-- ============================================================
+-- 3. Seed de catalogo
 -- ============================================================
 INSERT INTO categorias (nombre, descripcion, icono) VALUES
     ('Plomeria',      'Servicios de plomeria y fontaneria',          'wrench'),

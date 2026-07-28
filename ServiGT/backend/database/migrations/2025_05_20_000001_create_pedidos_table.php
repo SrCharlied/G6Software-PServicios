@@ -25,7 +25,7 @@ return new class extends Migration
 
             $table->enum('urgencia', ['baja', 'media', 'alta']);
 
-            $table->enum('estado', ['abierto', 'expirado', 'cerrado', 'cancelado'])
+            $table->enum('estado', ['abierto', 'adjudicado', 'expirado', 'cerrado', 'cancelado'])
                 ->default('abierto');
 
             $table->timestamp('fecha_expiracion');

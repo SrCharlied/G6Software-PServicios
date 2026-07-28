@@ -109,6 +109,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/pedidos/mios',                          [PedidoController::class, 'mios']);
     Route::post('/pedidos/{pedidoId}/cotizaciones',                       [CotizacionController::class, 'store'])->where('pedidoId', '[0-9]+');
     Route::put('/pedidos/{pedidoId}/cotizaciones/{cotizacionId}',         [CotizacionController::class, 'update'])->where(['pedidoId' => '[0-9]+', 'cotizacionId' => '[0-9]+']);
+    Route::post('/pedidos/{pedidoId}/cotizaciones/{cotizacionId}/aceptar', [CotizacionController::class, 'aceptar'])->where(['pedidoId' => '[0-9]+', 'cotizacionId' => '[0-9]+']);
 
     // ── Notificaciones ───────────────────────────────────────────────────────
     Route::get('/notificaciones',                [NotificacionController::class, 'index']);

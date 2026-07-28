@@ -103,4 +103,57 @@ class CotizacionController extends Controller
             'nuevo_saldo' => $nuevoSaldo,
         ]);
     }
+
+    /**
+     * POST /api/pedidos/{pedidoId}/cotizaciones/{cotizacionId}/aceptar
+     * El cliente dueno del pedido adjudica una cotizacion enviada.
+     */
+    public function aceptar(Request $request, int $pedidoId, int $cotizacionId): JsonResponse
+    {
+        $resultado = DB::transaction(function () use ($request, $pedidoId, $cotizacionId) {
+            $pedido = Pedido::whereKey($pedidoId)->lockForUpdate()->firstOrFail();
+
+            if ((int) $pedido->cliente_id !== (int) $request->user()->id) {
+                return $this->error('No tienes permiso para aceptar cotizaciones de este pedido.', 403);
+            }
+
+            if ($pedido->estado !== 'abierto') {
+                return $this->error('Este pedido ya no permite aceptar cotizaciones.', 422);
+            }
+
+            $cotizacion = Cotizacion::whereKey($cotizacionId)->lockForUpdate()->firstOrFail();
+
+            if ((int) $cotizacion->pedido_id !== (int) $pedido->id) {
+                return $this->error('La cotizacion no pertenece a este pedido.', 422);
+            }
+
+            if ($cotizacion->estado !== 'enviada') {
+                return $this->error('Esta cotizacion no puede ser aceptada.', 422);
+            }
+
+            $yaAceptada = Cotizacion::where('pedido_id', $pedido->id)
+                ->where('estado', 'aceptada')
+                ->exists();
+
+            if ($yaAceptada) {
+                return $this->error('Este pedido ya tiene una cotizacion aceptada.', 422);
+            }
+
+            $cotizacion->update(['estado' => 'aceptada']);
+
+            Cotizacion::where('pedido_id', $pedido->id)
+                ->where('id', '!=', $cotizacion->id)
+                ->where('estado', 'enviada')
+                ->update(['estado' => 'rechazada']);
+
+            $pedido->update(['estado' => 'adjudicado']);
+
+            return $this->success('Cotizacion aceptada correctamente.', [
+                'pedido'     => $pedido->fresh(),
+                'cotizacion' => $cotizacion->fresh(),
+            ]);
+        });
+
+        return $resultado;
+    }
 }

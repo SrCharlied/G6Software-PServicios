@@ -11,9 +11,6 @@ class Pedido extends Model
 {
     use HasFactory;
 
-    // La relación cotizaciones se activa cuando el módulo esté implementado.
-    // Hasta entonces, withCount('cotizaciones') retorna 0 de forma segura.
-
     protected $fillable = [
         'cliente_id',
         'categoria_id',
@@ -40,7 +37,6 @@ class Pedido extends Model
 
     public function cotizaciones(): HasMany
     {
-        // La clase Cotizacion se creará en el módulo de cotizaciones (sprint futuro).
-        return $this->hasMany('App\Models\Cotizacion');
+        return $this->hasMany(Cotizacion::class);
     }
 }

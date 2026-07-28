@@ -13,5 +13,9 @@ export default function Index() {
     );
   }
 
-  return <Redirect href={user ? '/home' : '/landing'} />;
+  if (!user) return <Redirect href="/landing" />;
+  if (user.role === 'admin') return <Redirect href="/admin" />;
+  if (user.role === 'proveedor') return <Redirect href="/dashboard" />;
+
+  return <Redirect href="/home" />;
 }

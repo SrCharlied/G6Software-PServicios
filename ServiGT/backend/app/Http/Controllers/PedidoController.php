@@ -57,6 +57,7 @@ class PedidoController extends Controller
             ->map(function ($c, $i) use ($esCliente) {
                 if ($esCliente) {
                     return [
+                        'id'         => $c->id,
                         'indice'     => $i,
                         'monto'      => (float) $c->monto,
                         'mensaje'    => $c->mensaje,

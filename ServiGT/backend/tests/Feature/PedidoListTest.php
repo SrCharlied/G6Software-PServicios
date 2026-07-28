@@ -38,6 +38,7 @@ class PedidoListTest extends TestCase
     public function test_listado_abiertos_solo_muestra_pedidos_abiertos(): void
     {
         $this->crearPedido(['estado' => 'abierto']);
+        $this->crearPedido(['estado' => 'adjudicado']);
         $this->crearPedido(['estado' => 'expirado']);
         $this->crearPedido(['estado' => 'cerrado']);
 
@@ -48,6 +49,7 @@ class PedidoListTest extends TestCase
 
         $pedidos = $response->json('pedidos');
         $this->assertCount(1, $pedidos);
+        $this->assertSame('abierto', $pedidos[0]['estado']);
     }
 
     public function test_listado_abiertos_excluye_expirados_por_fecha(): void

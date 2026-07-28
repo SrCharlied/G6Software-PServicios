@@ -1,6 +1,7 @@
 import { Redirect, useRouter } from 'expo-router';
 import ProviderDashboardScreen from '../../src/screens/ProviderDashboardScreen';
 import { useSession } from '../../src/context/SessionContext';
+import InternalLayout from '../../src/components/InternalLayout';
 
 export default function DashboardRoute() {
   const router = useRouter();
@@ -29,12 +30,14 @@ export default function DashboardRoute() {
   };
 
   return (
-    <ProviderDashboardScreen
-      navigation={navigation}
-      user={user}
-      providerProfile={providerProfile}
-      setProviderProfile={setProviderProfile}
-      onLogout={async () => { await signOut(); router.replace('/home'); }}
-    />
+    <InternalLayout section="proveedor">
+      <ProviderDashboardScreen
+        navigation={navigation}
+        user={user}
+        providerProfile={providerProfile}
+        setProviderProfile={setProviderProfile}
+        onLogout={async () => { await signOut(); router.replace('/home'); }}
+      />
+    </InternalLayout>
   );
 }

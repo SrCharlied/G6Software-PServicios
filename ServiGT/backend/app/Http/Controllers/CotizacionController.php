@@ -220,6 +220,7 @@ class CotizacionController extends Controller
             Cotizacion::query()
                 ->where('pedido_id', $pedido->id)
                 ->where('id', '!=', $cotizacion->id)
+                ->where('estado', 'enviada')
                 ->update(['estado' => 'rechazada']);
 
             $pedido->update(['estado' => 'adjudicado']);

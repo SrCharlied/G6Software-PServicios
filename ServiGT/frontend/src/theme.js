@@ -56,7 +56,41 @@ export const T = {
     shadowRadius: 32,
     elevation: 6,
   },
+
+  // ── Component patterns ───────────────────────────────────────────────────
+  card: {
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(14,20,36,0.09)',
+  },
+  input: {
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#d9e2ef',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 15,
+    color: '#0e1424',
+  },
+  chip: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(14,20,36,0.09)',
+    backgroundColor: '#ffffff',
+  },
+  primaryButton: {
+    backgroundColor: '#4589d4',
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  primaryButtonText: {
+    color: '#ffffff',
+    fontWeight: '700',
+  },
 };
 
 export default T;
-

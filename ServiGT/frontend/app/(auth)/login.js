@@ -15,6 +15,14 @@ export default function LoginRoute() {
 
   const handleLogin = (user, profile) => {
     signIn(user, profile);
+    if (user.role === 'admin') {
+      router.replace('/admin');
+      return;
+    }
+    if (user.role === 'proveedor') {
+      router.replace('/dashboard');
+      return;
+    }
     router.replace('/home');
   };
 

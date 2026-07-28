@@ -90,16 +90,16 @@ if (!$check->fetch()) {
 
 // ── Seed proveedores de ejemplo ────────────────────────────────────────────
 $sampleProviders = [
-    ['Juan Perez',      'Plomeria',     'Guatemala',      'Mixco',              '5555-0101', 75.00, 4.8, 'experto',     'Plomero con 15 anos de experiencia en instalaciones residenciales.'],
+    ['Juan Perez',      'Plomería',     'Guatemala',      'Mixco',              '5555-0101', 75.00, 4.8, 'experto',     'Plomero con 15 anos de experiencia en instalaciones residenciales.'],
     ['Maria Lopez',     'Electricidad', 'Sacatepequez',   'Antigua Guatemala',  '5555-0102', 90.00, 4.5, 'experto',     'Electricista certificada, instalaciones y reparaciones.'],
     ['Carlos Ramirez',  'Pintura',      'Quetzaltenango', 'Quetzaltenango',     '5555-0103', 60.00, 4.2, 'intermedio',  'Pintura de interiores y exteriores con acabados finos.'],
-    ['Ana Garcia',      'Carpinteria',  'Chimaltenango',  'Chimaltenango',      '5555-0104', 85.00, 4.7, 'experto',     'Muebles a la medida y reparaciones de madera.'],
+    ['Ana Garcia',      'Carpintería',  'Chimaltenango',  'Chimaltenango',      '5555-0104', 85.00, 4.7, 'experto',     'Muebles a la medida y reparaciones de madera.'],
     ['Luis Morales',    'Limpieza',     'Guatemala',      'Guatemala',          '5555-0105', 45.00, 4.0, 'intermedio',  'Limpieza profunda de hogares y oficinas.'],
-    ['Sofia Castillo',  'Jardineria',   'Escuintla',      'Escuintla',          '5555-0106', 50.00, 3.9, 'intermedio',  'Diseno y mantenimiento de jardines.'],
-    ['Pedro Vasquez',   'Albanileria',  'Huehuetenango',  'Huehuetenango',      '5555-0107', 70.00, 4.3, 'intermedio',  'Construccion y remodelacion de obra civil.'],
-    ['Lucia Mendez',    'Mecanica',     'Izabal',         'Puerto Barrios',     '5555-0108', 80.00, 4.6, 'experto',     'Mecanica automotriz general y diagnostico.'],
-    ['Diego Hernandez', 'Tecnologia',   'Guatemala',      'Villa Nueva',        '5555-0109', 95.00, 4.4, 'intermedio',  'Soporte tecnico, redes y reparacion de equipos.'],
-    ['Elena Flores',    'Ensenanza',    'Alta Verapaz',   'Coban',              '5555-0110', 55.00, 4.9, 'experto',     'Tutoria academica de matematicas y ciencias.'],
+    ['Sofia Castillo',  'Jardinería',   'Escuintla',      'Escuintla',          '5555-0106', 50.00, 3.9, 'intermedio',  'Diseno y mantenimiento de jardines.'],
+    ['Pedro Vasquez',   'Albañilería',  'Huehuetenango',  'Huehuetenango',      '5555-0107', 70.00, 4.3, 'intermedio',  'Construccion y remodelacion de obra civil.'],
+    ['Lucia Mendez',    'Mecánica',     'Izabal',         'Puerto Barrios',     '5555-0108', 80.00, 4.6, 'experto',     'Mecanica automotriz general y diagnostico.'],
+    ['Diego Hernandez', 'Tecnología',   'Guatemala',      'Villa Nueva',        '5555-0109', 95.00, 4.4, 'intermedio',  'Soporte tecnico, redes y reparacion de equipos.'],
+    ['Elena Flores',    'Enseñanza',    'Alta Verapaz',   'Coban',              '5555-0110', 55.00, 4.9, 'experto',     'Tutoria academica de matematicas y ciencias.'],
 ];
 
 $providerPassword = getenv('PROVIDER_SEED_PASSWORD') ?: 'Proveedor123!';

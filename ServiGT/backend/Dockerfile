@@ -32,6 +32,7 @@ COPY app/Traits/ /app/app/Traits/
 COPY config/cors.php /app/config/cors.php
 COPY bootstrap/app.php /app/bootstrap/app.php
 COPY lang/ /app/lang/
+COPY tests/ /app/tests/
 COPY docker/entrypoint.sh /app/docker/entrypoint.sh
 COPY docker/sync_schema.php /app/docker/sync_schema.php
 

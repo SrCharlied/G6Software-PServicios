@@ -1,6 +1,7 @@
 import { Redirect, useRouter } from 'expo-router';
 import AdminDashboardScreen from '../../src/screens/AdminDashboardScreen';
 import { useSession } from '../../src/context/SessionContext';
+import InternalLayout from '../../src/components/InternalLayout';
 
 export default function AdminRoute() {
   const router = useRouter();
@@ -16,5 +17,9 @@ export default function AdminRoute() {
     },
   };
 
-  return <AdminDashboardScreen navigation={navigation} user={user} />;
+  return (
+    <InternalLayout section="admin">
+      <AdminDashboardScreen navigation={navigation} user={user} />
+    </InternalLayout>
+  );
 }

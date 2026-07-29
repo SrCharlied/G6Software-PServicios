@@ -14,8 +14,9 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { getPedidoDetalle, enviarCotizacion, editarCotizacion, getMiCredito, storageUrl } from '../services/api';
+import { getPedidoDetalle, enviarCotizacion, editarCotizacion, aceptarCotizacion, getMiCredito, storageUrl } from '../services/api';
 import { useSession } from '../context/SessionContext';
+import { useToast } from '../context/ToastContext';
 import { T } from '../theme';
 
 const URGENCIA_CONFIG = {
@@ -43,7 +44,7 @@ const fmtMonto = (v)   => v != null ? `Q${Number(v).toFixed(2)}` : '—';
 
 // ── Vista cliente: card de cotización con foto, nombre, rating, monto, mensaje ──
 
-function CotizacionClienteRow({ cot, esMejorPrecio, esMejorCalif, isLast }) {
+function CotizacionClienteRow({ cot, esMejorPrecio, esMejorCalif, isLast, puedeElegir, onElegir }) {
   const prov     = cot.proveedor;
   const nombre   = prov?.nombre   ?? 'Proveedor';
   const rating   = prov?.calificacion_promedio ?? 0;
@@ -97,6 +98,17 @@ function CotizacionClienteRow({ cot, esMejorPrecio, esMejorCalif, isLast }) {
 
       {/* Pie: tiempo */}
       <Text style={cs.tiempo}>{timeAgo(cot.created_at)}</Text>
+
+      {/* Acción / estado */}
+      {cot.estado === 'aceptada' ? (
+        <View style={cs.aceptadaBadge}>
+          <Text style={cs.aceptadaText}>✓ Cotización aceptada</Text>
+        </View>
+      ) : puedeElegir ? (
+        <TouchableOpacity style={cs.elegirBtn} onPress={() => onElegir(cot)} activeOpacity={0.85}>
+          <Text style={cs.elegirBtnText}>Elegir cotización</Text>
+        </TouchableOpacity>
+      ) : null}
     </View>
   );
 }
@@ -105,6 +117,7 @@ function CotizacionClienteRow({ cot, esMejorPrecio, esMejorCalif, isLast }) {
 
 export default function PedidoDetailScreen({ pedidoId, navigation }) {
   const { user } = useSession();
+  const toast = useToast();
   const esProveedor = user?.role === 'proveedor';
 
   const [pedido, setPedido]             = useState(null);
@@ -121,6 +134,10 @@ export default function PedidoDetailScreen({ pedidoId, navigation }) {
   const [submitting, setSubmitting]     = useState(false);
   const [submitError, setSubmitError]   = useState('');
   const [submitted, setSubmitted]       = useState(false);
+
+  const [confirmCot, setConfirmCot]     = useState(null);
+  const [aceptando, setAceptando]       = useState(false);
+  const [acceptError, setAcceptError]   = useState('');
 
   useEffect(() => { load(); }, [pedidoId]);
 
@@ -186,6 +203,22 @@ export default function PedidoDetailScreen({ pedidoId, navigation }) {
       setSubmitError(e.message);
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleAceptar = async () => {
+    if (!confirmCot) return;
+    setAceptando(true);
+    setAcceptError('');
+    try {
+      const data = await aceptarCotizacion(pedidoId, confirmCot.id);
+      toast(data.message || 'Cotización aceptada. Servicio creado.', 'success');
+      setConfirmCot(null);
+      navigation.navigate('Solicitudes');
+    } catch (e) {
+      setAcceptError(e.message);
+    } finally {
+      setAceptando(false);
     }
   };
 
@@ -288,6 +321,17 @@ export default function PedidoDetailScreen({ pedidoId, navigation }) {
             </View>
           )}
 
+          {/* Estado del pedido cuando ya no está abierto (vista cliente) */}
+          {!esProveedor && pedido.estado !== 'abierto' && (
+            <View style={s.rangeBar}>
+              <Text style={s.rangeText}>
+                {pedido.estado === 'adjudicado'
+                  ? 'Este pedido ya fue adjudicado.'
+                  : `Este pedido está ${pedido.estado}.`}
+              </Text>
+            </View>
+          )}
+
           {cotizaciones.length === 0 ? (
             <View style={s.emptyState}>
               <Text style={s.emptyText}>
@@ -329,6 +373,8 @@ export default function PedidoDetailScreen({ pedidoId, navigation }) {
                 esMejorPrecio={i === mejorPrecioIdx}
                 esMejorCalif={i === mejorCalifIdx}
                 isLast={i === cotizaciones.length - 1}
+                puedeElegir={pedido.estado === 'abierto' && c.estado === 'enviada'}
+                onElegir={setConfirmCot}
               />
             ))
           )}
@@ -442,6 +488,47 @@ export default function PedidoDetailScreen({ pedidoId, navigation }) {
           </Pressable>
         </KeyboardAvoidingView>
       </Modal>
+
+      {/* Modal de confirmación — elegir cotización (vista cliente) */}
+      <Modal
+        visible={!!confirmCot}
+        transparent
+        animationType="fade"
+        onRequestClose={() => !aceptando && setConfirmCot(null)}
+      >
+        <View style={s.confirmOverlay}>
+          <View style={s.confirmCard}>
+            <Text style={s.confirmTitle}>Elegir esta cotización</Text>
+            <Text style={s.confirmSubtitle}>
+              {confirmCot ? `${confirmCot.proveedor?.nombre ?? 'Este proveedor'} · ${fmtMonto(confirmCot.monto)}` : ''}
+            </Text>
+            <Text style={s.confirmWarning}>
+              Esta acción no se puede deshacer. Las demás cotizaciones se rechazarán y se creará un servicio con este proveedor.
+            </Text>
+
+            {acceptError ? <Text style={s.submitError}>{acceptError}</Text> : null}
+
+            <View style={s.modalActions}>
+              <TouchableOpacity
+                style={s.cancelBtn}
+                onPress={() => setConfirmCot(null)}
+                disabled={aceptando}
+              >
+                <Text style={s.cancelText}>Cancelar</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[s.sendBtn, aceptando && s.sendBtnDisabled]}
+                onPress={handleAceptar}
+                disabled={aceptando}
+              >
+                {aceptando
+                  ? <ActivityIndicator color="#fff" />
+                  : <Text style={s.sendText}>Confirmar</Text>}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -524,6 +611,12 @@ const s = StyleSheet.create({
   sendBtn:       { flex: 2, paddingVertical: 13, borderRadius: T.rSm, backgroundColor: T.blue, alignItems: 'center' },
   sendBtnDisabled: { opacity: 0.6 },
   sendText:      { color: '#fff', fontWeight: '700', fontSize: 15 },
+
+  confirmOverlay: { flex: 1, backgroundColor: 'rgba(14,20,36,0.5)', alignItems: 'center', justifyContent: 'center', padding: 20 },
+  confirmCard:    { width: '100%', maxWidth: 420, backgroundColor: T.paper, borderRadius: T.rMd, padding: 22, ...T.sh3 },
+  confirmTitle:   { fontSize: 18, fontWeight: '800', color: T.ink, marginBottom: 6 },
+  confirmSubtitle:{ fontSize: 15, fontWeight: '700', color: T.blue, marginBottom: 12 },
+  confirmWarning: { fontSize: 13, color: T.muted, lineHeight: 19, marginBottom: 4 },
 });
 
 // ── Estilos CotizacionClienteRow ──────────────────────────────────────────────
@@ -556,4 +649,9 @@ const cs = StyleSheet.create({
 
   mensaje: { fontSize: 14, color: T.text, lineHeight: 21, marginBottom: 8 },
   tiempo:  { fontSize: 11, color: T.faint },
+
+  elegirBtn:     { marginTop: 12, backgroundColor: T.blue, borderRadius: T.rSm, paddingVertical: 11, alignItems: 'center' },
+  elegirBtnText: { color: '#fff', fontWeight: '700', fontSize: 14 },
+  aceptadaBadge: { marginTop: 12, backgroundColor: '#d1fae5', borderWidth: 1, borderColor: '#86efac', borderRadius: T.rSm, paddingVertical: 9, alignItems: 'center' },
+  aceptadaText:  { color: '#065f46', fontWeight: '700', fontSize: 13 },
 });

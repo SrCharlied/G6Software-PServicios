@@ -57,6 +57,7 @@ class PedidoController extends Controller
             ->map(function ($c, $i) use ($esCliente) {
                 if ($esCliente) {
                     return [
+                        'id'         => $c->id,
                         'indice'     => $i,
                         'monto'      => (float) $c->monto,
                         'mensaje'    => $c->mensaje,
@@ -123,6 +124,7 @@ class PedidoController extends Controller
     {
         $query = Pedido::query()
             ->with(['cliente', 'categoria'])
+            ->withCount('cotizaciones')
             ->where('estado', 'abierto')
             ->where('fecha_expiracion', '>', now())
             ->orderByDesc('created_at');

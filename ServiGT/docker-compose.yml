@@ -112,8 +112,9 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
+    # Sin `command:` corre la suite completa (tests/Unit + tests/Feature).
+    # Para una sola clase: docker compose --profile test run --rm backend_test tests/Feature/CreditosYAceptacionTest.php
     entrypoint: ["php", "artisan", "test"]
-    command: ["tests/Feature/CreditosYAceptacionTest.php"]
     environment:
       APP_ENV: testing
       APP_KEY: base64:xR3TbPNBfz4mGU5MhKtp3HKDO+jMnaSj6UEahGkAjQo=

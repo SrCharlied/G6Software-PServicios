@@ -1,5 +1,6 @@
 import { Redirect, useRouter } from 'expo-router';
 import SolicitudFormScreen from '../../src/screens/SolicitudFormScreen';
+import InternalLayout from '../../src/components/InternalLayout';
 import { useSession } from '../../src/context/SessionContext';
 
 export default function SolicitudRoute() {
@@ -20,10 +21,12 @@ export default function SolicitudRoute() {
   };
 
   return (
-    <SolicitudFormScreen
-      navigation={navigation}
-      user={user}
-      selectedProvider={selectedProvider}
-    />
+    <InternalLayout>
+      <SolicitudFormScreen
+        navigation={navigation}
+        user={user}
+        selectedProvider={selectedProvider}
+      />
+    </InternalLayout>
   );
 }

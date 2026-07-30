@@ -1,5 +1,6 @@
 import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
 import CalificarProveedorScreen from '../../../src/screens/CalificarProveedorScreen';
+import InternalLayout from '../../../src/components/InternalLayout';
 import { useSession } from '../../../src/context/SessionContext';
 
 export default function CalificarRoute() {
@@ -20,10 +21,12 @@ export default function CalificarRoute() {
   };
 
   return (
-    <CalificarProveedorScreen
-      navigation={navigation}
-      servicioId={id}
-      user={user}
-    />
+    <InternalLayout>
+      <CalificarProveedorScreen
+        navigation={navigation}
+        servicioId={id}
+        user={user}
+      />
+    </InternalLayout>
   );
 }

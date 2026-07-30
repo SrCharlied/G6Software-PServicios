@@ -1,5 +1,6 @@
 import { useRouter } from 'expo-router';
 import PublicarPedidoScreen from '../../../src/screens/PublicarPedidoScreen';
+import InternalLayout from '../../../src/components/InternalLayout';
 
 export default function PublicarPedidoRoute() {
   const router = useRouter();
@@ -12,5 +13,9 @@ export default function PublicarPedidoRoute() {
     goBack: () => router.back(),
   };
 
-  return <PublicarPedidoScreen navigation={navigation} />;
+  return (
+    <InternalLayout>
+      <PublicarPedidoScreen navigation={navigation} />
+    </InternalLayout>
+  );
 }

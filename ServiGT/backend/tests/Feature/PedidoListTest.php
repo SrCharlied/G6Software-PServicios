@@ -5,12 +5,13 @@ namespace Tests\Feature;
 use App\Models\Categoria;
 use App\Models\Pedido;
 use App\Models\User;
-use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Tests\TestCase;
 
 class PedidoListTest extends TestCase
 {
-    use RefreshDatabase;
+    // Ver nota en PedidoCreationTest: el esquema viene de database/init.sql.
+    use DatabaseTransactions;
 
     private User $cliente;
     private Categoria $categoria;
@@ -109,7 +110,7 @@ class PedidoListTest extends TestCase
 
     public function test_mis_pedidos_devuelve_cualquier_estado(): void
     {
-        foreach (['abierto', 'expirado', 'cerrado', 'cancelado'] as $estado) {
+        foreach (['abierto', 'expirado', 'cerrado', 'adjudicado'] as $estado) {
             $this->crearPedido(['estado' => $estado]);
         }
 

@@ -5,12 +5,15 @@ namespace Tests\Feature;
 use App\Models\Categoria;
 use App\Models\Pedido;
 use App\Models\User;
-use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Tests\TestCase;
 
 class PedidoCreationTest extends TestCase
 {
-    use RefreshDatabase;
+    // El esquema de pruebas lo provee database/init.sql (fuente unica del
+    // proyecto). No se usa RefreshDatabase porque migrate:fresh borraria las
+    // 19 tablas de init.sql y las migraciones solo cubren 3 de ellas.
+    use DatabaseTransactions;
 
     private User $cliente;
     private Categoria $categoria;

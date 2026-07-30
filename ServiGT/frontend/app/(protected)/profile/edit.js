@@ -1,7 +1,7 @@
 import { Redirect, useRouter } from 'expo-router';
 import ProviderEditProfileScreen from '../../../src/screens/ProviderEditProfileScreen';
+import InternalLayout from '../../../src/components/InternalLayout';
 import { useSession } from '../../../src/context/SessionContext';
-import { getProviders } from '../../../src/services/api';
 
 export default function ProfileEditRoute() {
   const router = useRouter();
@@ -17,14 +17,16 @@ export default function ProfileEditRoute() {
   };
 
   return (
-    <ProviderEditProfileScreen
-      navigation={navigation}
-      user={user}
-      providerProfile={providerProfile}
-      onProfileUpdated={(updated) => {
-        setProviderProfile(updated);
-        router.replace('/dashboard');
-      }}
-    />
+    <InternalLayout>
+      <ProviderEditProfileScreen
+        navigation={navigation}
+        user={user}
+        providerProfile={providerProfile}
+        onProfileUpdated={(updated) => {
+          setProviderProfile(updated);
+          router.replace('/dashboard');
+        }}
+      />
+    </InternalLayout>
   );
 }

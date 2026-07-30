@@ -1,6 +1,7 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import ChatScreen from '../../src/screens/ChatScreen';
 import ChatListScreen from '../../src/screens/ChatListScreen';
+import InternalLayout from '../../src/components/InternalLayout';
 import { useSession } from '../../src/context/SessionContext';
 
 export default function ChatRoute() {
@@ -21,15 +22,21 @@ export default function ChatRoute() {
   };
 
   if (!userId) {
-    return <ChatListScreen navigation={navigation} user={user} />;
+    return (
+      <InternalLayout>
+        <ChatListScreen navigation={navigation} user={user} />
+      </InternalLayout>
+    );
   }
 
   return (
-    <ChatScreen
-      navigation={navigation}
-      user={user}
-      chatWithUserId={Number(userId)}
-      chatWithName={name ? decodeURIComponent(String(name)) : ''}
-    />
+    <InternalLayout>
+      <ChatScreen
+        navigation={navigation}
+        user={user}
+        chatWithUserId={Number(userId)}
+        chatWithName={name ? decodeURIComponent(String(name)) : ''}
+      />
+    </InternalLayout>
   );
 }

@@ -13,7 +13,10 @@ import { useSession } from '../context/SessionContext';
 import { getNotificaciones, getUnreadNotificationsCount, loadStoredSession, marcarTodasLeidas } from '../services/api';
 import { T } from '../theme';
 
-export default function NotificationBell({ onPress }) {
+// `tone` es el color de la tinta del icono, misma convencion que ServiGTLogo:
+// 'dark' para superficies claras (default), 'light' para superficies oscuras
+// como el sidebar de InternalLayout.
+export default function NotificationBell({ onPress, tone = 'dark' }) {
   const { user, sessionLoading } = useSession();
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -118,9 +121,9 @@ export default function NotificationBell({ onPress }) {
         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
       >
         <View style={styles.bellIcon}>
-          <View style={styles.bellBody} />
-          <View style={styles.bellBase} />
-          <View style={styles.bellClapper} />
+          <View style={[styles.bellBody, tone === 'light' && styles.bellBodyLight]} />
+          <View style={[styles.bellBase, tone === 'light' && styles.bellInkLight]} />
+          <View style={[styles.bellClapper, tone === 'light' && styles.bellInkLight]} />
         </View>
         {loading ? (
           <View style={styles.loader}>
@@ -235,6 +238,12 @@ const styles = StyleSheet.create({
     borderRadius: 3,
     backgroundColor: T.ink,
     marginTop: 1,
+  },
+  bellBodyLight: {
+    borderColor: T.white,
+  },
+  bellInkLight: {
+    backgroundColor: T.white,
   },
   loader: {
     position: 'absolute',

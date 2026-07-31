@@ -1,5 +1,6 @@
 import { usePathname, useRouter } from 'expo-router';
 import { StyleSheet, Text, TouchableOpacity, useWindowDimensions, View } from 'react-native';
+import NotificationBell from './NotificationBell';
 import { useSession } from '../context/SessionContext';
 import { T } from '../theme';
 
@@ -86,8 +87,15 @@ export default function InternalLayout({ children, section }) {
   return (
     <View style={styles.shell}>
       <View style={styles.sidebar}>
-        <Text style={styles.brand}>ServiGT</Text>
-        <Text style={styles.role}>{ROLE_LABEL[role] ?? 'Cliente'}</Text>
+        <View style={styles.brandRow}>
+          <View style={styles.brandBox}>
+            <Text style={styles.brand}>ServiGT</Text>
+            <Text style={styles.role}>{ROLE_LABEL[role] ?? 'Cliente'}</Text>
+          </View>
+          {/* La campana vive en el layout para que proveedor y admin tambien
+              la tengan, no solo el home del cliente. */}
+          <NotificationBell tone="light" />
+        </View>
 
         <View style={styles.userBox}>
           <Text style={styles.userName} numberOfLines={1}>{user?.name || 'Usuario'}</Text>
@@ -130,6 +138,17 @@ const styles = StyleSheet.create({
     paddingTop: T.s6,
     paddingBottom: T.s4,
   },
+  brandRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: T.s2,
+    marginBottom: T.s5,
+  },
+  brandBox: {
+    flex: 1,
+    minWidth: 0,
+  },
   brand: {
     color: T.white,
     fontSize: 22,
@@ -139,7 +158,6 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.7)',
     fontSize: 12,
     marginTop: 4,
-    marginBottom: T.s5,
   },
   userBox: {
     borderTopWidth: 1,

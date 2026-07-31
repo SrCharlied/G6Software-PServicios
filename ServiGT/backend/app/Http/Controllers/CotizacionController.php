@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Cotizacion;
 use App\Models\CreditoProveedor;
+use App\Models\Notificacion;
 use App\Models\Pedido;
 use App\Models\Proveedor;
 use App\Models\Servicio;
@@ -215,6 +216,16 @@ class CotizacionController extends Controller
                 'codigo_inicio'  => str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT),
             ]);
 
+            // Se capturan las perdedoras antes del update masivo: despues todas
+            // quedan en `rechazada` y ya no se distingue cuales competian de
+            // verdad de las que el proveedor habia retirado.
+            $perdedoras = Cotizacion::query()
+                ->where('pedido_id', $pedido->id)
+                ->where('id', '!=', $cotizacion->id)
+                ->where('estado', 'enviada')
+                ->with('proveedor')
+                ->get();
+
             $cotizacion->update(['estado' => 'aceptada']);
 
             Cotizacion::query()
@@ -224,6 +235,8 @@ class CotizacionController extends Controller
                 ->update(['estado' => 'rechazada']);
 
             $pedido->update(['estado' => 'adjudicado']);
+
+            $this->notificarAdjudicacion($pedido, $cotizacion, $servicio, $perdedoras);
 
             return [
                 'pedido'     => $pedido->fresh(),
@@ -237,5 +250,59 @@ class CotizacionController extends Controller
         }
 
         return $this->success('Cotización aceptada y servicio creado correctamente.', $resultado);
+    }
+
+    /**
+     * Notifica la adjudicación de un pedido: al proveedor ganador y a los que
+     * cotizaron y no fueron seleccionados.
+     *
+     * `destinatario_id` es un id de users, no de proveedores; por eso se resuelve
+     * a través de proveedor->user_id, igual que en ServicioController.
+     *
+     * @param  \Illuminate\Support\Collection<int, Cotizacion>  $perdedoras
+     */
+    private function notificarAdjudicacion(
+        Pedido $pedido,
+        Cotizacion $ganadora,
+        Servicio $servicio,
+        $perdedoras,
+    ): void {
+        $monto = number_format((float) $ganadora->monto, 2);
+
+        $ganador = $ganadora->proveedor;
+        if ($ganador?->user_id) {
+            Notificacion::create([
+                'destinatario_id' => $ganador->user_id,
+                'tipo'            => 'cotizacion_aceptada',
+                'titulo'          => 'Tu cotización fue aceptada',
+                'mensaje'         => "El cliente adjudicó el pedido a tu cotización de Q{$monto}. "
+                                     . 'Pídele el código de inicio para arrancar el servicio.',
+                'datos'           => [
+                    'pedido_id'     => $pedido->id,
+                    'cotizacion_id' => $ganadora->id,
+                    'servicio_id'   => $servicio->id,
+                ],
+            ]);
+        }
+
+        foreach ($perdedoras as $perdedora) {
+            $proveedor = $perdedora->proveedor;
+
+            if (!$proveedor?->user_id) {
+                continue;
+            }
+
+            Notificacion::create([
+                'destinatario_id' => $proveedor->user_id,
+                'tipo'            => 'cotizacion_rechazada',
+                'titulo'          => 'El pedido se adjudicó a otro proveedor',
+                'mensaje'         => 'El cliente eligió otra cotización para este pedido. '
+                                     . 'Sigue revisando oportunidades abiertas.',
+                'datos'           => [
+                    'pedido_id'     => $pedido->id,
+                    'cotizacion_id' => $perdedora->id,
+                ],
+            ]);
+        }
     }
 }

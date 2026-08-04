@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<title>ServiGT · Paleta v2 y estados</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<style>
+*,*::before,*::after{box-sizing:border-box}
+body{margin:0;font-family:Inter,system-ui,sans-serif;background:var(--canvas);color:var(--text);transition:background .2s}
+body{--blue:#4589d4;--deep:#1b5499;--soft:#b3cfe8;--ink:#0e1424;--paper:#f6f4ee;--canvas:#f0eee9;--text:#0e1424;--muted:#667085;--faint:#9aa3af;--border:rgba(14,20,36,.09);--inputBg:#f9f8f5;--inputBorder:#d9e2ef;--deepText:#1b5499}
+body.dark{--paper:#151b2b;--canvas:#090d18;--text:#eae7e0;--muted:#98a1b0;--faint:#6f7887;--border:rgba(246,244,238,.10);--inputBg:#111726;--inputBorder:#24304a;--soft:rgba(69,137,212,.20);--deepText:#a8cbec}
+.wrap{max-width:1180px;margin:0 auto;padding:44px 32px 90px}
+h1{font-size:30px;font-weight:800;letter-spacing:-.02em;margin:0 0 6px}
+.sub{color:var(--muted);font-size:14px;margin:0 0 34px;max-width:620px;line-height:1.55}
+h2{font-size:12px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--faint);margin:40px 0 14px;padding-bottom:9px;border-bottom:1px solid var(--border)}
+.card{background:var(--paper);border:1px solid var(--border);border-radius:14px;padding:18px}
+.sw{display:grid;grid-template-columns:repeat(auto-fill,minmax(178px,1fr));gap:12px}
+.swatch{background:var(--paper);border:1px solid var(--border);border-radius:12px;overflow:hidden}
+.swatch .chip{height:62px;border-bottom:1px solid var(--border)}
+.swatch .m{padding:9px 11px 11px}
+.swatch .n{font-size:13px;font-weight:600}
+.swatch .v{font-size:11px;color:var(--muted);font-family:ui-monospace,Menlo,monospace;margin-top:2px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);padding:0 10px 10px;border-bottom:1px solid var(--border)}
+td{padding:11px 10px;border-bottom:1px solid var(--border);vertical-align:middle}
+tbody tr:last-child td{border-bottom:none}
+.key{font-family:ui-monospace,Menlo,monospace;font-size:11.5px;color:var(--muted)}
+.hex{font-family:ui-monospace,Menlo,monospace;font-size:11px;color:var(--faint);white-space:nowrap}
+.ratio{font-family:ui-monospace,Menlo,monospace;font-size:12px;font-weight:600}
+.pass{color:#16a34a}.fail{color:#be123c}
+.st{display:inline-flex;align-items:center;gap:6px;font-weight:600;font-size:12px;padding:4px 10px;border-radius:999px;line-height:1.2;white-space:nowrap}
+.dot{width:6px;height:6px;border-radius:999px;flex:none}
+.dot.hollow{background:transparent!important;box-shadow:inset 0 0 0 2px currentColor}
+.fam{display:flex;gap:8px;align-items:center}
+.famtag{font-size:10.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--faint)}
+.note{background:var(--inputBg);border:1px solid var(--border);border-radius:12px;padding:14px 16px;font-size:13px;line-height:1.6;color:var(--muted);margin-top:14px}
+.note b{color:var(--text)}
+.toggle{position:fixed;right:26px;top:26px;display:flex;gap:6px;background:var(--paper);border:1px solid var(--border);border-radius:999px;padding:5px;box-shadow:0 6px 22px rgba(14,20,36,.1);z-index:9}
+.toggle button{border:none;background:transparent;color:var(--muted);font:600 12.5px Inter,sans-serif;padding:7px 15px;border-radius:999px;cursor:pointer}
+.toggle button.on{background:var(--blue);color:#fff}
+.demo{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.btn{height:42px;padding:0 18px;border-radius:12px;font:600 14px Inter,sans-serif;cursor:pointer;border:1px solid transparent}
+.grad{background:linear-gradient(135deg,var(--deep) 0%,var(--blue) 62%,#7db2e4 100%);color:#fff;border:none}
+.pill{display:inline-flex;align-items:center;gap:7px;background:var(--soft);color:var(--deep);font:700 12px Inter,sans-serif;padding:5px 11px;border-radius:999px}
+body.dark .pill{background:rgba(69,137,212,.2);color:var(--deepText)}
+.note.warnnote{border-color:var(--inputBorder)}
+.slots{display:flex;gap:5px;align-items:center}
+.slot{width:30px;height:8px;border-radius:999px}
+</style>
+</head>
+<body>
+<div class="toggle"><button id="bl" class="on">Claro</button><button id="bd">Oscuro</button></div>
+<div class="wrap">
+<h1>Paleta v2 &amp; estados</h1>
+<p class="sub">Validación única antes de aplicar a las 20 pantallas. Los ratios se calculan en vivo (texto sobre su propio fondo de chip, compuesto sobre la superficie). AA = 4.5:1 para texto normal; los chips son texto pequeño en negrita, así que apunto a ≥4.5.</p>
+
+<h2>Superficies y marca</h2>
+<div class="sw" id="tokens"></div>
+
+<h2>Estados de servicio · relleno sólido <span class="famtag">(8 claves del esquema)</span></h2>
+<div class="card"><table><thead><tr><th style="width:190px">Chip</th><th>Clave</th><th>bg / fg / dot</th><th style="width:120px">Contraste</th></tr></thead><tbody id="t-serv"></tbody></table></div>
+
+<h2>Estados de pedido · relleno sólido</h2>
+<div class="card"><table><thead><tr><th style="width:190px">Chip</th><th>Clave</th><th>bg / fg / dot</th><th style="width:120px">Contraste</th></tr></thead><tbody id="t-ped"></tbody></table>
+<div class="note"><b>Cómo distingo pedido de cotización sin abrir familias nuevas:</b> comparten hue (azul = activo, verde = resuelto a favor, rosa = terminado en contra, gris = neutro) pero no el tratamiento. <b>Pedido</b> = chip relleno con punto sólido. <b>Cotización</b> = chip de contorno sobre superficie, punto hueco. A un metro de distancia se leen como dos objetos distintos aunque el color coincida.</div></div>
+
+<h2>Estados de cotización · contorno + punto hueco</h2>
+<div class="card"><table><thead><tr><th style="width:190px">Chip</th><th>Clave</th><th>bg / fg / borde</th><th style="width:120px">Contraste</th></tr></thead><tbody id="t-cot"></tbody></table></div>
+
+<h2>Urgencia</h2>
+<div class="card"><table><thead><tr><th style="width:190px">Chip</th><th>Clave</th><th>bg / fg / dot</th><th style="width:120px">Contraste</th></tr></thead><tbody id="t-urg"></tbody></table></div>
+
+<h2>Crédito / slot de cotización</h2>
+<div class="card"><table><thead><tr><th style="width:190px">Chip</th><th>Clave</th><th>bg / fg / dot</th><th style="width:120px">Contraste</th></tr></thead><tbody id="t-cre"></tbody></table></div>
+
+<h2>En contexto</h2>
+<div class="card">
+<div class="demo" style="margin-bottom:16px">
+<button class="btn grad">Enviar cotización</button>
+<button class="btn" style="background:var(--blue);color:#fff">Elegir cotización</button>
+<button class="btn" style="background:var(--paper);color:var(--deepText);border:1.5px solid var(--soft)">Ver pedido</button>
+<button class="btn" style="background:transparent;color:var(--muted);border:1px solid var(--inputBorder)">Cancelar</button>
+<span class="pill">◆ 12 créditos</span>
+</div>
+<div class="demo" style="gap:22px">
+<div><div class="famtag" style="margin-bottom:7px">Slots — 3 gratis / 4-6 pagadas</div><div class="slots" id="slots"></div></div>
+<div><div class="famtag" style="margin-bottom:7px">Código de 6 dígitos</div>
+<div style="display:flex;gap:6px" id="code"></div></div>
+<div><div class="famtag" style="margin-bottom:7px">Expira en</div>
+<div style="font:700 15px ui-monospace,Menlo,monospace;color:var(--text)">4 d 06 h <span style="color:var(--muted);font-weight:500">· 12 May</span></div></div>
+</div>
+</div>
+</div>
+<script>
+const L={blue:'#4589d4',deep:'#1b5499',deepText:'#1b5499',soft:'#b3cfe8',ink:'#0e1424',paper:'#f6f4ee',canvas:'#f0eee9',white:'#ffffff',text:'#0e1424',muted:'#667085',faint:'#9aa3af',success:'#16a34a',danger:'#be123c',warn:'#b45309',amber:'#f59e0b',border:'rgba(14,20,36,0.09)',inputBg:'#f9f8f5',inputBorder:'#d9e2ef'};
+const D={blue:'#4589d4',deep:'#1b5499',deepText:'#a8cbec',soft:'rgba(69,137,212,0.20)',ink:'#eae7e0',paper:'#151b2b',canvas:'#090d18',white:'#111726',text:'#eae7e0',muted:'#98a1b0',faint:'#6f7887',success:'#22c55e',danger:'#e11d48',warn:'#d97706',amber:'#f59e0b',border:'rgba(246,244,238,0.10)',inputBg:'#111726',inputBorder:'#24304a'};
+// status tables: [key,label,bgL,fgL,dotL, bgD,fgD,dotD, outline?]
+const SERV=[
+['pendiente','Pendiente','#fdf2e3','#8a4708','#f59e0b','rgba(245,158,11,.18)','#f2c879','#f59e0b'],
+['aceptado','Aceptado','#e6effa','#1b5499','#4589d4','rgba(69,137,212,.18)','#a8cbec','#4589d4'],
+['en_camino','En camino','#e0f2f4','#0f5c63','#0e7490','rgba(14,116,144,.24)','#8ed3dd','#22a5b8'],
+['en_progreso','En progreso','#dbe8f7','#123c6f','#1b5499','rgba(27,84,153,.30)','#bcd6f0','#5b9be0'],
+['por_confirmar','Por confirmar','#eeeaf9','#4c3a8f','#7c5cd6','rgba(124,92,214,.24)','#c3b2f2','#9b7ef0'],
+['completado','Completado','#e3f5e9','#14683a','#16a34a','rgba(22,163,74,.18)','#8fdba9','#22c55e'],
+['cancelado','Cancelado','#fbe9ed','#9f1239','#be123c','rgba(190,18,60,.20)','#f5a3b6','#e11d48'],
+['rechazado','Rechazado','#f4eced','#7a3b4a','#a15563','rgba(161,85,99,.24)','#e7b3bd','#c9788a']];
+const PED=[
+['pedido_abierto','Abierto','#e6effa','#1b5499','#4589d4','rgba(69,137,212,.18)','#a8cbec','#4589d4'],
+['pedido_adjudicado','Adjudicado','#e3f5e9','#14683a','#16a34a','rgba(22,163,74,.18)','#8fdba9','#22c55e'],
+['pedido_cerrado','Cerrado','#ecebe7','#4a5262','#667085','rgba(246,244,238,.08)','#b9bfc9','#9aa3af'],
+['pedido_expirado','Expirado','#fbe9ed','#9f1239','#be123c','rgba(190,18,60,.20)','#f5a3b6','#e11d48']];
+const COT=[
+['cot_enviada','Enviada','#f6f4ee','#1b5499','#b3cfe8','#151b2b','#a8cbec','rgba(69,137,212,.45)'],
+['cot_aceptada','Aceptada','#f6f4ee','#14683a','#a7dcbb','#151b2b','#8fdba9','rgba(34,197,94,.45)'],
+['cot_rechazada','Rechazada','#f6f4ee','#9f1239','#f0c3ce','#151b2b','#f5a3b6','rgba(225,29,72,.45)'],
+['cot_retirada','Retirada','#f6f4ee','#5c6577','#dcd9d2','#151b2b','#b9bfc9','rgba(246,244,238,.22)']];
+const URG=[
+['urg_baja','Baja','#ecebe7','#4a5262','#9aa3af','rgba(246,244,238,.08)','#b9bfc9','#9aa3af'],
+['urg_media','Media','#fdf2e3','#8a4708','#f59e0b','rgba(245,158,11,.18)','#f2c879','#f59e0b'],
+['urg_alta','Alta','#fbe9ed','#9f1239','#be123c','rgba(190,18,60,.20)','#f5a3b6','#e11d48']];
+const CRE=[
+['slot_gratis','Gratis','#e3f5e9','#14683a','#16a34a','rgba(22,163,74,.18)','#8fdba9','#22c55e'],
+['slot_pagada','Cuesta 1 crédito','#fdf2e3','#8a4708','#f59e0b','rgba(245,158,11,.18)','#f2c879','#f59e0b'],
+['slot_sin_saldo','Sin saldo','#fbe9ed','#9f1239','#be123c','rgba(190,18,60,.20)','#f5a3b6','#e11d48'],
+['slot_limite','Límite alcanzado','#ecebe7','#4a5262','#667085','rgba(246,244,238,.08)','#b9bfc9','#9aa3af']];
+function parse(c){c=c.trim();if(c[0]==='#'){if(c.length===4)c='#'+[1,2,3].map(i=>c[i]+c[i]).join('');return[parseInt(c.slice(1,3),16),parseInt(c.slice(3,5),16),parseInt(c.slice(5,7),16),1];}
+const m=c.match(/rgba?\(([^)]+)\)/);const p=m[1].split(',').map(Number);return[p[0],p[1],p[2],p.length>3?p[3]:1];}
+function over(fg,bg){const a=parse(fg),b=parse(bg);return[0,1,2].map(i=>a[i]*a[3]+b[i]*(1-a[3]));}
+function lum(rgb){const s=rgb.map(v=>{v/=255;return v<=.03928?v/12.92:Math.pow((v+.055)/1.055,2.4)});return .2126*s[0]+.7152*s[1]+.0722*s[2];}
+function ratio(fg,bg,base){const B=over(bg,base),F=over(fg,'rgb('+B.join(',')+')');const a=lum(F),b=lum(B);return((Math.max(a,b)+.05)/(Math.min(a,b)+.05));}
+let dark=false;
+function chip(r,outline){const i=dark?5:2,bg=r[i],fg=r[i+1],ac=r[i+2];
+return '<span class="st" style="background:'+bg+';color:'+fg+(outline?';box-shadow:inset 0 0 0 1.5px '+ac:'')+'"><span class="dot'+(outline?' hollow':'')+'" style="background:'+ac+'"></span>'+r[1]+'</span>';}
+function rows(id,list,outline){const base=dark?D.paper:L.paper;
+document.getElementById(id).innerHTML=list.map(r=>{const i=dark?5:2;const rr=ratio(r[i+1],r[i],base);const ok=rr>=4.5;
+return '<tr><td>'+chip(r,outline)+'</td><td class="key">'+r[0]+'</td><td class="hex">'+r[i]+' · '+r[i+1]+' · '+r[i+2]+'</td><td><span class="ratio '+(ok?'pass':'fail')+'">'+rr.toFixed(2)+':1 '+(ok?'AA':'✕')+'</span></td></tr>';}).join('');}
+function tokens(){const T=dark?D:L;const order=[['blue','Marca · blue'],['deep','Marca · deep'],['deepText','Marca · deepText (texto)'],['soft','Marca · soft'],['ink','Superficie · ink'],['paper','Superficie · paper'],['canvas','Superficie · canvas'],['white','Superficie · white'],['text','Texto · text'],['muted','Texto · muted'],['faint','Texto · faint'],['success','Semántico · success'],['danger','Semántico · danger'],['warn','Semántico · warn'],['amber','Semántico · amber'],['border','Chrome · border'],['inputBg','Chrome · inputBg'],['inputBorder','Chrome · inputBorder']];
+document.getElementById('tokens').innerHTML=order.map(([k,n])=>'<div class="swatch"><div class="chip" style="background:'+T[k]+'"></div><div class="m"><div class="n">'+n+'</div><div class="v">'+T[k]+'</div></div></div>').join('');}
+function extras(){const T=dark?D:L;
+document.getElementById('slots').innerHTML=[0,1,2,3,4,5].map(i=>'<div class="slot" style="background:'+(i<2?T.success:i<3?(dark?'rgba(34,197,94,.3)':'#c8ead4'):i===3?T.amber:(dark?'rgba(246,244,238,.12)':'#e2e0da'))+'"></div>').join('');
+document.getElementById('code').innerHTML='481902'.split('').map(d=>'<span style="width:34px;height:44px;display:inline-flex;align-items:center;justify-content:center;background:'+T.inputBg+';border:1px solid '+T.inputBorder+';border-radius:9px;font:700 19px ui-monospace,Menlo,monospace;color:'+T.deepText+'">'+d+'</span>').join('');}
+function render(){document.body.classList.toggle('dark',dark);tokens();rows('t-serv',SERV);rows('t-ped',PED);rows('t-cot',COT,true);rows('t-urg',URG);rows('t-cre',CRE);extras();
+document.getElementById('bl').className=dark?'':'on';document.getElementById('bd').className=dark?'on':'';}
+document.getElementById('bl').onclick=()=>{dark=false;render()};
+document.getElementById('bd').onclick=()=>{dark=true;render()};
+render();
+</script>
+</body>
+</html>

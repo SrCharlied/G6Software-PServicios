@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Categoria;
 use App\Models\Cotizacion;
 use App\Models\CreditoProveedor;
+use App\Models\Notificacion;
 use App\Models\Pedido;
 use App\Models\Proveedor;
 use App\Models\Servicio;
@@ -340,6 +341,74 @@ class CreditosYAceptacionTest extends TestCase
         $this->assertDatabaseHas('cotizaciones', [
             'id'     => $cotizacion->id,
             'estado' => 'retirada',
+        ]);
+    }
+
+    public function test_adjudicar_notifica_al_ganador_y_a_los_no_seleccionados(): void
+    {
+        $ganador   = $this->crearProveedor();
+        $perdedor1 = $this->crearProveedor();
+        $perdedor2 = $this->crearProveedor();
+
+        $cotizacionGanadora = $this->crearCotizacion($ganador, 475.50);
+        $cotizacionPerdedora1 = $this->crearCotizacion($perdedor1, 520.00);
+        $cotizacionPerdedora2 = $this->crearCotizacion($perdedor2, 610.00);
+
+        Sanctum::actingAs($this->cliente);
+
+        $this->postJson(
+            "/api/pedidos/{$this->pedido->id}/cotizaciones/{$cotizacionGanadora->id}/aceptar"
+        )->assertOk();
+
+        $servicio = Servicio::sole();
+
+        // El ganador recibe la notificacion con los tres ids acordados.
+        $this->assertDatabaseHas('notificaciones', [
+            'destinatario_id' => $ganador->user->id,
+            'tipo'            => 'cotizacion_aceptada',
+        ]);
+
+        $notifGanador = Notificacion::where('destinatario_id', $ganador->user->id)
+            ->where('tipo', 'cotizacion_aceptada')
+            ->sole();
+
+        $this->assertSame($this->pedido->id, $notifGanador->datos['pedido_id']);
+        $this->assertSame($cotizacionGanadora->id, $notifGanador->datos['cotizacion_id']);
+        $this->assertSame($servicio->id, $notifGanador->datos['servicio_id']);
+
+        // Cada perdedor recibe la suya, referida a su propia cotizacion.
+        foreach ([[$perdedor1, $cotizacionPerdedora1], [$perdedor2, $cotizacionPerdedora2]] as [$prov, $cot]) {
+            $notif = Notificacion::where('destinatario_id', $prov->user->id)
+                ->where('tipo', 'cotizacion_rechazada')
+                ->sole();
+
+            $this->assertSame($this->pedido->id, $notif->datos['pedido_id']);
+            $this->assertSame($cot->id, $notif->datos['cotizacion_id']);
+        }
+
+        // El cliente no se notifica a si mismo.
+        $this->assertDatabaseMissing('notificaciones', [
+            'destinatario_id' => $this->cliente->id,
+            'tipo'            => 'cotizacion_rechazada',
+        ]);
+    }
+
+    public function test_proveedor_que_retiro_su_cotizacion_no_recibe_notificacion_de_rechazo(): void
+    {
+        $ganador  = $this->crearProveedor();
+        $retirado = $this->crearProveedor();
+
+        $cotizacionGanadora = $this->crearCotizacion($ganador, 300.00);
+        $this->crearCotizacion($retirado, 450.00)->update(['estado' => 'retirada']);
+
+        Sanctum::actingAs($this->cliente);
+
+        $this->postJson(
+            "/api/pedidos/{$this->pedido->id}/cotizaciones/{$cotizacionGanadora->id}/aceptar"
+        )->assertOk();
+
+        $this->assertDatabaseMissing('notificaciones', [
+            'destinatario_id' => $retirado->user->id,
         ]);
     }
 

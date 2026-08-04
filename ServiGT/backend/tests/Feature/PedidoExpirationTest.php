@@ -5,12 +5,13 @@ namespace Tests\Feature;
 use App\Models\Categoria;
 use App\Models\Pedido;
 use App\Models\User;
-use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Tests\TestCase;
 
 class PedidoExpirationTest extends TestCase
 {
-    use RefreshDatabase;
+    // Ver nota en PedidoCreationTest: el esquema viene de database/init.sql.
+    use DatabaseTransactions;
 
     private User $cliente;
     private Categoria $categoria;
@@ -48,13 +49,16 @@ class PedidoExpirationTest extends TestCase
 
     public function test_comando_no_modifica_pedidos_en_estados_finales(): void
     {
-        $cerrado  = $this->crearPedido(['estado' => 'cerrado',   'fecha_expiracion' => now()->subDay()]);
-        $cancelado = $this->crearPedido(['estado' => 'cancelado', 'fecha_expiracion' => now()->subDay()]);
+        // `adjudicado` en lugar de `cancelado`: init.sql solo admite
+        // abierto/adjudicado/cerrado/expirado, y proteger un pedido ya
+        // adjudicado del comando de expiracion es el caso que importa.
+        $cerrado    = $this->crearPedido(['estado' => 'cerrado',    'fecha_expiracion' => now()->subDay()]);
+        $adjudicado = $this->crearPedido(['estado' => 'adjudicado', 'fecha_expiracion' => now()->subDay()]);
 
         $this->artisan('pedidos:expirar')->assertExitCode(0);
 
-        $this->assertDatabaseHas('pedidos', ['id' => $cerrado->id,   'estado' => 'cerrado']);
-        $this->assertDatabaseHas('pedidos', ['id' => $cancelado->id, 'estado' => 'cancelado']);
+        $this->assertDatabaseHas('pedidos', ['id' => $cerrado->id,    'estado' => 'cerrado']);
+        $this->assertDatabaseHas('pedidos', ['id' => $adjudicado->id, 'estado' => 'adjudicado']);
     }
 
     public function test_comando_sin_pedidos_que_expirar_termina_exitosamente(): void

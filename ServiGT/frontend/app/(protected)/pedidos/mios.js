@@ -1,5 +1,6 @@
 import { useRouter } from 'expo-router';
 import MisPedidosScreen from '../../../src/screens/MisPedidosScreen';
+import InternalLayout from '../../../src/components/InternalLayout';
 
 export default function MisPedidosRoute() {
   const router = useRouter();
@@ -11,5 +12,9 @@ export default function MisPedidosRoute() {
     },
     goBack: () => router.back(),
   };
-  return <MisPedidosScreen navigation={navigation} />;
+  return (
+    <InternalLayout>
+      <MisPedidosScreen navigation={navigation} />
+    </InternalLayout>
+  );
 }

@@ -1,5 +1,6 @@
 import { useRouter } from 'expo-router';
 import SolicitudesScreen from '../../src/screens/SolicitudesScreen';
+import InternalLayout from '../../src/components/InternalLayout';
 import { useSession } from '../../src/context/SessionContext';
 
 export default function SolicitudesRoute() {
@@ -21,5 +22,9 @@ export default function SolicitudesRoute() {
     goBack: () => router.back(),
   };
 
-  return <SolicitudesScreen navigation={navigation} user={user} />;
+  return (
+    <InternalLayout>
+      <SolicitudesScreen navigation={navigation} user={user} />
+    </InternalLayout>
+  );
 }

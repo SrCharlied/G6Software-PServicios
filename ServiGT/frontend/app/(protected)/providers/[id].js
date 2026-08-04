@@ -1,5 +1,6 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import ProviderDetailScreen from '../../../src/screens/ProviderDetailScreen';
+import InternalLayout from '../../../src/components/InternalLayout';
 import { useSession } from '../../../src/context/SessionContext';
 
 export default function ProviderDetailRoute() {
@@ -35,12 +36,14 @@ export default function ProviderDetailRoute() {
     : null;
 
   return (
-    <ProviderDetailScreen
-      navigation={navigation}
-      user={user}
-      providerProfile={providerProfile}
-      selectedProvider={preloaded}
-      providerId={id}
-    />
+    <InternalLayout>
+      <ProviderDetailScreen
+        navigation={navigation}
+        user={user}
+        providerProfile={providerProfile}
+        selectedProvider={preloaded}
+        providerId={id}
+      />
+    </InternalLayout>
   );
 }

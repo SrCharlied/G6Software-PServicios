@@ -7,6 +7,7 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -23,7 +24,10 @@ import { Image } from 'react-native';
 const normalizeText = (value) =>
   (value || '').toString().normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 
-function TopBar({ onMenuPress }) {
+// `showBell`: en desktop la campana la provee el sidebar de InternalLayout, asi
+// que aqui se oculta para no duplicarla. En movil no hay sidebar y esta es la
+// unica campana, por eso se mantiene.
+function TopBar({ onMenuPress, showBell }) {
   return (
     <View style={styles.topBar}>
       <TouchableOpacity onPress={onMenuPress} style={styles.menuBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
@@ -34,7 +38,7 @@ function TopBar({ onMenuPress }) {
         </View>
       </TouchableOpacity>
       <ServiGTLogo size={18} mode="dark" />
-      <NotificationBell />
+      {showBell ? <NotificationBell /> : <View style={styles.bellSpacer} />}
     </View>
   );
 }
@@ -85,6 +89,10 @@ function ProviderCard({ prov, onPress }) {
 export default function HomeScreen() {
   const router = useRouter();
   const { setSelectedProvider, user } = useSession();
+  const { width } = useWindowDimensions();
+  // Mismo umbral que InternalLayout: arriba de este ancho el sidebar es visible
+  // y ya trae la campana.
+  const sidebarVisible = width >= 900;
 
   const [proveedores, setProveedores] = useState([]);
   const [loading, setLoading]         = useState(true);
@@ -193,7 +201,7 @@ export default function HomeScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar style="dark" />
-      <TopBar onMenuPress={() => setDrawerOpen(true)} />
+      <TopBar onMenuPress={() => setDrawerOpen(true)} showBell={!sidebarVisible} />
       <FlatList
         data={loading ? [] : filteredProviders}
         keyExtractor={(item) => String(item.id)}
@@ -238,6 +246,9 @@ const styles = StyleSheet.create({
   menuBtnPlaceholder: { width: 32 },
   hamburger: { gap: 5, paddingVertical: 2 },
   hamburgerLine: { width: 22, height: 2, backgroundColor: '#333', borderRadius: 2 },
+  // Mismo ancho que el boton de NotificationBell, para que el logo no se
+  // descentre cuando la campana se oculta en desktop.
+  bellSpacer: { width: 36, height: 36 },
   topBarTitle: { fontSize: 18, fontWeight: '700', color: '#4589d4', letterSpacing: 0.3 },
   listContent: { paddingBottom: 32 },
   listHeader: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 4 },

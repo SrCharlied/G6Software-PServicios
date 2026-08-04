@@ -1,5 +1,6 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import PedidoDetailScreen from '../../../src/screens/PedidoDetailScreen';
+import InternalLayout from '../../../src/components/InternalLayout';
 
 export default function PedidoDetailRoute() {
   const router = useRouter();
@@ -13,5 +14,9 @@ export default function PedidoDetailRoute() {
     goBack: () => router.back(),
   };
 
-  return <PedidoDetailScreen pedidoId={Number(id)} navigation={navigation} />;
+  return (
+    <InternalLayout>
+      <PedidoDetailScreen pedidoId={Number(id)} navigation={navigation} />
+    </InternalLayout>
+  );
 }

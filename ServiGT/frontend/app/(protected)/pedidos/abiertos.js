@@ -1,5 +1,6 @@
 import { useRouter } from 'expo-router';
 import PedidosAbiertosScreen from '../../../src/screens/PedidosAbiertosScreen';
+import InternalLayout from '../../../src/components/InternalLayout';
 
 export default function PedidosAbiertosRoute() {
   const router = useRouter();
@@ -10,5 +11,9 @@ export default function PedidosAbiertosRoute() {
     },
     goBack: () => router.back(),
   };
-  return <PedidosAbiertosScreen navigation={navigation} />;
+  return (
+    <InternalLayout>
+      <PedidosAbiertosScreen navigation={navigation} />
+    </InternalLayout>
+  );
 }

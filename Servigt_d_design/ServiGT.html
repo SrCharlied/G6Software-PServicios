@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>ServiGT — Marketplace de servicios en Guatemala</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<style>
+  html, body { margin: 0; background: #f0eee9; font-family: Inter, system-ui, sans-serif; }
+  body { min-height: 100vh; }
+  *, *::before, *::after { box-sizing: border-box; }
+</style>
+
+<!-- Splash thumbnail -->
+<template id="__bundler_thumbnail">
+<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+  <defs><linearGradient id="g" x1="0" x2="1" y1="0" y2="1"><stop offset="0" stop-color="#0b3d91"/><stop offset="1" stop-color="#4ea8ff"/></linearGradient></defs>
+  <rect width="200" height="200" rx="24" fill="url(#g)"/>
+  <text x="100" y="118" text-anchor="middle" font-family="Inter,sans-serif" font-weight="800" font-size="56" fill="#fff">SGT</text>
+</svg>
+</template>
+</head>
+<body>
+<div id="root"></div>
+
+<!-- React + Babel (pinned) -->
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<!-- Lucide icons (UMD) + Recharts -->
+<script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js"></script>
+<script src="https://unpkg.com/prop-types@15.8.1/prop-types.min.js"></script>
+<script src="https://unpkg.com/recharts@2.12.7/umd/Recharts.js"></script>
+
+<!-- Shared modules -->
+<script type="text/babel" src="data.jsx"></script>
+<script type="text/babel" src="ui.jsx"></script>
+<script type="text/babel" src="design-canvas.jsx"></script>
+<script type="text/babel" src="tweaks-panel.jsx"></script>
+
+<!-- Screens -->
+<script type="text/babel" src="screens-1-public.jsx"></script>
+<script type="text/babel" src="screens-2-client.jsx"></script>
+<script type="text/babel" src="screens-3-provider.jsx"></script>
+<script type="text/babel" src="screens-4-misc.jsx"></script>
+<script type="text/babel" src="screens-5-marketplace.jsx"></script>
+<script type="text/babel" src="screens-6-monetizacion.jsx"></script>
+
+<script type="text/babel">
+const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+  "primaryColor": "#4589d4",
+  "primaryDark": "#1b5499",
+  "skyAccent": "#7db2e4",
+  "density": "regular",
+  "dark": false,
+  "fontScale": 1.0
+}/*EDITMODE-END*/;
+
+function App() {
+  const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
+  const [dark, setDark] = React.useState(t.dark);
+  React.useEffect(() => setDark(t.dark), [t.dark]);
+
+  // Apply tweak overrides globally (rebrand SGT object).
+  React.useEffect(() => {
+    SGT.blue = t.primaryColor;
+    SGT.blueDark = t.primaryDark;
+    SGT.sky = t.skyAccent;
+    // also override CSS var-like usages by injecting a style block
+    let s = document.getElementById('sgt-tweak-vars');
+    if (!s) { s = document.createElement('style'); s.id = 'sgt-tweak-vars'; document.head.appendChild(s); }
+    s.textContent = `:root { --sgt-primary: ${t.primaryColor}; --sgt-primary-dark: ${t.primaryDark}; --sgt-sky: ${t.skyAccent}; }
+                    .sgt-grad { background: linear-gradient(135deg, ${t.primaryDark} 0%, ${t.primaryColor} 50%, ${t.skyAccent} 100%) !important; }`;
+  }, [t.primaryColor, t.primaryDark, t.skyAccent]);
+
+  // Density → padding scale (consumed via CSS var)
+  const density = { compact: 0.85, regular: 1, comfy: 1.15 }[t.density] || 1;
+
+  // ARTBOARD WRAPPER: applies theme vars + dark class on the artboard root.
+  const Wrap = ({ children, sLabel }) => {
+    const themeVars = applySgtTheme(dark);
+    return (
+      <div data-screen-label={sLabel} className={dark ? 'sgt-dark' : ''}
+           style={{ width: '100%', height: '100%', ...themeVars, fontSize: `${14 * t.fontScale}px` }}>
+        {children}
+      </div>
+    );
+  };
+
+  // Each artboard gets its own dark/setDark — but we tie them all to one global.
+  const screenProps = { dark, setDark };
+
+  // Card sizes (16:10-ish, fits the design)
+  const W_LG = 1280, H_LG = 820;
+  const W_MD = 1100, H_MD = 800;
+
+  return (
+    <>
+      <DesignCanvas>
+        <DCSection id="public" title="01 · Público" subtitle="Landing y autenticación">
+          <DCArtboard id="landing" label="01 · Landing pública" width={W_LG} height={2300}>
+            <Wrap sLabel="01 Landing"><ScreenLanding {...screenProps} /></Wrap>
+          </DCArtboard>
+          <DCArtboard id="login" label="02 · Login" width={W_LG} height={H_LG}>
+            <Wrap sLabel="02 Login"><ScreenLogin {...screenProps} /></Wrap>
+          </DCArtboard>
+          <DCArtboard id="register" label="03 · Registro" width={W_MD} height={1100}>
+            <Wrap sLabel="03 Registro"><ScreenRegister {...screenProps} /></Wrap>
+          </DCArtboard>
+          <DCArtboard id="recover" label="04 · Recuperar contraseña" width={760} height={760}>
+            <Wrap sLabel="04 Recuperar"><ScreenRecover {...screenProps} /></Wrap>
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection id="client" title="02 · Cliente" subtitle="Catálogo, perfil, solicitud, gestión">
+          <DCArtboard id="home-cliente" label="05 · Home cliente — Lista + filtros" width={W_LG} height={H_LG}>
+            <Wrap sLabel="05 Home cliente"><ScreenHomeCliente {...screenProps} /></Wrap>
+          </DCArtboard>
+          <DCArtboard id="provider-detail" label="06 · Detalle de proveedor" width={W_LG} height={1100}>
+            <Wrap sLabel="06 Detalle proveedor"><ScreenProviderDetail {...screenProps} /></Wrap>
+          </DCArtboard>
+          <DCArtboard id="solicitud" label="07 · Nueva solicitud (3 pasos)" width={W_MD} height={1080}>
+            <Wrap sLabel="07 Solicitud"><ScreenSolicitud {...screenProps} /></Wrap>
+          </DCArtboard>
+          <DCArtboard id="mis-solicitudes" label="08 · Mis solicitudes" width={W_MD} height={1560}>
+            <Wrap sLabel="08 Mis solicitudes"><ScreenMisSolicitudes {...screenProps} /></Wrap>
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection id="provider" title="03 · Proveedor" subtitle="Dashboard y edición de perfil">
+          <DCArtboard id="provider-dash" label="09 · Provider dashboard" width={W_LG} height={1000}>
+            <Wrap sLabel="09 Provider dashboard"><ScreenProviderDashboard {...screenProps} /></Wrap>
+          </DCArtboard>
+          <DCArtboard id="provider-edit" label="10 · Editar perfil" width={W_LG} height={1280}>
+            <Wrap sLabel="10 Editar perfil"><ScreenEditProfile {...screenProps} /></Wrap>
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection id="comm" title="04 · Comunicación" subtitle="Chat y notificaciones">
+          <DCArtboard id="chat" label="11 · Chat" width={W_LG} height={H_LG}>
+            <Wrap sLabel="11 Chat"><ScreenChat {...screenProps} /></Wrap>
+          </DCArtboard>
+          <DCArtboard id="notif" label="12 · Notificaciones" width={W_MD} height={H_MD}>
+            <Wrap sLabel="12 Notificaciones"><ScreenNotificaciones {...screenProps} /></Wrap>
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection id="admin" title="05 · Admin" subtitle="Panel de administración">
+          <DCArtboard id="admin-dash" label="13 · Admin dashboard" width={W_LG} height={1100}>
+            <Wrap sLabel="13 Admin"><ScreenAdmin {...screenProps} /></Wrap>
+          </DCArtboard>
+        </DCSection>
+        <DCSection id="marketplace" title="06 · Marketplace de demanda" subtitle="Pedidos, cotizaciones y créditos">
+          <DCArtboard id="publicar-pedido" label="14 · Publicar pedido" width={W_MD} height={1080}>
+            <Wrap sLabel="14 Publicar pedido"><ScreenPublicarPedido {...screenProps} /></Wrap>
+          </DCArtboard>
+          <DCArtboard id="mis-pedidos" label="15 · Mis pedidos / Mis servicios" width={W_LG} height={1560}>
+            <Wrap sLabel="15 Mis pedidos"><ScreenMisPedidos {...screenProps} /></Wrap>
+          </DCArtboard>
+          <DCArtboard id="detalle-pedido" label="16 · Detalle de pedido + cotizaciones" width={W_LG} height={1560}>
+            <Wrap sLabel="16 Detalle pedido"><ScreenDetallePedido {...screenProps} /></Wrap>
+          </DCArtboard>
+          <DCArtboard id="oportunidades" label="17 · Oportunidades (proveedor)" width={W_LG} height={1240}>
+            <Wrap sLabel="17 Oportunidades"><ScreenOportunidades {...screenProps} /></Wrap>
+          </DCArtboard>
+          <DCArtboard id="enviar-cotizacion" label="18 · Enviar cotización" width={W_MD} height={1180}>
+            <Wrap sLabel="18 Enviar cotización"><ScreenEnviarCotizacion {...screenProps} /></Wrap>
+          </DCArtboard>
+          <DCArtboard id="creditos" label="19 · Créditos (proveedor)" width={W_LG} height={1240}>
+            <Wrap sLabel="19 Créditos"><ScreenCreditos {...screenProps} /></Wrap>
+          </DCArtboard>
+          <DCArtboard id="admin-recargas" label="20 · Admin · Créditos y Premium" width={W_LG} height={1180}>
+            <Wrap sLabel="20 Admin recargas"><ScreenAdminRecargas {...screenProps} /></Wrap>
+          </DCArtboard>
+        </DCSection>
+        <DCSection id="monetizacion" title="07 · Monetización" subtitle="Compra de créditos y Premium">
+          <DCArtboard id="checkout" label="21 · Checkout de créditos" width={W_LG} height={1180}>
+            <Wrap sLabel="21 Checkout"><ScreenCheckout {...screenProps} /></Wrap>
+          </DCArtboard>
+          <DCArtboard id="premium-nuevo" label="22 · Premium — nunca activado" width={W_LG} height={1240}>
+            <Wrap sLabel="22 Premium propuesta"><ScreenPremium {...screenProps} estado="nunca" /></Wrap>
+          </DCArtboard>
+          <DCArtboard id="premium-activo" label="23 · Premium — activo" width={W_LG} height={1240}>
+            <Wrap sLabel="23 Premium activo"><ScreenPremium {...screenProps} estado="activo" /></Wrap>
+          </DCArtboard>
+          <DCArtboard id="premium-vencido" label="24 · Premium — vencido" width={W_LG} height={1240}>
+            <Wrap sLabel="24 Premium vencido"><ScreenPremium {...screenProps} estado="vencido" /></Wrap>
+          </DCArtboard>
+        </DCSection>
+      </DesignCanvas>
+
+      <TweaksPanel>
+        <TweakSection label="Marca" />
+        <TweakColor label="Azul primario" value={t.primaryColor} onChange={v => setTweak('primaryColor', v)} />
+        <TweakColor label="Azul oscuro"   value={t.primaryDark}  onChange={v => setTweak('primaryDark', v)} />
+        <TweakColor label="Celeste"       value={t.skyAccent}    onChange={v => setTweak('skyAccent', v)} />
+
+        <TweakSection label="Apariencia" />
+        <TweakToggle label="Modo oscuro" value={t.dark} onChange={v => setTweak('dark', v)} />
+        <TweakRadio label="Densidad" value={t.density}
+                    options={['compact', 'regular', 'comfy']}
+                    onChange={v => setTweak('density', v)} />
+        <TweakSlider label="Escala texto" value={t.fontScale} min={0.85} max={1.2} step={0.05}
+                     onChange={v => setTweak('fontScale', v)} unit="x" />
+      </TweaksPanel>
+    </>
+  );
+}
+
+function mount() {
+  // Wait for lucide & Recharts UMDs (and the JSX modules that defined the screens)
+  if (!window.lucide || !window.Recharts || !window.ScreenLanding || !window.ScreenPublicarPedido || !window.ScreenPremium || !window.DesignCanvas || !window.useTweaks) {
+    return setTimeout(mount, 50);
+  }
+  ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+}
+mount();
+</script>
+
+</body>
+</html>

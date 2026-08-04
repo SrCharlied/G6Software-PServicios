@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>ServiGT Mobile — Print</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<style>
+  html, body { margin: 0; background: #f0eee9; font-family: Inter, system-ui, sans-serif; }
+  *, *::before, *::after { box-sizing: border-box; }
+  [data-sgt-frame] *::-webkit-scrollbar { display: none; }
+
+  /* Print layout: 2 phones per A4 portrait page */
+  .print-page {
+    width: 210mm;
+    min-height: 297mm;
+    padding: 12mm 10mm;
+    background: #f0eee9;
+    page-break-after: always;
+    break-after: page;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  .print-page:last-child { page-break-after: auto; break-after: auto; }
+  .print-page-title {
+    font-size: 14pt; font-weight: 800; color: #1b5499;
+    margin: 0 0 6mm 0; align-self: flex-start;
+    letter-spacing: -0.01em;
+  }
+  .print-page-sub {
+    font-size: 10pt; color: #667085; margin: -4mm 0 8mm 0;
+    align-self: flex-start;
+  }
+  .phones-row {
+    display: flex; gap: 10mm; justify-content: center; align-items: flex-start;
+    flex-wrap: wrap;
+  }
+  .phone-cell {
+    display: flex; flex-direction: column; align-items: center; gap: 4mm;
+    break-inside: avoid; page-break-inside: avoid;
+  }
+  .phone-cell-label {
+    font-size: 9pt; font-weight: 700; color: #1f2937;
+    text-align: center;
+  }
+  .phone-cell-label small { display: block; font-weight: 500; color: #667085; font-size: 8pt; margin-top: 1mm; }
+
+  @page { size: A4 portrait; margin: 0; }
+  @media print {
+    html, body { background: white; }
+    .print-page { background: white; }
+    * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+  }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js"></script>
+<script src="https://unpkg.com/prop-types@15.8.1/prop-types.min.js"></script>
+<script src="https://unpkg.com/recharts@2.12.7/umd/Recharts.js"></script>
+
+<script type="text/babel" src="data.jsx"></script>
+<script type="text/babel" src="ui.jsx"></script>
+<script type="text/babel" src="ios-frame.jsx"></script>
+<script type="text/babel" src="mobile-ui.jsx"></script>
+
+<script type="text/babel" src="m-screens-1-public.jsx"></script>
+<script type="text/babel" src="m-screens-2-client.jsx"></script>
+<script type="text/babel" src="m-screens-3-rest.jsx"></script>
+<script type="text/babel" src="m-screens-4-marketplace.jsx"></script>
+<script type="text/babel" src="m-screens-5-monetizacion.jsx"></script>
+
+<script type="text/babel">
+function PrintApp() {
+  const themeVars = applySgtTheme(false);
+  // Scale phones down ~62% so two fit per A4 page
+  const scale = 0.58;
+  const phoneW = 390, phoneH = 844;
+
+  const Phone = ({ children, sLabel }) => (
+    <div style={{
+      width: phoneW * scale, height: phoneH * scale,
+      overflow: 'hidden', position: 'relative',
+    }}>
+      <div style={{
+        width: phoneW, height: phoneH,
+        transform: `scale(${scale})`, transformOrigin: 'top left',
+      }}>
+        <IOSDevice width={phoneW} height={phoneH} dark={false}>
+          <div data-screen-label={sLabel} style={{ width: '100%', height: '100%', ...themeVars }}>
+            {children}
+          </div>
+        </IOSDevice>
+      </div>
+    </div>
+  );
+
+  const screens = [
+    { sec: '01 · Público',       sub: 'Onboarding y autenticación', items: [
+      { lbl: '01 Landing',         sublbl: 'Hero + categorías',         comp: <MScreenLanding /> },
+      { lbl: '02 Login',           sublbl: 'Inicio de sesión',          comp: <MScreenLogin /> },
+      { lbl: '03 Registro',        sublbl: 'Cliente o proveedor',       comp: <MScreenRegister /> },
+      { lbl: '04 Recuperar',       sublbl: 'Stepper 4 pasos',           comp: <MScreenRecover /> },
+    ]},
+    { sec: '02 · Cliente',       sub: 'Catálogo, perfil, solicitud, gestión', items: [
+      { lbl: '05 Home cliente',    sublbl: 'Lista + mapa',              comp: <MScreenHomeCliente /> },
+      { lbl: '06 Detalle',         sublbl: 'Perfil del proveedor',      comp: <MScreenProviderDetail /> },
+      { lbl: '07 Nueva solicitud', sublbl: '3 pasos',                   comp: <MScreenSolicitud /> },
+      { lbl: '08 Mis pedidos',     sublbl: 'Estados y filtros',         comp: <MScreenMisSolicitudes /> },
+    ]},
+    { sec: '03 · Proveedor',     sub: 'Dashboard y edición', items: [
+      { lbl: '09 Dashboard',       sublbl: 'KPIs y agenda',             comp: <MScreenProviderDashboard /> },
+      { lbl: '10 Editar perfil',   sublbl: 'Datos y servicios',         comp: <MScreenEditProfile /> },
+    ]},
+    { sec: '04 · Comunicación',  sub: 'Chat y notificaciones', items: [
+      { lbl: '11 Chat',            sublbl: 'iMessage style',            comp: <MScreenChat /> },
+      { lbl: '12 Notificaciones',  sublbl: 'Agrupadas por fecha',       comp: <MScreenNotificaciones /> },
+    ]},
+    { sec: '05 · Admin',         sub: 'Panel de administración', items: [
+      { lbl: '13 Admin',           sublbl: 'KPIs globales',             comp: <MScreenAdmin /> },
+    ]},
+    { sec: '06 · Marketplace de demanda', sub: 'Pedidos, cotizaciones y créditos', items: [
+      { lbl: '14 Publicar pedido', sublbl: '3 pasos',                   comp: <MScreenPublicarPedido /> },
+      { lbl: '15 Mi actividad',    sublbl: 'Servicios / Pedidos',       comp: <MScreenMisPedidos /> },
+      { lbl: '16 Detalle pedido',  sublbl: 'Cotizaciones recibidas',    comp: <MScreenDetallePedido /> },
+      { lbl: '17 Oportunidades',   sublbl: 'Abiertas / Mis cotizaciones', comp: <MScreenOportunidades /> },
+      { lbl: '18 Cotizar',         sublbl: 'Costo del slot',            comp: <MScreenEnviarCotizacion /> },
+      { lbl: '19 Créditos',        sublbl: 'Saldo, paquetes, movimientos', comp: <MScreenCreditos /> },
+      { lbl: '20 Admin recargas',  sublbl: 'Compras y acreditación manual', comp: <MScreenAdminRecargas /> },
+    ]},
+    { sec: '07 · Monetización', sub: 'Compra de créditos y Premium', items: [
+      { lbl: '21 Checkout',        sublbl: 'Sheet · por confirmar',      comp: <MScreenCheckout /> },
+      { lbl: '21b Checkout',       sublbl: 'Compra completada',          comp: <MScreenCheckout initial="completada" /> },
+      { lbl: '22 Premium',         sublbl: 'Nunca activado',             comp: <MScreenPremium estado="nunca" /> },
+      { lbl: '23 Premium',         sublbl: 'Activo · días restantes',    comp: <MScreenPremium estado="activo" /> },
+      { lbl: '24 Premium',         sublbl: 'Vencido · reactivar',        comp: <MScreenPremium estado="vencido" /> },
+    ]},
+  ];
+
+  // Group items into pages of 2
+  const pages = [];
+  screens.forEach(sec => {
+    for (let i = 0; i < sec.items.length; i += 2) {
+      pages.push({
+        sec: sec.sec, sub: sec.sub,
+        items: sec.items.slice(i, i + 2),
+        first: i === 0,
+      });
+    }
+  });
+
+  return (
+    <>
+      {pages.map((p, i) => (
+        <div key={i} className="print-page">
+          {p.first && (
+            <>
+              <div className="print-page-title">{p.sec}</div>
+              <div className="print-page-sub">{p.sub}</div>
+            </>
+          )}
+          <div className="phones-row">
+            {p.items.map((it, j) => (
+              <div key={j} className="phone-cell">
+                <Phone sLabel={it.lbl}>{it.comp}</Phone>
+                <div className="phone-cell-label">
+                  {it.lbl}
+                  <small>{it.sublbl}</small>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+    </>
+  );
+}
+
+function mount() {
+  if (!window.lucide || !window.Recharts || !window.MScreenLanding || !window.MScreenPublicarPedido || !window.MScreenPremium || !window.IOSDevice) {
+    return setTimeout(mount, 50);
+  }
+  ReactDOM.createRoot(document.getElementById('root')).render(<PrintApp />);
+
+  // Auto-print once fonts + JSX are ready
+  const tryPrint = async () => {
+    try { await document.fonts.ready; } catch (e) {}
+    setTimeout(() => window.print(), 700);
+  };
+  setTimeout(tryPrint, 1200);
+}
+mount();
+</script>
+</body>
+</html>

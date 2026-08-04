@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>ServiGT Mobile — App de servicios en Guatemala</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<style>
+  html, body { margin: 0; background: #f0eee9; font-family: Inter, system-ui, sans-serif; }
+  body { min-height: 100vh; }
+  *, *::before, *::after { box-sizing: border-box; }
+  /* hide scrollbars inside scroll regions */
+  [data-sgt-frame] *::-webkit-scrollbar { display: none; }
+</style>
+
+<template id="__bundler_thumbnail">
+<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+  <defs><linearGradient id="g" x1="0" x2="1" y1="0" y2="1"><stop offset="0" stop-color="#0b3d91"/><stop offset="1" stop-color="#4ea8ff"/></linearGradient></defs>
+  <rect width="200" height="200" rx="40" fill="url(#g)"/>
+  <text x="100" y="118" text-anchor="middle" font-family="Inter,sans-serif" font-weight="800" font-size="48" fill="#fff">SGT</text>
+</svg>
+</template>
+</head>
+<body>
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js"></script>
+<script src="https://unpkg.com/prop-types@15.8.1/prop-types.min.js"></script>
+<script src="https://unpkg.com/recharts@2.12.7/umd/Recharts.js"></script>
+
+<!-- Shared modules -->
+<script type="text/babel" src="data.jsx"></script>
+<script type="text/babel" src="ui.jsx"></script>
+<script type="text/babel" src="design-canvas.jsx"></script>
+<script type="text/babel" src="tweaks-panel.jsx"></script>
+<script type="text/babel" src="ios-frame.jsx"></script>
+<script type="text/babel" src="mobile-ui.jsx"></script>
+
+<!-- Mobile screens -->
+<script type="text/babel" src="m-screens-1-public.jsx"></script>
+<script type="text/babel" src="m-screens-2-client.jsx"></script>
+<script type="text/babel" src="m-screens-3-rest.jsx"></script>
+<script type="text/babel" src="m-screens-4-marketplace.jsx"></script>
+<script type="text/babel" src="m-screens-5-monetizacion.jsx"></script>
+
+<script type="text/babel">
+const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+  "primaryColor": "#4589d4",
+  "primaryDark": "#1b5499",
+  "skyAccent": "#7db2e4",
+  "dark": false,
+  "fontScale": 1,
+  "showFrames": true
+}/*EDITMODE-END*/;
+
+function MobileApp() {
+  const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
+  const dark = t.dark;
+
+  React.useEffect(() => {
+    SGT.blue = t.primaryColor;
+    SGT.blueDark = t.primaryDark;
+    SGT.sky = t.skyAccent;
+    let s = document.getElementById('sgt-tweak-vars');
+    if (!s) { s = document.createElement('style'); s.id = 'sgt-tweak-vars'; document.head.appendChild(s); }
+    s.textContent = `:root { --sgt-primary: ${t.primaryColor}; --sgt-primary-dark: ${t.primaryDark}; --sgt-sky: ${t.skyAccent}; }
+                    .sgt-grad { background: linear-gradient(135deg, ${t.primaryDark} 0%, ${t.primaryColor} 50%, ${t.skyAccent} 100%) !important; }`;
+  }, [t.primaryColor, t.primaryDark, t.skyAccent]);
+
+  // Mobile-screen artboard wrapper
+  const Phone = ({ children, sLabel }) => {
+    const themeVars = applySgtTheme(dark);
+    const inner = (
+      <div data-screen-label={sLabel} className={dark ? 'sgt-dark' : ''}
+           style={{ width: '100%', height: '100%', ...themeVars, fontSize: `${14 * t.fontScale}px` }}>
+        {children}
+      </div>
+    );
+    if (!t.showFrames) {
+      return (
+        <div style={{
+          width: 390, height: 844, borderRadius: 32, overflow: 'hidden',
+          boxShadow: '0 20px 50px rgba(0,0,0,.12), 0 0 0 1px rgba(0,0,0,.08)',
+          background: dark ? '#000' : '#fff',
+        }}>{inner}</div>
+      );
+    }
+    return (
+      <IOSDevice width={390} height={844} dark={dark}>
+        {inner}
+      </IOSDevice>
+    );
+  };
+
+  // Two artboard sizes (frame on/off): include device chrome margin
+  const W = t.showFrames ? 430 : 410;
+  const H = t.showFrames ? 880 : 864;
+
+  return (
+    <>
+      <DesignCanvas>
+        <DCSection id="public" title="01 · Público" subtitle="Onboarding y autenticación">
+          <DCArtboard id="m-landing"  label="01 · Landing"             width={W} height={H}>
+            <Phone sLabel="01 Landing"><MScreenLanding /></Phone>
+          </DCArtboard>
+          <DCArtboard id="m-login"    label="02 · Login"               width={W} height={H}>
+            <Phone sLabel="02 Login"><MScreenLogin /></Phone>
+          </DCArtboard>
+          <DCArtboard id="m-register" label="03 · Registro"            width={W} height={H}>
+            <Phone sLabel="03 Registro"><MScreenRegister /></Phone>
+          </DCArtboard>
+          <DCArtboard id="m-recover"  label="04 · Recuperar contraseña" width={W} height={H}>
+            <Phone sLabel="04 Recuperar"><MScreenRecover /></Phone>
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection id="client" title="02 · Cliente" subtitle="Catálogo, perfil, solicitud, gestión">
+          <DCArtboard id="m-home"     label="05 · Home cliente"        width={W} height={H}>
+            <Phone sLabel="05 Home cliente"><MScreenHomeCliente /></Phone>
+          </DCArtboard>
+          <DCArtboard id="m-detail"   label="06 · Detalle proveedor"   width={W} height={H}>
+            <Phone sLabel="06 Detalle proveedor"><MScreenProviderDetail /></Phone>
+          </DCArtboard>
+          <DCArtboard id="m-soli"     label="07 · Nueva solicitud"     width={W} height={H}>
+            <Phone sLabel="07 Solicitud"><MScreenSolicitud /></Phone>
+          </DCArtboard>
+          <DCArtboard id="m-mis"      label="08 · Mis pedidos"         width={W} height={H}>
+            <Phone sLabel="08 Mis pedidos"><MScreenMisSolicitudes /></Phone>
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection id="provider" title="03 · Proveedor" subtitle="Dashboard y edición de perfil">
+          <DCArtboard id="m-pdash"    label="09 · Dashboard proveedor" width={W} height={H}>
+            <Phone sLabel="09 Provider dashboard"><MScreenProviderDashboard /></Phone>
+          </DCArtboard>
+          <DCArtboard id="m-pedit"    label="10 · Editar perfil"       width={W} height={H}>
+            <Phone sLabel="10 Editar perfil"><MScreenEditProfile /></Phone>
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection id="comm" title="04 · Comunicación" subtitle="Chat y notificaciones">
+          <DCArtboard id="m-chat"     label="11 · Chat"                width={W} height={H}>
+            <Phone sLabel="11 Chat"><MScreenChat /></Phone>
+          </DCArtboard>
+          <DCArtboard id="m-notif"    label="12 · Notificaciones"      width={W} height={H}>
+            <Phone sLabel="12 Notificaciones"><MScreenNotificaciones /></Phone>
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection id="admin" title="05 · Admin" subtitle="Panel de administración">
+          <DCArtboard id="m-admin"    label="13 · Admin dashboard"     width={W} height={H}>
+            <Phone sLabel="13 Admin"><MScreenAdmin /></Phone>
+          </DCArtboard>
+        </DCSection>
+        <DCSection id="marketplace" title="06 · Marketplace de demanda" subtitle="Pedidos, cotizaciones y créditos">
+          <DCArtboard id="m-publicar"  label="14 · Publicar pedido"        width={W} height={H}>
+            <Phone sLabel="14 Publicar pedido"><MScreenPublicarPedido /></Phone>
+          </DCArtboard>
+          <DCArtboard id="m-mis-ped"   label="15 · Mis pedidos / servicios" width={W} height={H}>
+            <Phone sLabel="15 Mis pedidos"><MScreenMisPedidos /></Phone>
+          </DCArtboard>
+          <DCArtboard id="m-det-ped"   label="16 · Detalle + cotizaciones"  width={W} height={H}>
+            <Phone sLabel="16 Detalle pedido"><MScreenDetallePedido /></Phone>
+          </DCArtboard>
+          <DCArtboard id="m-oport"     label="17 · Oportunidades"          width={W} height={H}>
+            <Phone sLabel="17 Oportunidades"><MScreenOportunidades /></Phone>
+          </DCArtboard>
+          <DCArtboard id="m-cotizar"   label="18 · Enviar cotización"      width={W} height={H}>
+            <Phone sLabel="18 Enviar cotización"><MScreenEnviarCotizacion /></Phone>
+          </DCArtboard>
+          <DCArtboard id="m-creditos"  label="19 · Créditos"               width={W} height={H}>
+            <Phone sLabel="19 Créditos"><MScreenCreditos /></Phone>
+          </DCArtboard>
+          <DCArtboard id="m-adm-rec"   label="20 · Admin · Recargas"        width={W} height={H}>
+            <Phone sLabel="20 Admin recargas"><MScreenAdminRecargas /></Phone>
+          </DCArtboard>
+        </DCSection>
+        <DCSection id="monetizacion" title="07 · Monetización" subtitle="Compra de créditos y Premium">
+          <DCArtboard id="m-checkout" label="21 · Checkout (bottom sheet)" width={W} height={H}>
+            <Phone sLabel="21 Checkout"><MScreenCheckout /></Phone>
+          </DCArtboard>
+          <DCArtboard id="m-checkout-ok" label="21b · Checkout — completada" width={W} height={H}>
+            <Phone sLabel="21b Checkout completada"><MScreenCheckout initial="completada" /></Phone>
+          </DCArtboard>
+          <DCArtboard id="m-prem-nuevo" label="22 · Premium — nunca activado" width={W} height={H}>
+            <Phone sLabel="22 Premium propuesta"><MScreenPremium estado="nunca" /></Phone>
+          </DCArtboard>
+          <DCArtboard id="m-prem-activo" label="23 · Premium — activo" width={W} height={H}>
+            <Phone sLabel="23 Premium activo"><MScreenPremium estado="activo" /></Phone>
+          </DCArtboard>
+          <DCArtboard id="m-prem-vencido" label="24 · Premium — vencido" width={W} height={H}>
+            <Phone sLabel="24 Premium vencido"><MScreenPremium estado="vencido" /></Phone>
+          </DCArtboard>
+        </DCSection>
+      </DesignCanvas>
+
+      <TweaksPanel>
+        <TweakSection label="Marca" />
+        <TweakColor label="Azul primario" value={t.primaryColor} onChange={v => setTweak('primaryColor', v)} />
+        <TweakColor label="Azul oscuro"   value={t.primaryDark}  onChange={v => setTweak('primaryDark', v)} />
+        <TweakColor label="Celeste"       value={t.skyAccent}    onChange={v => setTweak('skyAccent', v)} />
+
+        <TweakSection label="Apariencia" />
+        <TweakToggle label="Modo oscuro" value={t.dark} onChange={v => setTweak('dark', v)} />
+        <TweakToggle label="Marcos iPhone" value={t.showFrames} onChange={v => setTweak('showFrames', v)} />
+        <TweakSlider label="Escala texto" value={t.fontScale} min={0.85} max={1.2} step={0.05}
+                     onChange={v => setTweak('fontScale', v)} unit="x" />
+      </TweaksPanel>
+    </>
+  );
+}
+
+function mount() {
+  if (!window.lucide || !window.Recharts || !window.MScreenLanding || !window.MScreenPublicarPedido || !window.MScreenPremium || !window.IOSDevice ||
+      !window.DesignCanvas || !window.useTweaks) {
+    return setTimeout(mount, 50);
+  }
+  ReactDOM.createRoot(document.getElementById('root')).render(<MobileApp />);
+}
+mount();
+</script>
+</body>
+</html>

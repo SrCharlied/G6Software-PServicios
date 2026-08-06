@@ -4,7 +4,7 @@ import InternalLayout from '../../src/components/InternalLayout';
 export default function HomeRoute() {
   return (
     <InternalLayout>
-      <HomeScreen />
+      <HomeScreen useLayoutNavigation />
     </InternalLayout>
   );
 }

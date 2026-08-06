@@ -86,7 +86,7 @@ function ProviderCard({ prov, onPress }) {
   );
 }
 
-export default function HomeScreen() {
+export default function HomeScreen({ useLayoutNavigation = false } = {}) {
   const router = useRouter();
   const { setSelectedProvider, user } = useSession();
   const { width } = useWindowDimensions();
@@ -201,7 +201,9 @@ export default function HomeScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar style="dark" />
-      <TopBar onMenuPress={() => setDrawerOpen(true)} showBell={!sidebarVisible} />
+      {!useLayoutNavigation ? (
+        <TopBar onMenuPress={() => setDrawerOpen(true)} showBell={!sidebarVisible} />
+      ) : null}
       <FlatList
         data={loading ? [] : filteredProviders}
         keyExtractor={(item) => String(item.id)}
@@ -220,7 +222,9 @@ export default function HomeScreen() {
         maxToRenderPerBatch={10}
         windowSize={5}
       />
-      <Drawer isOpen={drawerOpen} onClose={() => setDrawerOpen(false)} />
+      {!useLayoutNavigation ? (
+        <Drawer isOpen={drawerOpen} onClose={() => setDrawerOpen(false)} />
+      ) : null}
     </SafeAreaView>
   );
 }

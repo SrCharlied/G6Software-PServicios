@@ -1,16 +1,11 @@
 import { useState } from 'react';
-import {
-  ActivityIndicator,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Feather } from '@expo/vector-icons';
 import { createServicio } from '../services/api';
 import { useToast } from '../context/ToastContext';
 import { validateRequired, validateNumeric, validateDate } from '../utils/validation';
+import { T } from '../theme';
+import { Button, Card, Input } from '../components/ui';
 
 export default function SolicitudFormScreen({
   navigation,
@@ -31,9 +26,9 @@ export default function SolicitudFormScreen({
     return (
       <View style={styles.emptyContainer}>
         <Text style={styles.emptyText}>No se encontro el proveedor para esta solicitud.</Text>
-        <TouchableOpacity style={styles.backHomeBtn} onPress={() => navigation.navigate('Home')}>
-          <Text style={styles.backHomeBtnText}>Volver al listado</Text>
-        </TouchableOpacity>
+        <Button kind="primary" onPress={() => navigation.navigate('Home')}>
+          Volver al listado
+        </Button>
       </View>
     );
   }
@@ -76,147 +71,101 @@ export default function SolicitudFormScreen({
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <TouchableOpacity
-        style={styles.backRow}
-        onPress={() => navigation.navigate('ProviderDetail', { provider: selectedProvider })}
-      >
-        <Text style={styles.backText}>← Volver al perfil</Text>
-      </TouchableOpacity>
-
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>Solicitar servicio</Text>
-        <Text style={styles.cardSubtitle}>
-          Enviando solicitud a:{' '}
-          <Text style={styles.provName}>{selectedProvider?.nombre}</Text>
-        </Text>
-
-        <Text style={styles.label}>Descripcion del servicio *</Text>
-        <TextInput
-          style={[styles.input, styles.textArea, errors.descripcion && styles.inputError]}
-          placeholder="Describe detalladamente lo que necesitas..."
-          value={descripcion}
-          onChangeText={(v) => { setDescripcion(v); clearError('descripcion'); }}
-          multiline
-          numberOfLines={5}
-        />
-        {errors.descripcion ? <Text style={styles.fieldError}>{errors.descripcion}</Text> : null}
-
-        <Text style={styles.label}>Direccion (donde se realizara)</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="Ej: Zona 10, Guatemala Ciudad"
-          value={direccion}
-          onChangeText={setDireccion}
-        />
-
-        <Text style={styles.label}>Fecha y hora deseada (YYYY-MM-DD HH:MM)</Text>
-        <TextInput
-          style={[styles.input, errors.fecha && styles.inputError]}
-          placeholder="Ej: 2026-05-10 09:00"
-          value={fecha}
-          onChangeText={(v) => { setFecha(v); clearError('fecha'); }}
-        />
-        {errors.fecha ? <Text style={styles.fieldError}>{errors.fecha}</Text> : null}
-
-        <Text style={styles.label}>Monto acordado (Q)</Text>
-        <TextInput
-          style={[styles.input, errors.monto && styles.inputError]}
-          placeholder="Opcional - monto en quetzales"
-          value={monto}
-          onChangeText={(v) => { setMonto(v); clearError('monto'); }}
-          keyboardType="decimal-pad"
-        />
-        {errors.monto ? <Text style={styles.fieldError}>{errors.monto}</Text> : null}
-
+      <View style={styles.formWrap}>
         <TouchableOpacity
-          style={[styles.submitBtn, submitting && styles.submitBtnDisabled]}
-          onPress={handleSubmit}
-          disabled={submitting}
-        >
-          {submitting ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={styles.submitBtnText}>Enviar solicitud</Text>
-          )}
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.cancelBtn}
+          style={styles.backRow}
           onPress={() => navigation.navigate('ProviderDetail', { provider: selectedProvider })}
         >
-          <Text style={styles.cancelBtnText}>Cancelar</Text>
+          <Feather name="arrow-left" size={15} color={T.blue} />
+          <Text style={styles.backText}>Volver al perfil</Text>
         </TouchableOpacity>
+
+        <Card style={styles.card}>
+          <Text style={styles.cardTitle}>Solicitar servicio</Text>
+          <Text style={styles.cardSubtitle}>
+            Enviando solicitud a:{' '}
+            <Text style={styles.provName}>{selectedProvider?.nombre}</Text>
+          </Text>
+
+          <Text style={styles.label}>Descripcion del servicio *</Text>
+          <Input
+            placeholder="Describe detalladamente lo que necesitas..."
+            value={descripcion}
+            onChangeText={(v) => { setDescripcion(v); clearError('descripcion'); }}
+            multiline
+            numberOfLines={5}
+            error={errors.descripcion}
+            style={styles.field}
+          />
+
+          <Text style={styles.label}>Direccion (donde se realizara)</Text>
+          <Input
+            icon="map-pin"
+            placeholder="Ej: Zona 10, Guatemala Ciudad"
+            value={direccion}
+            onChangeText={setDireccion}
+            style={styles.field}
+          />
+
+          <Text style={styles.label}>Fecha y hora deseada (YYYY-MM-DD HH:MM)</Text>
+          <Input
+            icon="calendar"
+            placeholder="Ej: 2026-05-10 09:00"
+            value={fecha}
+            onChangeText={(v) => { setFecha(v); clearError('fecha'); }}
+            error={errors.fecha}
+            style={styles.field}
+          />
+
+          <Text style={styles.label}>Monto acordado (Q)</Text>
+          <Input
+            icon="dollar-sign"
+            placeholder="Opcional - monto en quetzales"
+            value={monto}
+            onChangeText={(v) => { setMonto(v); clearError('monto'); }}
+            keyboardType="decimal-pad"
+            error={errors.monto}
+            style={styles.field}
+          />
+
+          <Button kind="primary" full loading={submitting} onPress={handleSubmit} style={{ marginTop: 8 }}>
+            Enviar solicitud
+          </Button>
+
+          <TouchableOpacity
+            style={styles.cancelBtn}
+            onPress={() => navigation.navigate('ProviderDetail', { provider: selectedProvider })}
+          >
+            <Text style={styles.cancelBtnText}>Cancelar</Text>
+          </TouchableOpacity>
+        </Card>
       </View>
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f0eee9' },
+  container: { flex: 1, backgroundColor: T.canvas },
   content: { padding: 16, paddingBottom: 40 },
-  emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
-  emptyText: { fontSize: 15, color: '#667085', textAlign: 'center', marginBottom: 16 },
-  backHomeBtn: {
-    backgroundColor: '#4589d4',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 8,
-  },
-  backHomeBtnText: { color: '#fff', fontWeight: '700', fontSize: 14 },
+  // Formulario centrado y con ancho maximo propio: InternalLayout ya limita
+  // el area de contenido a 1120px, pero un formulario de una columna se ve
+  // mejor angosto en vez de estirado a ese ancho completo.
+  formWrap: { width: '100%', maxWidth: 560, alignSelf: 'center' },
 
-  backRow: { marginBottom: 14 },
-  backText: { color: '#4589d4', fontSize: 15, fontWeight: '600' },
+  emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24, gap: 14 },
+  emptyText: { fontSize: 15, color: T.muted, textAlign: 'center' },
 
-  card: {
-    backgroundColor: '#f6f4ee',
-    borderRadius: 12,
-    padding: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 3,
-    elevation: 2,
-  },
-  cardTitle: { fontSize: 20, fontWeight: '800', color: '#333', marginBottom: 6 },
-  cardSubtitle: { fontSize: 14, color: '#666', marginBottom: 20 },
-  provName: { fontWeight: '700', color: '#4589d4' },
+  backRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 14 },
+  backText: { color: T.blue, fontSize: 15, fontWeight: '600' },
 
-  label: {
-    fontSize: 13, fontWeight: '600', color: '#444',
-    marginBottom: 6, marginTop: 4,
-  },
-  input: {
-    backgroundColor: '#f7f9fc',
-    borderWidth: 1,
-    borderColor: '#d9e2ef',
-    borderRadius: 8,
-    padding: 13,
-    fontSize: 15,
-    marginBottom: 4,
-    color: '#333',
-  },
-  inputError: {
-    borderColor: '#c0392b',
-    backgroundColor: '#fff5f5',
-  },
-  fieldError: {
-    fontSize: 12,
-    color: '#c0392b',
-    marginBottom: 10,
-    marginLeft: 2,
-  },
-  textArea: { height: 120, textAlignVertical: 'top' },
+  card: { padding: 20 },
+  cardTitle: { fontSize: 20, fontWeight: '800', color: T.text, marginBottom: 6 },
+  cardSubtitle: { fontSize: 14, color: T.muted, marginBottom: 20 },
+  provName: { fontWeight: '700', color: T.blue },
 
-  submitBtn: {
-    backgroundColor: '#4589d4',
-    padding: 16,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginTop: 8,
-  },
-  submitBtnDisabled: { opacity: 0.6 },
-  submitBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  label: { fontSize: 13, fontWeight: '600', color: T.text, marginBottom: 6, marginTop: 4 },
+  field: { marginBottom: 10 },
 
   cancelBtn: { padding: 14, alignItems: 'center', marginTop: 4 },
-  cancelBtnText: { color: '#999', fontSize: 15 },
+  cancelBtnText: { color: T.faint, fontSize: 15 },
 });

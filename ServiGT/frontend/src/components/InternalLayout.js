@@ -1,5 +1,6 @@
+import { useState } from 'react';
 import { usePathname, useRouter } from 'expo-router';
-import { StyleSheet, Text, TouchableOpacity, useWindowDimensions, View } from 'react-native';
+import { Pressable, SafeAreaView, StyleSheet, Text, TouchableOpacity, useWindowDimensions, View } from 'react-native';
 import NotificationBell from './NotificationBell';
 import { useSession } from '../context/SessionContext';
 import { T } from '../theme';
@@ -65,24 +66,98 @@ function SidebarItem({ label, path, active }) {
   );
 }
 
+function MobileNavItem({ label, path, active, onNavigate }) {
+  return (
+    <TouchableOpacity
+      style={[styles.mobileNavItem, active && styles.mobileNavItemActive]}
+      onPress={() => onNavigate(path)}
+      activeOpacity={0.75}
+      accessibilityRole="link"
+      accessibilityState={{ selected: active }}
+    >
+      <Text style={[styles.mobileNavLabel, active && styles.mobileNavLabelActive]}>{label}</Text>
+    </TouchableOpacity>
+  );
+}
+
 export default function InternalLayout({ children, section }) {
   const router = useRouter();
   const pathname = usePathname();
   const { user, signOut } = useSession();
   const { width } = useWindowDimensions();
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const role = section ?? user?.role ?? 'cliente';
   const items = NAV_BY_ROLE[role] ?? NAV_BY_ROLE.cliente;
   const activePath = resolveActivePath(items, pathname ?? '');
 
-  if (width < DESKTOP_MIN_WIDTH) {
-    return children;
-  }
-
   const handleLogout = async () => {
+    setMobileMenuOpen(false);
     await signOut();
     router.replace('/home');
   };
+
+  const handleNavigate = (path) => {
+    setMobileMenuOpen(false);
+    router.push(path);
+  };
+
+  if (width < DESKTOP_MIN_WIDTH) {
+    return (
+      <SafeAreaView style={styles.mobileShell}>
+        <View style={styles.mobileHeader}>
+          <TouchableOpacity
+            style={styles.mobileMenuBtn}
+            onPress={() => setMobileMenuOpen((open) => !open)}
+            activeOpacity={0.75}
+            accessibilityRole="button"
+            accessibilityLabel="Abrir menu"
+          >
+            <View style={styles.mobileMenuLine} />
+            <View style={styles.mobileMenuLine} />
+            <View style={styles.mobileMenuLine} />
+          </TouchableOpacity>
+
+          <View style={styles.mobileTitleBox}>
+            <Text style={styles.mobileBrand}>ServiGT</Text>
+            <Text style={styles.mobileRole}>{ROLE_LABEL[role] ?? 'Cliente'}</Text>
+          </View>
+
+          <NotificationBell />
+        </View>
+
+        {mobileMenuOpen ? (
+          <View style={styles.mobileMenuWrap}>
+            <Pressable style={styles.mobileMenuBackdrop} onPress={() => setMobileMenuOpen(false)} />
+            <View style={styles.mobileMenu}>
+              <Text style={styles.mobileUserName} numberOfLines={1}>{user?.name || 'Usuario'}</Text>
+              <Text style={styles.mobileUserMeta} numberOfLines={1}>{user?.email || ''}</Text>
+
+              <View style={styles.mobileNav}>
+                {items.map((item) => (
+                  <MobileNavItem
+                    key={item.path}
+                    label={item.label}
+                    path={item.path}
+                    active={activePath === item.path}
+                    onNavigate={handleNavigate}
+                  />
+                ))}
+              </View>
+
+              <TouchableOpacity style={styles.mobileLogoutBtn} onPress={handleLogout} activeOpacity={0.75}>
+                <Text style={styles.mobileLogoutText}>Cerrar sesion</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        ) : null}
+
+        <View style={styles.mobileContent}>
+          {children}
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <View style={styles.shell}>
@@ -119,13 +194,122 @@ export default function InternalLayout({ children, section }) {
       </View>
 
       <View style={styles.content}>
-        {children}
+        <View style={[styles.contentFrame, width < 1200 && styles.contentFrameCompact]}>
+          {children}
+        </View>
       </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  mobileShell: {
+    flex: 1,
+    backgroundColor: T.canvas,
+  },
+  mobileHeader: {
+    minHeight: 56,
+    backgroundColor: T.paper,
+    borderBottomWidth: 1,
+    borderBottomColor: T.border,
+    paddingHorizontal: T.s3,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: T.s3,
+    zIndex: 30,
+  },
+  mobileMenuBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: T.rSm,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+  },
+  mobileMenuLine: {
+    width: 19,
+    height: 2,
+    borderRadius: 2,
+    backgroundColor: T.ink,
+  },
+  mobileTitleBox: {
+    flex: 1,
+    minWidth: 0,
+  },
+  mobileBrand: {
+    color: T.ink,
+    fontSize: 16,
+    fontWeight: '800',
+  },
+  mobileRole: {
+    color: T.muted,
+    fontSize: 11,
+    marginTop: 1,
+  },
+  mobileMenuWrap: {
+    ...StyleSheet.absoluteFillObject,
+    top: 56,
+    zIndex: 20,
+  },
+  mobileMenuBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(14,20,36,0.28)',
+  },
+  mobileMenu: {
+    width: '82%',
+    maxWidth: 320,
+    backgroundColor: T.paper,
+    borderRightWidth: 1,
+    borderRightColor: T.border,
+    padding: T.s4,
+    gap: T.s3,
+    ...T.sh3,
+  },
+  mobileUserName: {
+    color: T.ink,
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  mobileUserMeta: {
+    color: T.muted,
+    fontSize: 12,
+    marginTop: -8,
+  },
+  mobileNav: {
+    gap: T.s1,
+  },
+  mobileNavItem: {
+    paddingVertical: 12,
+    paddingHorizontal: T.s3,
+    borderRadius: T.rSm,
+  },
+  mobileNavItemActive: {
+    backgroundColor: 'rgba(69,137,212,0.22)',
+  },
+  mobileNavLabel: {
+    color: T.ink,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  mobileNavLabelActive: {
+    color: T.blue,
+    fontWeight: '800',
+  },
+  mobileLogoutBtn: {
+    borderTopWidth: 1,
+    borderTopColor: T.border,
+    paddingTop: T.s3,
+    marginTop: T.s1,
+  },
+  mobileLogoutText: {
+    color: T.danger,
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  mobileContent: {
+    flex: 1,
+    minWidth: 0,
+  },
   shell: {
     flex: 1,
     flexDirection: 'row',
@@ -224,5 +408,16 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     minWidth: 0,
+    alignItems: 'center',
+  },
+  contentFrame: {
+    flex: 1,
+    width: '100%',
+    maxWidth: 1120,
+    paddingHorizontal: T.s5,
+    paddingVertical: T.s4,
+  },
+  contentFrameCompact: {
+    paddingHorizontal: T.s3,
   },
 });

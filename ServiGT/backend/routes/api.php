@@ -12,6 +12,7 @@ use App\Http\Controllers\DisponibilidadController;
 use App\Http\Controllers\CalificacionController;
 use App\Http\Controllers\NotificacionController;
 use App\Http\Controllers\CotizacionController;
+use App\Http\Controllers\CreditoController;
 use App\Http\Controllers\PedidoController;
 
 /*
@@ -110,6 +111,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/pedidos/{pedidoId}/cotizaciones',                       [CotizacionController::class, 'store'])->where('pedidoId', '[0-9]+');
     Route::put('/pedidos/{pedidoId}/cotizaciones/{cotizacionId}',         [CotizacionController::class, 'update'])->where(['pedidoId' => '[0-9]+', 'cotizacionId' => '[0-9]+']);
     Route::post('/pedidos/{pedidoId}/cotizaciones/{cotizacionId}/aceptar', [CotizacionController::class, 'aceptar'])->where(['pedidoId' => '[0-9]+', 'cotizacionId' => '[0-9]+']);
+
+    // ── Creditos del proveedor ───────────────────────────────────────────────
+    // Saldo del proveedor autenticado. Se consume desde el modal de cotizacion.
+    Route::get('/mi-credito', [CreditoController::class, 'mio']);
 
     // ── Notificaciones ───────────────────────────────────────────────────────
     Route::get('/notificaciones',                [NotificacionController::class, 'index']);

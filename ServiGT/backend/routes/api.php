@@ -14,6 +14,7 @@ use App\Http\Controllers\NotificacionController;
 use App\Http\Controllers\CotizacionController;
 use App\Http\Controllers\CreditoController;
 use App\Http\Controllers\PedidoController;
+use App\Http\Controllers\PremiumController;
 
 /*
 |--------------------------------------------------------------------------
@@ -115,6 +116,16 @@ Route::middleware('auth:sanctum')->group(function () {
     // ── Creditos del proveedor ───────────────────────────────────────────────
     // Saldo del proveedor autenticado. Se consume desde el modal de cotizacion.
     Route::get('/mi-credito', [CreditoController::class, 'mio']);
+    // Catalogo de paquetes comprables
+    Route::get('/creditos/paquetes', [CreditoController::class, 'paquetes']);
+    // Compra simulada e inmediata de un paquete
+    Route::post('/creditos/comprar', [CreditoController::class, 'comprar']);
+    // Historial paginado de movimientos de creditos
+    Route::get('/creditos/transacciones', [CreditoController::class, 'transacciones']);
+
+    // ── Premium del proveedor ────────────────────────────────────────────────
+    Route::post('/premium/activar',  [PremiumController::class, 'activar']);
+    Route::get('/premium/mi-estado', [PremiumController::class, 'miEstado']);
 
     // ── Notificaciones ───────────────────────────────────────────────────────
     Route::get('/notificaciones',                [NotificacionController::class, 'index']);

@@ -9,14 +9,23 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { useRouter } from 'expo-router';
 import { useSession } from '../context/SessionContext';
-import { getNotificaciones, getUnreadNotificationsCount, loadStoredSession, marcarTodasLeidas } from '../services/api';
+import {
+  getNotificaciones,
+  getUnreadNotificationsCount,
+  loadStoredSession,
+  marcarNotificacionLeida,
+  marcarTodasLeidas,
+} from '../services/api';
+import { destinoNotificacion } from '../utils/notificationRoutes';
 import { T } from '../theme';
 
 // `tone` es el color de la tinta del icono, misma convencion que ServiGTLogo:
 // 'dark' para superficies claras (default), 'light' para superficies oscuras
 // como el sidebar de InternalLayout.
 export default function NotificationBell({ onPress, tone = 'dark' }) {
+  const router = useRouter();
   const { user, sessionLoading } = useSession();
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -24,6 +33,7 @@ export default function NotificationBell({ onPress, tone = 'dark' }) {
   const [notifications, setNotifications] = useState([]);
   const [listLoading, setListLoading] = useState(false);
   const [listError, setListError] = useState('');
+  const [itemError, setItemError] = useState('');
   const [markingAll, setMarkingAll] = useState(false);
 
   useEffect(() => {
@@ -57,6 +67,7 @@ export default function NotificationBell({ onPress, tone = 'dark' }) {
   const loadNotifications = async () => {
     setListLoading(true);
     setListError('');
+    setItemError('');
 
     if (!user || !loadStoredSession()) {
       setNotifications([]);
@@ -83,9 +94,40 @@ export default function NotificationBell({ onPress, tone = 'dark' }) {
     loadNotifications();
   };
 
+  // Toque sobre una notificacion: se marca leida y se navega a su destino.
+  // El marcado es optimista para que la lista responda de inmediato, y se
+  // revierte si el backend falla: el badge no puede quedar mintiendo.
+  const handleNotificationPress = (item) => {
+    setItemError('');
+
+    if (!item.leida) {
+      setNotifications((items) =>
+        items.map((n) => (n.id === item.id ? { ...n, leida: true } : n)),
+      );
+      setUnreadCount((count) => Math.max(0, count - 1));
+
+      marcarNotificacionLeida(item.id).catch((error) => {
+        setNotifications((items) =>
+          items.map((n) => (n.id === item.id ? { ...n, leida: false } : n)),
+        );
+        setUnreadCount((count) => count + 1);
+        setItemError(error.message);
+      });
+    }
+
+    // Sin destino conocido no se navega: el panel queda abierto para que se
+    // vea el cambio a leida.
+    const destino = destinoNotificacion(item);
+    if (destino) {
+      setOpen(false);
+      router.push(destino);
+    }
+  };
+
   const handleMarkAllRead = async () => {
     setMarkingAll(true);
     setListError('');
+    setItemError('');
     try {
       await marcarTodasLeidas();
       setUnreadCount(0);
@@ -159,6 +201,12 @@ export default function NotificationBell({ onPress, tone = 'dark' }) {
               </View>
             </View>
 
+            {itemError ? (
+              <View style={styles.itemErrorBar}>
+                <Text style={styles.itemErrorText}>{itemError}</Text>
+              </View>
+            ) : null}
+
             {listLoading && notifications.length === 0 ? (
               <View style={styles.stateBox}>
                 <ActivityIndicator color={T.blue} />
@@ -175,23 +223,33 @@ export default function NotificationBell({ onPress, tone = 'dark' }) {
               </View>
             ) : (
               <ScrollView style={styles.list} contentContainerStyle={styles.listContent}>
-                {notifications.map((item) => (
-                  <View
-                    key={item.id}
-                    style={[styles.notificationItem, !item.leida && styles.notificationUnread]}
-                  >
-                    <View style={styles.notificationTop}>
-                      <Text style={styles.notificationTitle} numberOfLines={1}>
-                        {item.titulo || 'Notificacion'}
+                {notifications.map((item) => {
+                  const navegable = destinoNotificacion(item) !== null;
+
+                  return (
+                    <TouchableOpacity
+                      key={item.id}
+                      style={[styles.notificationItem, !item.leida && styles.notificationUnread]}
+                      onPress={() => handleNotificationPress(item)}
+                      activeOpacity={0.65}
+                      accessibilityRole="button"
+                      accessibilityLabel={item.titulo || 'Notificacion'}
+                    >
+                      <View style={styles.notificationTop}>
+                        <Text style={styles.notificationTitle} numberOfLines={1}>
+                          {item.titulo || 'Notificacion'}
+                        </Text>
+                        {!item.leida ? <View style={styles.unreadDot} /> : null}
+                        {/* La flecha solo aparece si el tipo tiene destino */}
+                        {navegable ? <Text style={styles.chevron}>›</Text> : null}
+                      </View>
+                      <Text style={styles.notificationMessage} numberOfLines={3}>
+                        {item.mensaje || ''}
                       </Text>
-                      {!item.leida ? <View style={styles.unreadDot} /> : null}
-                    </View>
-                    <Text style={styles.notificationMessage} numberOfLines={3}>
-                      {item.mensaje || ''}
-                    </Text>
-                    <Text style={styles.notificationDate}>{formatDate(item.created_at)}</Text>
-                  </View>
-                ))}
+                      <Text style={styles.notificationDate}>{formatDate(item.created_at)}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
               </ScrollView>
             )}
           </Pressable>
@@ -378,6 +436,24 @@ const styles = StyleSheet.create({
     height: 8,
     borderRadius: 4,
     backgroundColor: T.blue,
+  },
+  chevron: {
+    fontSize: 20,
+    lineHeight: 20,
+    fontWeight: '700',
+    color: T.faint,
+  },
+  itemErrorBar: {
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    backgroundColor: '#fef2f2',
+    borderBottomWidth: 1,
+    borderBottomColor: '#fecaca',
+  },
+  itemErrorText: {
+    fontSize: 12,
+    color: '#991b1b',
+    lineHeight: 17,
   },
   notificationMessage: {
     marginTop: 5,

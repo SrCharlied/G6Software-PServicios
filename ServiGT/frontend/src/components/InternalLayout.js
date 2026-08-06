@@ -119,7 +119,9 @@ export default function InternalLayout({ children, section }) {
       </View>
 
       <View style={styles.content}>
-        {children}
+        <View style={[styles.contentFrame, width < 1200 && styles.contentFrameCompact]}>
+          {children}
+        </View>
       </View>
     </View>
   );
@@ -224,5 +226,16 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     minWidth: 0,
+    alignItems: 'center',
+  },
+  contentFrame: {
+    flex: 1,
+    width: '100%',
+    maxWidth: 1120,
+    paddingHorizontal: T.s5,
+    paddingVertical: T.s4,
+  },
+  contentFrameCompact: {
+    paddingHorizontal: T.s3,
   },
 });

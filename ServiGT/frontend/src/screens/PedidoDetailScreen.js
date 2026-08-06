@@ -129,6 +129,7 @@ export default function PedidoDetailScreen({ pedidoId, navigation }) {
   const [showModal, setShowModal]       = useState(false);
   const [saldo, setSaldo]               = useState(null);
   const [loadingSaldo, setLoadingSaldo] = useState(false);
+  const [saldoError, setSaldoError]     = useState('');
   const [monto, setMonto]               = useState('');
   const [mensaje, setMensaje]           = useState('');
   const [submitting, setSubmitting]     = useState(false);
@@ -156,17 +157,24 @@ export default function PedidoDetailScreen({ pedidoId, navigation }) {
     }
   };
 
+  // Un fallo al consultar el saldo deja saldo en null y muestra el error real.
+  // Nunca se sustituye por 0: un cero solo puede venir del backend.
+  const cargarSaldo = () => {
+    setLoadingSaldo(true);
+    setSaldoError('');
+    getMiCredito()
+      .then((data) => setSaldo(data.saldo ?? 0))
+      .catch((e) => { setSaldo(null); setSaldoError(e.message); })
+      .finally(() => setLoadingSaldo(false));
+  };
+
   const openModal = () => {
     setMonto(miCotizacion ? String(miCotizacion.monto) : '');
     setMensaje(miCotizacion ? miCotizacion.mensaje : '');
     setSubmitError('');
     setShowModal(true);
     // Siempre obtener saldo actualizado al abrir el modal
-    setLoadingSaldo(true);
-    getMiCredito()
-      .then((data) => setSaldo(data.saldo ?? 0))
-      .catch(() => setSaldo(0))
-      .finally(() => setLoadingSaldo(false));
+    cargarSaldo();
   };
 
   const handleSubmit = async () => {
@@ -425,8 +433,19 @@ export default function PedidoDetailScreen({ pedidoId, navigation }) {
                   <Text style={s.creditBannerIcon}>💳</Text>
                   <Text style={s.creditBannerText}>
                     Costo: 1 crédito{'  ·  '}
-                    Saldo: {loadingSaldo ? '…' : (saldo ?? '—')}
+                    Saldo: {loadingSaldo ? '…' : (saldo ?? 'no disponible')}
                   </Text>
+                </View>
+              )}
+
+              {/* El saldo no se pudo consultar: se muestra el motivo real en
+                  lugar de un cero que el proveedor leeria como "sin creditos" */}
+              {miCotizacion && !loadingSaldo && !!saldoError && (
+                <View style={s.saldoErrorBox}>
+                  <Text style={s.saldoErrorText}>{saldoError}</Text>
+                  <Pressable onPress={cargarSaldo} hitSlop={8}>
+                    <Text style={s.saldoRetry}>Reintentar</Text>
+                  </Pressable>
                 </View>
               )}
 
@@ -605,6 +624,9 @@ const s = StyleSheet.create({
   creditBannerText: { fontSize: 13, fontWeight: '700', color: '#713f12', flex: 1 },
   sinSaldoBox:   { backgroundColor: '#fff7ed', borderRadius: T.rSm, padding: 12, borderWidth: 1, borderColor: '#fed7aa', marginTop: 6, marginBottom: 4 },
   sinSaldoText:  { fontSize: 13, color: '#92400e', lineHeight: 18 },
+  saldoErrorBox: { backgroundColor: '#fef2f2', borderRadius: T.rSm, padding: 12, borderWidth: 1, borderColor: '#fecaca', marginTop: 6, marginBottom: 4, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
+  saldoErrorText: { fontSize: 13, color: '#991b1b', lineHeight: 18, flex: 1 },
+  saldoRetry:    { fontSize: 13, fontWeight: '700', color: '#991b1b', textDecorationLine: 'underline' },
   modalActions:  { flexDirection: 'row', gap: 10, marginTop: 20 },
   cancelBtn:     { flex: 1, paddingVertical: 13, borderRadius: T.rSm, borderWidth: 1, borderColor: T.border, alignItems: 'center', backgroundColor: T.white },
   cancelText:    { color: T.text, fontWeight: '600', fontSize: 14 },

@@ -24,12 +24,14 @@ class Proveedor extends Model
         'tarifa_hora',
         'tarifa_proyecto',
         'nivel',
+        'premium_vence_at',
     ];
 
     protected $casts = [
         'tarifa_hora'           => 'decimal:2',
         'tarifa_proyecto'       => 'decimal:2',
         'calificacion_promedio' => 'decimal:2',
+        'premium_vence_at'      => 'datetime',
     ];
 
     public function categoria()
@@ -75,5 +77,23 @@ class Proveedor extends Model
     public function cotizaciones()
     {
         return $this->hasMany(Cotizacion::class, 'proveedor_id');
+    }
+
+    public function compras()
+    {
+        return $this->hasMany(CompraCredito::class, 'proveedor_id');
+    }
+
+    /**
+     * Estado Premium derivado de premium_vence_at: no se guarda por separado
+     * para evitar que ambos campos se desincronicen.
+     */
+    public function premiumEstado(): string
+    {
+        if (!$this->premium_vence_at) {
+            return 'nunca';
+        }
+
+        return $this->premium_vence_at->isFuture() ? 'activo' : 'vencido';
     }
 }

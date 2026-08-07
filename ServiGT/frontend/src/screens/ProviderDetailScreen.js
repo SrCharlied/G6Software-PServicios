@@ -1,29 +1,22 @@
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  Image,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
+  useWindowDimensions,
   View,
 } from 'react-native';
+import { Feather } from '@expo/vector-icons';
 import { getProvider, getCalificacionesProveedor, getDisponibilidadProveedor, storageUrl } from '../services/api';
 import { useToast } from '../context/ToastContext';
+import { T } from '../theme';
+import { Avatar, Button, Card, StatusChip, Stars } from '../components/ui';
 
 const DIAS = ['Dom', 'Lun', 'Mar', 'Mie', 'Jue', 'Vie', 'Sab'];
 
-const Stars = ({ value }) => {
-  return (
-    <View style={{ flexDirection: 'row', gap: 2 }}>
-      {[1, 2, 3, 4, 5].map((s) => (
-        <Text key={s} style={{ color: s <= value ? '#f59e0b' : '#d1d5db', fontSize: 16 }}>
-          ★
-        </Text>
-      ))}
-    </View>
-  );
-};
+const NIVEL_VARIANT = { novato: 'info', intermedio: 'success', experto: 'warn' };
 
 export default function ProviderDetailScreen({
   navigation,
@@ -33,6 +26,8 @@ export default function ProviderDetailScreen({
   providerId,
 }) {
   const toast = useToast();
+  const { width } = useWindowDimensions();
+  const twoColumns = width >= 900;
   const [proveedor, setProveedor] = useState(selectedProvider || null);
   const [calificaciones, setCalificaciones] = useState([]);
   const [disponibilidad, setDisponibilidad] = useState([]);
@@ -53,25 +48,6 @@ export default function ProviderDetailScreen({
         .finally(() => setLoading(false));
     }
   }, [selectedProvider, providerId]);
-
-  if (loading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#4589d4" />
-      </View>
-    );
-  }
-
-  if (!proveedor) {
-    return (
-      <View style={styles.loadingContainer}>
-        <Text style={styles.loadingText}>No se encontro el proveedor seleccionado.</Text>
-        <TouchableOpacity style={styles.backFallbackBtn} onPress={() => navigation.navigate('Home')}>
-          <Text style={styles.backFallbackBtnText}>Volver al listado</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
 
   const loadExtras = async (id) => {
     setLoading(true);
@@ -94,18 +70,21 @@ export default function ProviderDetailScreen({
   if (loading || !proveedor) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#4589d4" />
-        <Text style={styles.loadingText}>Cargando perfil...</Text>
+        <ActivityIndicator size="large" color={T.blue} />
+        {!loading ? (
+          <>
+            <Text style={styles.loadingText}>No se encontro el proveedor seleccionado.</Text>
+            <Button kind="primary" onPress={() => navigation.navigate('Home')} style={{ marginTop: 14 }}>
+              Volver al listado
+            </Button>
+          </>
+        ) : (
+          <Text style={styles.loadingText}>Cargando perfil...</Text>
+        )}
       </View>
     );
   }
 
-  const nivelColores = {
-    novato:     { bg: '#f0f9ff', text: '#0369a1' },
-    intermedio: { bg: '#f0fdf4', text: '#15803d' },
-    experto:    { bg: '#fef3c7', text: '#b45309' },
-  };
-  const nivelColor = nivelColores[proveedor.nivel] || nivelColores.novato;
   const formatRelativeDate = (value) => {
     if (!value) return '';
     const date = new Date(value);
@@ -125,45 +104,28 @@ export default function ProviderDetailScreen({
     return date.toLocaleDateString('es-GT', { day: '2-digit', month: 'short', year: 'numeric' });
   };
 
-  return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      {/* Back */}
-      <TouchableOpacity style={styles.backRow} onPress={() => navigation.navigate('Home')}>
-        <Text style={styles.backText}>← Volver</Text>
-      </TouchableOpacity>
+  const categorias = proveedor.categorias?.length > 0
+    ? proveedor.categorias
+    : proveedor.categoria ? [proveedor.categoria] : [];
 
-      {/* Header card */}
-      <View style={styles.profileCard}>
-        {storageUrl(proveedor.foto_perfil) ? (
-          <Image
-            source={{ uri: storageUrl(proveedor.foto_perfil) }}
-            style={styles.avatarPlaceholder}
-          />
-        ) : (
-          <View style={styles.avatarPlaceholder}>
-            <Text style={styles.avatarInitial}>{(proveedor.nombre || '?')[0].toUpperCase()}</Text>
-          </View>
-        )}
-
+  const ProfileColumn = (
+    <View style={twoColumns ? styles.colLeft : undefined}>
+      <Card style={styles.profileCard}>
+        <Avatar uri={storageUrl(proveedor.foto_perfil)} name={proveedor.nombre} size={72} />
         <Text style={styles.provName}>{proveedor.nombre}</Text>
 
-        {/* Mostrar todas las categorías; fallback a categoria principal */}
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, justifyContent: 'center' }}>
-          {(proveedor.categorias?.length > 0 ? proveedor.categorias : proveedor.categoria ? [proveedor.categoria] : [])
-            .map((cat) => (
-              <View key={cat.id} style={styles.badge}>
-                <Text style={styles.badgeText}>{cat.nombre}</Text>
-              </View>
-            ))}
+        <View style={styles.chipsWrap}>
+          {categorias.map((cat) => (
+            <StatusChip key={cat.id} variant="info" label={cat.nombre} dot={false} />
+          ))}
+          {proveedor.nivel ? (
+            <StatusChip
+              variant={NIVEL_VARIANT[proveedor.nivel] || 'neutral'}
+              label={proveedor.nivel.charAt(0).toUpperCase() + proveedor.nivel.slice(1)}
+              dot={false}
+            />
+          ) : null}
         </View>
-
-        {proveedor.nivel && (
-          <View style={[styles.badge, { backgroundColor: nivelColor.bg, marginTop: 4 }]}>
-            <Text style={[styles.badgeText, { color: nivelColor.text }]}>
-              {proveedor.nivel.charAt(0).toUpperCase() + proveedor.nivel.slice(1)}
-            </Text>
-          </View>
-        )}
 
         <View style={styles.ratingRow}>
           <Stars value={Math.round(proveedor.calificacion_promedio || 0)} />
@@ -175,26 +137,71 @@ export default function ProviderDetailScreen({
           </Text>
         </View>
 
-        <Text style={styles.location}>
-          {proveedor.municipio ? `${proveedor.municipio}, ` : ''}{proveedor.departamento}
-        </Text>
+        <View style={styles.metaRow}>
+          <Feather name="map-pin" size={13} color={T.muted} />
+          <Text style={styles.location}>
+            {proveedor.municipio ? `${proveedor.municipio}, ` : ''}{proveedor.departamento}
+          </Text>
+        </View>
 
         {proveedor.telefono ? (
-          <Text style={styles.phone}>{proveedor.telefono}</Text>
+          <View style={styles.metaRow}>
+            <Feather name="phone" size={13} color={T.blue} />
+            <Text style={styles.phone}>{proveedor.telefono}</Text>
+          </View>
         ) : null}
-      </View>
+      </Card>
 
-      {/* Descripcion */}
       {proveedor.descripcion ? (
-        <View style={styles.card}>
+        <Card style={styles.card}>
           <Text style={styles.cardTitle}>Sobre este proveedor</Text>
           <Text style={styles.descText}>{proveedor.descripcion}</Text>
-        </View>
+        </Card>
       ) : null}
 
-      {/* Tarifas */}
+      {user && !esMiPerfil ? (
+        <Card style={[styles.card, { gap: 10 }]}>
+          {esCliente && (
+            <Button
+              kind="primary"
+              full
+              icon="send"
+              onPress={() => navigation.navigate('SolicitudForm', { provider: proveedor })}
+            >
+              Solicitar servicio
+            </Button>
+          )}
+          <Button
+            kind="secondary"
+            full
+            icon="message-circle"
+            onPress={() =>
+              navigation.navigate('Chat', {
+                chatWithUserId: proveedor.user_id,
+                chatWithName: proveedor.nombre,
+              })
+            }
+          >
+            Enviar mensaje
+          </Button>
+        </Card>
+      ) : !user ? (
+        <Card style={[styles.card, { alignItems: 'center', gap: 10 }]}>
+          <Text style={styles.loginPrompt}>
+            Inicia sesion para solicitar servicios o chatear con este proveedor.
+          </Text>
+          <Button kind="primary" full onPress={() => navigation.navigate('Login')}>
+            Iniciar sesion
+          </Button>
+        </Card>
+      ) : null}
+    </View>
+  );
+
+  const DetailsColumn = (
+    <View style={twoColumns ? styles.colRight : undefined}>
       {(proveedor.tarifa_hora || proveedor.tarifa_proyecto) ? (
-        <View style={styles.card}>
+        <Card style={styles.card}>
           <Text style={styles.cardTitle}>Tarifas</Text>
           <View style={styles.tarifaRow}>
             {proveedor.tarifa_hora ? (
@@ -210,12 +217,11 @@ export default function ProviderDetailScreen({
               </View>
             ) : null}
           </View>
-        </View>
+        </Card>
       ) : null}
 
-      {/* Disponibilidad */}
       {disponibilidad.length > 0 ? (
-        <View style={styles.card}>
+        <Card style={styles.card}>
           <Text style={styles.cardTitle}>Disponibilidad</Text>
           <View style={styles.dispGrid}>
             {disponibilidad.map((d) => (
@@ -234,45 +240,10 @@ export default function ProviderDetailScreen({
               </View>
             ))}
           </View>
-        </View>
+        </Card>
       ) : null}
 
-      {/* Acciones */}
-      {user && !esMiPerfil ? (
-        <View style={styles.actionsCard}>
-          {esCliente && (
-            <TouchableOpacity
-              style={styles.primaryBtn}
-              onPress={() => navigation.navigate('SolicitudForm', { provider: proveedor })}
-            >
-              <Text style={styles.primaryBtnText}>Solicitar servicio</Text>
-            </TouchableOpacity>
-          )}
-          <TouchableOpacity
-            style={styles.secondaryBtn}
-            onPress={() =>
-              navigation.navigate('Chat', {
-                chatWithUserId: proveedor.user_id,
-                chatWithName: proveedor.nombre,
-              })
-            }
-          >
-            <Text style={styles.secondaryBtnText}>Enviar mensaje</Text>
-          </TouchableOpacity>
-        </View>
-      ) : !user ? (
-        <View style={styles.actionsCard}>
-          <Text style={styles.loginPrompt}>
-            Inicia sesion para solicitar servicios o chatear con este proveedor.
-          </Text>
-          <TouchableOpacity style={styles.primaryBtn} onPress={() => navigation.navigate('Login')}>
-            <Text style={styles.primaryBtnText}>Iniciar sesion</Text>
-          </TouchableOpacity>
-        </View>
-      ) : null}
-
-      {/* Resenas */}
-      <View style={styles.card}>
+      <Card style={styles.card}>
         <Text style={styles.cardTitle}>
           Resenas ({calificaciones.length})
         </Text>
@@ -294,81 +265,56 @@ export default function ProviderDetailScreen({
             </View>
           ))
         )}
+      </Card>
+    </View>
+  );
+
+  return (
+    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+      <TouchableOpacity style={styles.backRow} onPress={() => navigation.navigate('Home')}>
+        <Feather name="arrow-left" size={15} color={T.blue} />
+        <Text style={styles.backText}>Volver</Text>
+      </TouchableOpacity>
+
+      <View style={twoColumns ? styles.columns : undefined}>
+        {ProfileColumn}
+        {DetailsColumn}
       </View>
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f0eee9' },
-  content: { padding: 16, paddingBottom: 40 },
-  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  loadingText: { marginTop: 12, fontSize: 16, color: '#666' },
-  backFallbackBtn: {
-    marginTop: 14,
-    backgroundColor: '#4589d4',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 8,
-  },
-  backFallbackBtnText: { color: '#fff', fontWeight: '700', fontSize: 14 },
+  container: { flex: 1, backgroundColor: T.canvas },
+  content: { paddingBottom: 40 },
+  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
+  loadingText: { marginTop: 12, fontSize: 15, color: T.muted, textAlign: 'center' },
 
-  backRow: { marginBottom: 12 },
-  backText: { color: '#4589d4', fontSize: 15, fontWeight: '600' },
+  backRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 14 },
+  backText: { color: T.blue, fontSize: 15, fontWeight: '600' },
 
-  profileCard: {
-    backgroundColor: '#f6f4ee',
-    borderRadius: 14,
-    padding: 20,
-    alignItems: 'center',
-    marginBottom: 14,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  avatarPlaceholder: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    backgroundColor: '#4589d4',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  avatarInitial: { fontSize: 30, fontWeight: 'bold', color: '#fff' },
-  provName: { fontSize: 22, fontWeight: '800', color: '#0e1424', marginBottom: 8 },
-  badge: {
-    backgroundColor: '#e3f2fd',
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 14,
-    marginBottom: 4,
-  },
-  badgeText: { fontSize: 13, color: '#4589d4', fontWeight: '600' },
+  columns: { flexDirection: 'row', gap: 20, alignItems: 'flex-start' },
+  colLeft: { width: 340, gap: 14 },
+  colRight: { flex: 1, gap: 14 },
+
+  profileCard: { alignItems: 'center', marginBottom: 14 },
+  provName: { fontSize: 22, fontWeight: '800', color: T.ink, marginTop: 12, marginBottom: 8 },
+  chipsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, justifyContent: 'center', marginBottom: 4 },
   ratingRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8, marginBottom: 4 },
-  ratingText: { fontSize: 13, color: '#555' },
-  location: { fontSize: 14, color: '#666', marginTop: 4 },
-  phone: { fontSize: 14, color: '#4589d4', fontWeight: '600', marginTop: 4 },
+  ratingText: { fontSize: 13, color: T.muted },
+  metaRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 },
+  location: { fontSize: 14, color: T.muted },
+  phone: { fontSize: 14, color: T.blue, fontWeight: '600' },
 
-  card: {
-    backgroundColor: '#f6f4ee',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 14,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 3,
-    elevation: 2,
-  },
-  cardTitle: { fontSize: 16, fontWeight: '700', color: '#333', marginBottom: 12 },
-  descText: { fontSize: 14, color: '#555', lineHeight: 22 },
+  card: { marginBottom: 14 },
+  cardTitle: { fontSize: 16, fontWeight: '700', color: T.text, marginBottom: 12 },
+  descText: { fontSize: 14, color: T.muted, lineHeight: 22 },
+
+  loginPrompt: { fontSize: 14, color: T.muted, textAlign: 'center', lineHeight: 20 },
 
   tarifaRow: { flexDirection: 'row', gap: 12 },
   tarifaBox: {
-    flex: 1, backgroundColor: '#f0f9ff', borderRadius: 10,
+    flex: 1, backgroundColor: '#f0f9ff', borderRadius: T.rMd,
     padding: 14, alignItems: 'center',
   },
   tarifaAmount: { fontSize: 20, fontWeight: '800', color: '#0369a1' },
@@ -387,26 +333,6 @@ const styles = StyleSheet.create({
   dispHoras: { fontSize: 11, color: '#065f46', marginTop: 2 },
   dispNoDisp: { fontSize: 11, color: '#9ca3af', marginTop: 2 },
 
-  actionsCard: {
-    backgroundColor: '#f6f4ee',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 14,
-    gap: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 3,
-    elevation: 2,
-  },
-  loginPrompt: { fontSize: 14, color: '#666', textAlign: 'center', marginBottom: 8, lineHeight: 20 },
-  primaryBtn: { backgroundColor: '#4589d4', padding: 14, borderRadius: 8, alignItems: 'center' },
-  primaryBtnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
-  secondaryBtn: {
-    backgroundColor: '#f0f0f0', padding: 14, borderRadius: 8, alignItems: 'center',
-  },
-  secondaryBtnText: { color: '#333', fontWeight: '600', fontSize: 15 },
-
   resenaRow: {
     paddingVertical: 12,
     borderBottomWidth: 1,
@@ -414,8 +340,8 @@ const styles = StyleSheet.create({
   },
   resenaHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
   resenaAuthorBlock: { flex: 1, marginRight: 10 },
-  resenaAutor: { fontSize: 14, fontWeight: '600', color: '#333' },
-  resenaDate: { fontSize: 11, color: '#9aa3af', marginTop: 2 },
-  resenaComentario: { fontSize: 13, color: '#666', lineHeight: 19, marginTop: 4 },
-  emptyText: { fontSize: 14, color: '#999', textAlign: 'center', paddingVertical: 12 },
+  resenaAutor: { fontSize: 14, fontWeight: '600', color: T.text },
+  resenaDate: { fontSize: 11, color: T.faint, marginTop: 2 },
+  resenaComentario: { fontSize: 13, color: T.muted, lineHeight: 19, marginTop: 4 },
+  emptyText: { fontSize: 14, color: T.faint, textAlign: 'center', paddingVertical: 12 },
 });

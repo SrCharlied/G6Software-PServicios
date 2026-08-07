@@ -493,6 +493,56 @@ export const getMiCredito = async () => {
   }
 };
 
+export const getCreditosPaquetes = async () => {
+  try {
+    const response = await api.get('/creditos/paquetes');
+    return response.data;
+  } catch (error) {
+    throw new Error(getErrorMessage(error, 'No se pudieron cargar los paquetes de creditos.'));
+  }
+};
+
+export const comprarCreditos = async ({ paqueteId, idempotencyKey }) => {
+  try {
+    const response = await api.post('/creditos/comprar', {
+      paquete_id: paqueteId,
+      idempotency_key: idempotencyKey,
+    });
+    return response.data;
+  } catch (error) {
+    throw new Error(getErrorMessage(error, 'No se pudo completar la compra simulada.'));
+  }
+};
+
+export const getCreditosTransacciones = async ({ page = 1, perPage = 15 } = {}) => {
+  try {
+    const response = await api.get('/creditos/transacciones', {
+      params: { page, per_page: perPage },
+    });
+    return response.data;
+  } catch (error) {
+    throw new Error(getErrorMessage(error, 'No se pudo cargar el historial de creditos.'));
+  }
+};
+
+export const getPremiumMiEstado = async () => {
+  try {
+    const response = await api.get('/premium/mi-estado');
+    return response.data;
+  } catch (error) {
+    throw new Error(getErrorMessage(error, 'No se pudo cargar el estado Premium.'));
+  }
+};
+
+export const activarPremium = async () => {
+  try {
+    const response = await api.post('/premium/activar');
+    return response.data;
+  } catch (error) {
+    throw new Error(getErrorMessage(error, 'No se pudo activar Premium.'));
+  }
+};
+
 export const getPedidoDetalle = async (id) => {
   try {
     const response = await api.get(`/pedidos/${id}`);
@@ -574,6 +624,16 @@ export const recargarCreditosProveedor = async (proveedorId, { monto, motivo }) 
     return response.data;
   } catch (error) {
     throw new Error(getErrorMessage(error, 'No se pudo agregar creditos al proveedor.'));
+  }
+};
+
+export const getAdminCreditosPremium = async ({ estado = null } = {}) => {
+  try {
+    const params = estado ? { estado } : {};
+    const response = await api.get('/admin/creditos-premium', { params });
+    return response.data;
+  } catch (error) {
+    throw new Error(getErrorMessage(error, 'No se pudieron cargar creditos y Premium.'));
   }
 };
 

@@ -80,6 +80,10 @@ CREATE TABLE IF NOT EXISTS proveedores (
     calificacion_promedio DECIMAL(3,2) NOT NULL DEFAULT 0.00,
     total_calificaciones INT NOT NULL DEFAULT 0,
     nivel VARCHAR(20) NOT NULL DEFAULT 'novato' CHECK (nivel IN ('novato','intermedio','experto')),
+    premium_inicio_at TIMESTAMP WITHOUT TIME ZONE NULL,
+    premium_vence_at TIMESTAMP WITHOUT TIME ZONE NULL,
+    premium_ciclo_key VARCHAR(80),
+    premium_renovaciones INT NOT NULL DEFAULT 0 CHECK (premium_renovaciones >= 0),
     created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
@@ -140,6 +144,37 @@ CREATE TABLE IF NOT EXISTS transacciones_credito (
     created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX IF NOT EXISTS idx_trans_cred_proveedor ON transacciones_credito (proveedor_id, created_at DESC);
+
+-- Paquetes de creditos comprables (catalogo administrable sin tocar codigo)
+CREATE TABLE IF NOT EXISTS paquetes_creditos (
+    id BIGSERIAL PRIMARY KEY,
+    nombre VARCHAR(50) NOT NULL UNIQUE,
+    precio_gtq DECIMAL(10,2) NOT NULL CHECK (precio_gtq > 0),
+    creditos_base INT NOT NULL CHECK (creditos_base > 0),
+    creditos_bonus INT NOT NULL DEFAULT 0 CHECK (creditos_bonus >= 0),
+    activo BOOLEAN NOT NULL DEFAULT TRUE,
+    orden INT NOT NULL DEFAULT 0,
+    created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_paquetes_creditos_activo ON paquetes_creditos (activo, orden);
+
+-- Compras de creditos (simuladas durante el MVP: sin datos bancarios reales)
+CREATE TABLE IF NOT EXISTS compras_creditos (
+    id BIGSERIAL PRIMARY KEY,
+    proveedor_id BIGINT NOT NULL REFERENCES proveedores(id) ON DELETE CASCADE,
+    paquete_id BIGINT NOT NULL REFERENCES paquetes_creditos(id) ON DELETE RESTRICT,
+    monto_gtq DECIMAL(10,2) NOT NULL CHECK (monto_gtq > 0),
+    creditos_otorgados INT NOT NULL CHECK (creditos_otorgados > 0),
+    estado VARCHAR(20) NOT NULL DEFAULT 'pendiente'
+        CHECK (estado IN ('pendiente','completada','fallida','cancelada')),
+    referencia VARCHAR(20) NOT NULL UNIQUE,
+    idempotency_key VARCHAR(100) NOT NULL UNIQUE,
+    completada_at TIMESTAMP WITHOUT TIME ZONE,
+    created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_compras_creditos_proveedor ON compras_creditos (proveedor_id, created_at DESC);
 
 -- Servicios (solicitudes de trabajo)
 CREATE TABLE IF NOT EXISTS servicios (
@@ -352,6 +387,42 @@ BEGIN
 END $$;
 
 
+-- proveedores gana premium_vence_at: NULL = nunca activado, fecha futura =
+-- activo, fecha pasada = vencido. El estado se deriva de esta unica columna
+-- para no duplicar la fuente de verdad en un campo de estado aparte.
+ALTER TABLE proveedores ADD COLUMN IF NOT EXISTS premium_inicio_at TIMESTAMP WITHOUT TIME ZONE NULL;
+ALTER TABLE proveedores ADD COLUMN IF NOT EXISTS premium_vence_at TIMESTAMP WITHOUT TIME ZONE NULL;
+ALTER TABLE proveedores ADD COLUMN IF NOT EXISTS premium_ciclo_key VARCHAR(80);
+ALTER TABLE proveedores ADD COLUMN IF NOT EXISTS premium_renovaciones INT NOT NULL DEFAULT 0;
+
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint
+        WHERE conrelid = 'proveedores'::regclass
+          AND conname = 'proveedores_premium_renovaciones_check'
+    ) THEN
+        ALTER TABLE proveedores ADD CONSTRAINT proveedores_premium_renovaciones_check
+            CHECK (premium_renovaciones >= 0);
+    END IF;
+END $$;
+
+-- transacciones_credito.tipo gano el valor 'compra'. Igual que arriba, solo
+-- se recrea el CHECK si al actual le falta, para no tomar el lock en cada arranque.
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint
+        WHERE conrelid = 'transacciones_credito'::regclass
+          AND conname = 'transacciones_credito_tipo_check'
+          AND pg_get_constraintdef(oid) LIKE '%compra%'
+    ) THEN
+        ALTER TABLE transacciones_credito DROP CONSTRAINT IF EXISTS transacciones_credito_tipo_check;
+        ALTER TABLE transacciones_credito ADD CONSTRAINT transacciones_credito_tipo_check
+            CHECK (tipo IN ('bono','gasto','recarga','compra'));
+    END IF;
+END $$;
+
 -- Las categorias se sembraron sin tildes ni ñ. Este renombre corre ANTES del
 -- seed a proposito: si corriera despues, el seed ya habria insertado la
 -- version acentuada junto a la vieja y el UPDATE chocaria con el UNIQUE de
@@ -401,4 +472,12 @@ INSERT INTO categorias (nombre, descripcion, icono) VALUES
     ('Mecánica',      'Reparación de vehículos y maquinaria',        'settings'),
     ('Tecnología',    'Soporte técnico y reparación de equipos',     'monitor'),
     ('Enseñanza',     'Clases particulares y tutoría académica',     'book')
+ON CONFLICT (nombre) DO NOTHING;
+
+-- Paquetes de creditos ratificados para Sprint 6 (precio oficial en GTQ)
+INSERT INTO paquetes_creditos (nombre, precio_gtq, creditos_base, creditos_bonus, orden) VALUES
+    ('Inicial',      39.00,  8,   0,  1),
+    ('Impulso',      115.00, 25,  5,  2),
+    ('Profesional',  459.00, 110, 25, 3),
+    ('Negocio',      765.00, 190, 60, 4)
 ON CONFLICT (nombre) DO NOTHING;

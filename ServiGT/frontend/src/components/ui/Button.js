@@ -4,9 +4,11 @@ import { T } from '../../theme';
 
 const KIND_STYLES = {
   primary:   { bg: T.blue, border: T.blue, text: T.white },
-  secondary: { bg: T.white, border: T.soft, text: T.deep },
+  secondary: { bg: T.paper, border: T.soft, text: T.deep },
   ghost:     { bg: 'transparent', border: T.border, text: T.text },
   danger:    { bg: T.danger, border: T.danger, text: T.white },
+  success:   { bg: T.success, border: T.success, text: T.white },
+  dark:      { bg: T.deep, border: T.deep, text: T.white },
 };
 
 const SIZE_STYLES = {
@@ -46,6 +48,7 @@ export default function Button({
           width: full ? '100%' : undefined,
           opacity: isDisabled ? 0.55 : 1,
         },
+        kind === 'primary' && styles.primaryElev,
         style,
       ]}
     >
@@ -71,5 +74,12 @@ const styles = StyleSheet.create({
     borderRadius: T.rMd,
     borderWidth: 1,
   },
-  text: { fontWeight: '700' },
+  primaryElev: {
+    shadowColor: T.blue,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.22,
+    shadowRadius: 14,
+    elevation: 3,
+  },
+  text: { fontWeight: '700', letterSpacing: 0 },
 });

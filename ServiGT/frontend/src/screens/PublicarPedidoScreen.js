@@ -47,13 +47,13 @@ export default function PublicarPedidoScreen({ navigation }) {
   const validate = () => {
     const errs = {};
     if (!descripcion.trim() || descripcion.trim().length < 10) {
-      errs.descripcion = 'La descripción debe tener al menos 10 caracteres.';
+      errs.descripcion = 'La descripcion debe tener al menos 10 caracteres.';
     }
     if (!categoriaId) {
-      errs.categoriaId = 'Selecciona una categoría.';
+      errs.categoriaId = 'Selecciona una categoria.';
     }
     if (!direccion.trim()) {
-      errs.direccion = 'La dirección es obligatoria.';
+      errs.direccion = 'La direccion es obligatoria.';
     }
     if (!urgencia) {
       errs.urgencia = 'Selecciona la urgencia.';
@@ -85,13 +85,37 @@ export default function PublicarPedidoScreen({ navigation }) {
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
       <TouchableOpacity style={styles.backRow} onPress={() => navigation.goBack()}>
-        <Text style={styles.backText}>← Volver</Text>
+        <Text style={styles.backText}>Volver</Text>
       </TouchableOpacity>
-      <Text style={styles.title}>Publicar pedido</Text>
-      <Text style={styles.subtitle}>Describe tu problema y recibe propuestas de proveedores.</Text>
 
-      {/* Descripción */}
-      <Text style={styles.label}>Descripción <Text style={styles.required}>*</Text></Text>
+      <View style={styles.hero}>
+        <View style={styles.heroCopy}>
+          <Text style={styles.title}>Publicar pedido</Text>
+          <Text style={styles.subtitle}>
+            Describe lo que necesitas y recibe hasta 6 cotizaciones. Tu pedido queda abierto 7 dias.
+          </Text>
+        </View>
+      </View>
+
+      <View style={styles.stepper}>
+        {['Que necesitas', 'Donde', 'Publicar'].map((step, index) => (
+          <View key={step} style={styles.stepItem}>
+            <View style={[styles.stepDot, index === 0 && styles.stepDotActive]}>
+              <Text style={[styles.stepDotText, index === 0 && styles.stepDotTextActive]}>{index + 1}</Text>
+            </View>
+            <Text style={[styles.stepText, index === 0 && styles.stepTextActive]}>{step}</Text>
+          </View>
+        ))}
+      </View>
+
+      <View style={styles.formPanel}>
+      <View style={styles.sectionHeader}>
+        <Text style={styles.sectionTitle}>Datos del pedido</Text>
+        <Text style={styles.sectionHint}>Tu pedido queda abierto durante 7 dias.</Text>
+      </View>
+
+      {/* Descripcion */}
+      <Text style={styles.label}>Descripcion <Text style={styles.required}>*</Text></Text>
       <TextInput
         style={[styles.input, styles.textArea, errors.descripcion && styles.inputError]}
         placeholder="Describe detalladamente el problema o servicio que necesitas..."
@@ -104,8 +128,8 @@ export default function PublicarPedidoScreen({ navigation }) {
       />
       <FieldError message={errors.descripcion} />
 
-      {/* Categoría */}
-      <Text style={styles.label}>Categoría <Text style={styles.required}>*</Text></Text>
+      {/* Categoria */}
+      <Text style={styles.label}>Categoria <Text style={styles.required}>*</Text></Text>
       {loadingCats ? (
         <ActivityIndicator size="small" color={T.blue} style={{ marginBottom: 16 }} />
       ) : (
@@ -125,8 +149,8 @@ export default function PublicarPedidoScreen({ navigation }) {
       )}
       <FieldError message={errors.categoriaId} />
 
-      {/* Dirección */}
-      <Text style={styles.label}>Dirección <Text style={styles.required}>*</Text></Text>
+      {/* Direccion */}
+      <Text style={styles.label}>Direccion <Text style={styles.required}>*</Text></Text>
       <TextInput
         style={[styles.input, errors.direccion && styles.inputError]}
         placeholder="Zona 10, Ciudad de Guatemala..."
@@ -169,20 +193,36 @@ export default function PublicarPedidoScreen({ navigation }) {
           : <Text style={styles.submitText}>Publicar pedido</Text>}
       </TouchableOpacity>
 
-      <Text style={styles.hint}>Tu pedido estará visible para proveedores durante 7 días.</Text>
+      <Text style={styles.hint}>Tu pedido estara visible para proveedores durante 7 dias.</Text>
+      </View>
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   container:   { flex: 1, backgroundColor: T.canvas },
-  content:     { padding: 20, paddingBottom: 48 },
-  title:       { fontSize: 22, fontWeight: '800', color: T.ink, marginBottom: 4 },
-  subtitle:    { fontSize: 14, color: T.muted, marginBottom: 24, lineHeight: 20 },
+  content:     { padding: 24, paddingBottom: 56, alignItems: 'center' },
+  hero:        { width: '100%', maxWidth: 760, marginBottom: 18 },
+  heroCopy:    { flex: 1, minWidth: 0 },
+  formPanel:   { width: '100%', maxWidth: 760, backgroundColor: T.paper, borderRadius: 14, borderWidth: 1, borderColor: T.border, padding: 24, ...T.sh2 },
+  title:       { fontSize: 26, fontWeight: '800', color: T.ink, marginBottom: 5 },
+  subtitle:    { fontSize: 14, color: T.muted, lineHeight: 20 },
+  stepper:     { width: '100%', maxWidth: 760, flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 18 },
+  stepItem:    { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 7 },
+  stepDot:     { width: 28, height: 28, borderRadius: 999, alignItems: 'center', justifyContent: 'center', backgroundColor: T.inputBg },
+  stepDotActive: { backgroundColor: T.blue },
+  stepDotText: { fontSize: 12, color: T.muted, fontWeight: '800' },
+  stepDotTextActive: { color: T.white },
+  stepText:    { fontSize: 12, color: T.muted, fontWeight: '600', flexShrink: 1 },
+  stepTextActive: { color: T.ink, fontWeight: '800' },
+  sectionHeader: { marginBottom: 18, paddingBottom: 14, borderBottomWidth: 1, borderBottomColor: T.border },
+  sectionTitle: { fontSize: 18, fontWeight: '800', color: T.ink, marginBottom: 4 },
+  sectionHint:  { fontSize: 13, color: T.muted },
   label:       { fontSize: 14, fontWeight: '600', color: T.ink, marginBottom: 6 },
   required:    { color: T.danger },
   input:       {
     ...T.input,
+    backgroundColor: T.inputBg,
     marginBottom: 4,
   },
   textArea:    { height: 100, textAlignVertical: 'top' },
@@ -191,6 +231,7 @@ const styles = StyleSheet.create({
   chipRow:     { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 4 },
   chip:        {
     ...T.chip,
+    backgroundColor: T.inputBg,
   },
   chipSelected:     { borderColor: T.blue, backgroundColor: '#eef4ff' },
   chipText:         { fontSize: 13, color: T.muted },
@@ -199,6 +240,7 @@ const styles = StyleSheet.create({
   urgenciaBtn: {
     flex: 1, paddingVertical: 12, borderRadius: T.rMd,
     borderWidth: 1.5, borderColor: T.border, alignItems: 'center',
+    backgroundColor: T.inputBg,
   },
   urgenciaBtnText: { fontSize: 14, color: T.muted },
   submitBtn:   {

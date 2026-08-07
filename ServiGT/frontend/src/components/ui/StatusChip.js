@@ -5,11 +5,11 @@ import { T } from '../../theme';
 // dominio (urgencia, estado de pedido, etc.) a una de estas variantes en vez
 // de traer su propio bg/text/border como antes.
 const VARIANTS = {
-  neutral: { bg: T.paper, text: T.muted, border: T.border, dot: T.faint },
-  info:    { bg: '#eff6ff', text: '#1d4ed8', border: '#bfdbfe', dot: '#1d4ed8' },
-  success: { bg: '#f0fdf4', text: '#15803d', border: '#bbf7d0', dot: T.success },
-  warn:    { bg: '#fef3c7', text: '#92400e', border: '#fde68a', dot: T.warn },
-  danger:  { bg: '#fff1f2', text: '#be123c', border: '#fecdd3', dot: T.danger },
+  neutral: { bg: '#ecebe7', text: '#4a5262', border: '#dcd9d2', dot: T.faint },
+  info:    { bg: T.tint, text: T.deep, border: T.soft, dot: T.blue },
+  success: { bg: '#e3f5e9', text: '#14683a', border: '#a7dcbb', dot: T.success },
+  warn:    { bg: '#fdf2e3', text: '#8a4708', border: '#f2c879', dot: T.amber },
+  danger:  { bg: '#fbe9ed', text: '#9f1239', border: '#f0c3ce', dot: T.danger },
 };
 
 export default function StatusChip({ variant = 'neutral', label, size = 'md', dot = true }) {
@@ -43,5 +43,5 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
   },
   dot: { width: 6, height: 6, borderRadius: 3 },
-  label: { fontWeight: '700', letterSpacing: 0.2 },
+  label: { fontWeight: '700', letterSpacing: 0 },
 });

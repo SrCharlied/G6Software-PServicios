@@ -7,7 +7,10 @@ export default function Card({ children, style, padding = T.s4 }) {
 
 const styles = StyleSheet.create({
   card: {
-    ...T.card,
+    backgroundColor: T.paper,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: T.border,
     ...T.sh1,
   },
 });

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, TouchableOpacity, useWindowDimensions, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { createServicio } from '../services/api';
 import { useToast } from '../context/ToastContext';
@@ -13,6 +13,8 @@ export default function SolicitudFormScreen({
   selectedProvider,
 }) {
   const toast = useToast();
+  const { width } = useWindowDimensions();
+  const wide = width >= 900;
   const [descripcion, setDescripcion] = useState('');
   const [direccion, setDireccion] = useState('');
   const [fecha, setFecha] = useState('');
@@ -71,20 +73,49 @@ export default function SolicitudFormScreen({
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <View style={styles.formWrap}>
-        <TouchableOpacity
-          style={styles.backRow}
-          onPress={() => navigation.navigate('ProviderDetail', { provider: selectedProvider })}
-        >
-          <Feather name="arrow-left" size={15} color={T.blue} />
-          <Text style={styles.backText}>Volver al perfil</Text>
-        </TouchableOpacity>
+      <TouchableOpacity
+        style={styles.backRow}
+        onPress={() => navigation.navigate('ProviderDetail', { provider: selectedProvider })}
+      >
+        <Feather name="arrow-left" size={15} color={T.blue} />
+        <Text style={styles.backText}>Volver al perfil</Text>
+      </TouchableOpacity>
 
-        <Card style={styles.card}>
-          <Text style={styles.cardTitle}>Solicitar servicio</Text>
+      <View style={styles.hero}>
+        <Text style={styles.eyebrow}>Nueva solicitud</Text>
+        <Text style={styles.title}>Solicitar servicio</Text>
+        <Text style={styles.subtitle}>
+          Describe tu necesidad y envia la solicitud al proveedor seleccionado.
+        </Text>
+        <View style={styles.stepRow}>
+          {['Proveedor', 'Detalle', 'Enviar'].map((label, index) => (
+            <View key={label} style={styles.stepItem}>
+              <View style={[styles.stepCircle, index === 1 && styles.stepCircleActive]}>
+                <Text style={[styles.stepNum, index === 1 && styles.stepNumActive]}>{index + 1}</Text>
+              </View>
+              <Text style={[styles.stepLabel, index === 1 && styles.stepLabelActive]}>{label}</Text>
+            </View>
+          ))}
+        </View>
+      </View>
+
+      <View style={[styles.layout, wide && styles.layoutWide]}>
+        <Card padding={18} style={styles.summaryCard}>
+          <View style={styles.providerAvatar}>
+            <Text style={styles.providerAvatarText}>{selectedProvider.nombre?.charAt(0)?.toUpperCase() || 'P'}</Text>
+          </View>
+          <Text style={styles.summaryKicker}>Proveedor</Text>
+          <Text style={styles.summaryName}>{selectedProvider.nombre}</Text>
+          <Text style={styles.summaryMeta}>
+            {selectedProvider.categoria?.nombre || 'Servicio'} - {[selectedProvider.municipio, selectedProvider.departamento].filter(Boolean).join(', ') || 'Guatemala'}
+          </Text>
+          {selectedProvider.telefono ? <Text style={styles.summaryPhone}>{selectedProvider.telefono}</Text> : null}
+        </Card>
+
+        <Card padding={24} style={styles.card}>
+          <Text style={styles.cardTitle}>Datos de la solicitud</Text>
           <Text style={styles.cardSubtitle}>
-            Enviando solicitud a:{' '}
-            <Text style={styles.provName}>{selectedProvider?.nombre}</Text>
+            Enviando solicitud a <Text style={styles.provName}>{selectedProvider?.nombre}</Text>
           </Text>
 
           <Text style={styles.label}>Descripcion del servicio *</Text>
@@ -146,25 +177,60 @@ export default function SolicitudFormScreen({
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: T.canvas },
-  content: { padding: 16, paddingBottom: 40 },
-  // Formulario centrado y con ancho maximo propio: InternalLayout ya limita
-  // el area de contenido a 1120px, pero un formulario de una columna se ve
-  // mejor angosto en vez de estirado a ese ancho completo.
-  formWrap: { width: '100%', maxWidth: 560, alignSelf: 'center' },
+  content: { padding: 24, paddingBottom: 44, width: '100%', maxWidth: 1040, alignSelf: 'center' },
 
   emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24, gap: 14 },
   emptyText: { fontSize: 15, color: T.muted, textAlign: 'center' },
 
   backRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 14 },
-  backText: { color: T.blue, fontSize: 15, fontWeight: '600' },
+  backText: { color: T.blue, fontSize: 14, fontWeight: '800' },
+  hero: {
+    backgroundColor: T.paper,
+    borderWidth: 1,
+    borderColor: T.border,
+    borderRadius: 16,
+    padding: 24,
+    marginBottom: 16,
+    ...T.sh2,
+  },
+  eyebrow: { color: T.blue, fontSize: 12, fontWeight: '900', textTransform: 'uppercase' },
+  title: { color: T.ink, fontSize: 30, fontWeight: '900', marginTop: 4 },
+  subtitle: { color: T.muted, fontSize: 14, lineHeight: 21, marginTop: 6 },
+  stepRow: { flexDirection: 'row', gap: 10, flexWrap: 'wrap', marginTop: 18 },
+  stepItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: T.white,
+    borderWidth: 1,
+    borderColor: T.border,
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+  },
+  stepCircle: { width: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: T.canvas },
+  stepCircleActive: { backgroundColor: T.blue },
+  stepNum: { color: T.muted, fontSize: 12, fontWeight: '900' },
+  stepNumActive: { color: T.white },
+  stepLabel: { color: T.muted, fontSize: 12, fontWeight: '800' },
+  stepLabelActive: { color: T.deep },
+  layout: { gap: 16 },
+  layoutWide: { flexDirection: 'row', alignItems: 'flex-start' },
+  summaryCard: { width: '100%', maxWidth: 280 },
+  providerAvatar: { width: 58, height: 58, borderRadius: 18, backgroundColor: '#e6effa', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: T.soft },
+  providerAvatarText: { color: T.deep, fontSize: 24, fontWeight: '900' },
+  summaryKicker: { color: T.faint, fontSize: 11, fontWeight: '900', textTransform: 'uppercase', marginTop: 14 },
+  summaryName: { color: T.ink, fontSize: 19, fontWeight: '900', marginTop: 4 },
+  summaryMeta: { color: T.muted, fontSize: 13, lineHeight: 19, marginTop: 6 },
+  summaryPhone: { color: T.deep, fontSize: 13, fontWeight: '800', marginTop: 10 },
 
-  card: { padding: 20 },
-  cardTitle: { fontSize: 20, fontWeight: '800', color: T.text, marginBottom: 6 },
+  card: { flex: 1, minWidth: 0 },
+  cardTitle: { fontSize: 22, fontWeight: '900', color: T.text, marginBottom: 6 },
   cardSubtitle: { fontSize: 14, color: T.muted, marginBottom: 20 },
   provName: { fontWeight: '700', color: T.blue },
 
-  label: { fontSize: 13, fontWeight: '600', color: T.text, marginBottom: 6, marginTop: 4 },
-  field: { marginBottom: 10 },
+  label: { fontSize: 13, fontWeight: '800', color: T.text, marginBottom: 6, marginTop: 4 },
+  field: { marginBottom: 12 },
 
   cancelBtn: { padding: 14, alignItems: 'center', marginTop: 4 },
   cancelBtnText: { color: T.faint, fontSize: 15 },

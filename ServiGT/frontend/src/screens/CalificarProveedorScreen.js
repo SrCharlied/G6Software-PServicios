@@ -7,6 +7,7 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  useWindowDimensions,
 } from 'react-native';
 import { calificarServicio, getServicio } from '../services/api';
 import { useToast } from '../context/ToastContext';
@@ -32,6 +33,8 @@ const StarsInput = ({ value, onChange }) => (
 
 export default function CalificarProveedorScreen({ navigation, servicioId, user }) {
   const toast = useToast();
+  const { width } = useWindowDimensions();
+  const wide = width >= 900;
   const [servicio, setServicio] = useState(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -123,10 +126,17 @@ export default function CalificarProveedorScreen({ navigation, servicioId, user 
         <Text style={styles.backText}>Volver</Text>
       </TouchableOpacity>
 
-      <View style={styles.headerCard}>
+      <View style={[styles.headerCard, wide && styles.headerCardWide]}>
         <Text style={styles.eyebrow}>Calificar al proveedor</Text>
-        <Text style={styles.title}>{proveedor?.nombre || 'Proveedor'}</Text>
-        <Text style={styles.description}>{servicio.descripcion}</Text>
+        <View style={styles.providerRow}>
+          <View style={styles.avatar}>
+            <Text style={styles.avatarText}>{(proveedor?.nombre || 'P').charAt(0).toUpperCase()}</Text>
+          </View>
+          <View style={styles.providerCopy}>
+            <Text style={styles.title}>{proveedor?.nombre || 'Proveedor'}</Text>
+            <Text style={styles.description}>{servicio.descripcion}</Text>
+          </View>
+        </View>
         <View style={styles.metaRow}>
           <Text style={styles.metaPill}>{servicio.categoria?.nombre || proveedor?.categoria?.nombre || 'Servicio'}</Text>
           <Text style={styles.metaPill}>Q{Number(servicio.monto_acordado || 0).toFixed(2)}</Text>
@@ -144,7 +154,12 @@ export default function CalificarProveedorScreen({ navigation, servicioId, user 
           <Text style={styles.noticeText}>El servicio debe estar completado antes de enviar una resena.</Text>
         </View>
       ) : (
-        <View style={styles.formCard}>
+        <View style={[styles.formCard, wide && styles.formCardWide]}>
+          <View style={styles.formHeader}>
+            <Text style={styles.formTitle}>Como fue tu experiencia?</Text>
+            <Text style={styles.formSubtitle}>Tu resena ayuda a otros clientes a elegir mejor.</Text>
+          </View>
+
           <Text style={styles.label}>Puntuacion</Text>
           <StarsInput value={puntuacion} onChange={setPuntuacion} />
 
@@ -185,7 +200,7 @@ export default function CalificarProveedorScreen({ navigation, servicioId, user 
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: T.canvas },
-  content: { padding: 16, paddingBottom: 36 },
+  content: { padding: 24, paddingBottom: 48, width: '100%', maxWidth: 760, alignSelf: 'center' },
   center: {
     flex: 1,
     alignItems: 'center',
@@ -194,20 +209,25 @@ const styles = StyleSheet.create({
     backgroundColor: T.canvas,
   },
   loadingText: { marginTop: 12, color: T.muted, fontSize: 14 },
-  backBtn: { alignSelf: 'flex-start', paddingVertical: 8, paddingRight: 12, marginBottom: 6 },
+  backBtn: { alignSelf: 'flex-start', paddingVertical: 8, paddingRight: 12, marginBottom: 14 },
   backText: { color: T.blue, fontSize: 14, fontWeight: '800' },
   headerCard: {
     backgroundColor: T.paper,
-    borderRadius: T.rMd,
-    padding: 18,
-    marginBottom: 14,
+    borderRadius: 14,
+    padding: 22,
+    marginBottom: 16,
     borderWidth: 1,
     borderColor: T.border,
-    ...T.sh1,
+    ...T.sh2,
   },
+  headerCardWide: { padding: 24 },
   eyebrow: { color: T.blue, fontSize: 12, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5 },
-  title: { color: T.ink, fontSize: 24, fontWeight: '900', marginTop: 6 },
-  description: { color: T.text, fontSize: 14, lineHeight: 21, marginTop: 10, opacity: 0.82 },
+  providerRow: { flexDirection: 'row', gap: 14, alignItems: 'flex-start', marginTop: 14 },
+  avatar: { width: 54, height: 54, borderRadius: 16, backgroundColor: '#eef4ff', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: T.soft },
+  avatarText: { color: T.deep, fontSize: 22, fontWeight: '900' },
+  providerCopy: { flex: 1, minWidth: 0 },
+  title: { color: T.ink, fontSize: 24, fontWeight: '900' },
+  description: { color: T.text, fontSize: 14, lineHeight: 21, marginTop: 8, opacity: 0.82 },
   metaRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 14 },
   metaPill: {
     backgroundColor: T.white,
@@ -222,34 +242,38 @@ const styles = StyleSheet.create({
   },
   formCard: {
     backgroundColor: T.paper,
-    borderRadius: T.rMd,
-    padding: 18,
+    borderRadius: 14,
+    padding: 22,
     borderWidth: 1,
     borderColor: T.border,
-    ...T.sh1,
+    ...T.sh2,
   },
+  formCardWide: { padding: 24 },
+  formHeader: { marginBottom: 18, paddingBottom: 14, borderBottomWidth: 1, borderBottomColor: T.border },
+  formTitle: { color: T.ink, fontSize: 20, fontWeight: '900', marginBottom: 5 },
+  formSubtitle: { color: T.muted, fontSize: 14, lineHeight: 20 },
   label: { fontSize: 14, fontWeight: '800', color: T.ink, marginBottom: 10, marginTop: 4 },
-  starsRow: { flexDirection: 'row', gap: 8, marginBottom: 18 },
+  starsRow: { flexDirection: 'row', gap: 8, marginBottom: 20, flexWrap: 'wrap' },
   starBtn: {
-    width: 46,
-    height: 46,
-    borderRadius: 8,
+    width: 54,
+    height: 54,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: T.white,
     borderWidth: 1,
     borderColor: T.border,
   },
-  starText: { fontSize: 30, color: '#d1d5db', lineHeight: 34 },
+  starText: { fontSize: 32, color: '#d1d5db', lineHeight: 36 },
   starTextActive: { color: T.amber },
   textarea: {
-    minHeight: 130,
+    minHeight: 150,
     borderWidth: 1,
     borderColor: T.inputBorder,
     backgroundColor: T.inputBg,
-    borderRadius: T.rSm,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
     fontSize: 14,
     color: T.text,
     lineHeight: 20,
@@ -258,22 +282,24 @@ const styles = StyleSheet.create({
   errorText: { color: T.danger, fontSize: 13, marginTop: 8, marginBottom: 10 },
   primaryBtn: {
     backgroundColor: T.blue,
-    borderRadius: T.rSm,
-    paddingVertical: 13,
+    borderRadius: 12,
+    paddingVertical: 14,
     paddingHorizontal: 18,
     alignItems: 'center',
     justifyContent: 'center',
     minHeight: 48,
-    marginTop: 12,
+    marginTop: 14,
+    ...T.sh1,
   },
   primaryBtnDisabled: { opacity: 0.65 },
   primaryBtnText: { color: T.white, fontSize: 15, fontWeight: '800' },
   noticeCard: {
     backgroundColor: T.paper,
-    borderRadius: T.rMd,
-    padding: 18,
+    borderRadius: 14,
+    padding: 20,
     borderWidth: 1,
     borderColor: T.border,
+    ...T.sh1,
   },
   noticeTitle: { color: T.ink, fontSize: 17, fontWeight: '900', marginBottom: 8 },
   noticeText: { color: T.muted, fontSize: 14, lineHeight: 20 },

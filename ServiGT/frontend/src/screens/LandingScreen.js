@@ -4,6 +4,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
   useWindowDimensions,
 } from 'react-native';
@@ -87,6 +88,7 @@ export default function LandingScreen({ navigation }) {
 
   const onLogin    = () => navigation?.navigate('Login');
   const onRegister = () => navigation?.navigate('Register');
+  const onSearch   = () => navigation?.navigate('Servicios');
 
   return (
     <ScrollView style={s.root} stickyHeaderIndices={[0]}>
@@ -105,14 +107,40 @@ export default function LandingScreen({ navigation }) {
             <ServiGTLogo size={isWeb ? 32 : 26} mode="light" layout="horizontal" />
           </Animated.View>
 
+          <Animated.View style={[s.heroBadge, entrance(a0)]}>
+            <Text style={s.heroBadgeText}>+500 proveedores verificados en Guatemala</Text>
+          </Animated.View>
+
           <Animated.Text style={[s.heroTitle, isWeb && s.heroTitleWeb, entrance(a1)]}>
-            {'Encuentra el servicio\nque necesitas'}
+            Conectando servicios en Guatemala
           </Animated.Text>
 
           <Animated.Text style={[s.heroSub, isWeb && s.heroSubWeb, entrance(a2)]}>
-            Conectamos profesionales de confianza con quienes los necesitan
-            en Guatemala. Rápido, seguro y fácil.
+            Encuentra plomeros, electricistas, niñeras y más. Profesionales verificados,
+            cerca de ti, al precio justo.
           </Animated.Text>
+
+          <Animated.View style={[s.searchShell, !isWeb && s.searchShellMobile, entrance(a2)]}>
+            <TextInput
+              editable={false}
+              pointerEvents="none"
+              style={s.heroSearchInput}
+              placeholder="¿Qué servicio necesitas hoy?"
+              placeholderTextColor={C.muted}
+            />
+            <ScaleBtn
+              label="Buscar"
+              onPress={onSearch}
+              style={[s.searchBtn, !isWeb && { width: '100%' }]}
+              textStyle={s.searchBtnText}
+            />
+          </Animated.View>
+
+          <Animated.View style={[s.quickChips, entrance(a3)]}>
+            {['Plomería urgente', 'Limpieza de oficina', 'Niñera fin de semana', 'Reparación PC'].map((item) => (
+              <Text key={item} style={s.quickChip}>{item}</Text>
+            ))}
+          </Animated.View>
 
           <Animated.View style={[s.heroCtas, !isWeb && s.heroCtasMobile, entrance(a3)]}>
             <ScaleBtn
@@ -146,10 +174,10 @@ export default function LandingScreen({ navigation }) {
       {/* ── Features ── */}
       <View style={s.features}>
         <Text style={[s.sectionTitle, isWeb && s.sectionTitleWeb]}>
-          ¿Por qué elegir ServiGT?
+          Cómo funciona
         </Text>
         <Text style={s.sectionSub}>
-          La plataforma más completa para servicios profesionales en Guatemala
+          Tres pasos simples para resolver lo que necesitas
         </Text>
         <View style={[s.featureGrid, isWeb && s.featureGridWeb]}>
           <FeatureCard web={isWeb} anim={f0} icon="🔍" title="Encuentra Proveedores"
@@ -200,7 +228,7 @@ const s = StyleSheet.create({
 
   // Hero
   hero: {
-    backgroundColor: C.heroBg,
+    backgroundColor: C.deep,
     paddingHorizontal: 24,
     paddingVertical: 88,
     alignItems: 'center',
@@ -209,7 +237,7 @@ const s = StyleSheet.create({
   heroOverlay: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: C.deep,
-    opacity: 0.28,
+    opacity: 0.34,
   },
   heroContent: { alignItems: 'center', width: '100%', maxWidth: 620, zIndex: 1 },
   heroContentWeb: { maxWidth: 740 },
@@ -218,7 +246,7 @@ const s = StyleSheet.create({
     fontWeight: '800',
     color: C.paper,
     textAlign: 'center',
-    marginTop: 28,
+    marginTop: 18,
     marginBottom: 16,
     lineHeight: 42,
     letterSpacing: -0.5,
@@ -232,6 +260,66 @@ const s = StyleSheet.create({
     marginBottom: 40,
   },
   heroSubWeb: { fontSize: 19, lineHeight: 30, maxWidth: 580 },
+  heroBadge: {
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 999,
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.24)',
+    marginTop: 18,
+  },
+  heroBadgeText: { color: C.paper, fontSize: 12, fontWeight: '700' },
+  searchShell: {
+    width: '100%',
+    maxWidth: 580,
+    flexDirection: 'row',
+    gap: 8,
+    padding: 8,
+    borderRadius: 16,
+    backgroundColor: C.paper,
+    marginBottom: 22,
+    shadowColor: C.deep,
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.22,
+    shadowRadius: 34,
+    elevation: 5,
+  },
+  searchShellMobile: {
+    flexDirection: 'column',
+  },
+  heroSearchInput: {
+    flex: 1,
+    minHeight: 44,
+    paddingHorizontal: 14,
+    color: C.ink,
+    fontSize: 15,
+  },
+  searchBtn: {
+    backgroundColor: C.blue,
+    minWidth: 112,
+    height: 44,
+    borderRadius: 12,
+  },
+  searchBtnText: { color: '#fff', fontSize: 14, fontWeight: '800' },
+  quickChips: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    gap: 8,
+    marginBottom: 28,
+  },
+  quickChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 999,
+    backgroundColor: 'rgba(255,255,255,0.16)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.24)',
+    color: C.paper,
+    fontSize: 13,
+    fontWeight: '600',
+  },
   heroCtas: {
     flexDirection: 'row',
     gap: 14,
@@ -244,7 +332,7 @@ const s = StyleSheet.create({
     backgroundColor: C.accent,
     paddingHorizontal: 28,
     paddingVertical: 15,
-    borderRadius: 10,
+    borderRadius: 12,
     alignItems: 'center',
     minWidth: 200,
     height: 52,
@@ -255,7 +343,7 @@ const s = StyleSheet.create({
     borderColor: 'rgba(246,244,238,0.55)',
     paddingHorizontal: 28,
     paddingVertical: 14,
-    borderRadius: 10,
+    borderRadius: 12,
     alignItems: 'center',
     minWidth: 180,
     height: 52,
@@ -310,7 +398,7 @@ const s = StyleSheet.create({
   featureCardWeb: { flex: 1, marginHorizontal: 8 },
   featureIconWrap: {
     width: 66, height: 66, borderRadius: 33,
-    backgroundColor: C.soft,
+    backgroundColor: C.paper,
     justifyContent: 'center', alignItems: 'center',
     marginBottom: 18,
   },
@@ -320,7 +408,7 @@ const s = StyleSheet.create({
 
   // Bottom CTA
   ctaSection: {
-    backgroundColor: '#e8e6df',
+    backgroundColor: '#e6effa',
     paddingVertical: 72,
     paddingHorizontal: 24,
     alignItems: 'center',

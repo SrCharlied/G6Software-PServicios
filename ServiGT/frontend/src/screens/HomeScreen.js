@@ -18,7 +18,6 @@ import Drawer from '../components/Drawer';
 import ServiGTLogo from '../components/ServiGTLogo';
 import NotificationBell from '../components/NotificationBell';
 import { getProviders, storageUrl } from '../services/api';
-import { mockProviders } from '../data/mockProviders';
 import { T } from '../theme';
 import { Avatar, Button, Card, StatusChip, Stars } from '../components/ui';
 
@@ -127,9 +126,9 @@ export default function HomeScreen({ useLayoutNavigation = false } = {}) {
     try {
       const data = await getProviders();
       setProveedores(data.proveedores || []);
-    } catch {
-      setProveedores(mockProviders);
-      setNotice('Modo demo: mostrando proveedores de ejemplo.');
+    } catch (error) {
+      setProveedores([]);
+      setNotice(error.message || 'No se pudieron cargar los proveedores.');
     } finally {
       setLoading(false);
     }
@@ -155,7 +154,26 @@ export default function HomeScreen({ useLayoutNavigation = false } = {}) {
         </View>
       ) : null}
 
-      {/* CTA Marketplace de Demanda */}
+      <View style={styles.heroPanel}>
+        <View style={styles.heroCopy}>
+          <Text style={styles.heroKicker}>Marketplace de servicios</Text>
+          <Text style={styles.heroTitle}>Encuentra proveedores reales en Guatemala</Text>
+          <Text style={styles.heroText}>
+            Busca, compara y solicita servicios directamente desde perfiles verificados por la plataforma.
+          </Text>
+        </View>
+        <View style={styles.kpiRow}>
+          <View style={styles.kpiBox}>
+            <Text style={styles.kpiValue}>{proveedores.length}</Text>
+            <Text style={styles.kpiLabel}>proveedores</Text>
+          </View>
+          <View style={styles.kpiBox}>
+            <Text style={styles.kpiValue}>{filteredProviders.length}</Text>
+            <Text style={styles.kpiLabel}>resultados</Text>
+          </View>
+        </View>
+      </View>
+
       {user && user.role !== 'proveedor' ? (
         <TouchableOpacity
           style={styles.ctaBanner}
@@ -281,6 +299,24 @@ const styles = StyleSheet.create({
     borderRadius: 10, padding: 12, marginBottom: 14,
   },
   noticeText: { color: '#8a5a00', fontSize: 13, lineHeight: 18 },
+  heroPanel: {
+    backgroundColor: T.paper,
+    borderWidth: 1,
+    borderColor: T.border,
+    borderRadius: 14,
+    padding: 18,
+    marginBottom: 14,
+    gap: 14,
+    ...T.sh2,
+  },
+  heroCopy: { gap: 4 },
+  heroKicker: { color: T.blue, fontSize: 12, fontWeight: '900', textTransform: 'uppercase' },
+  heroTitle: { color: T.ink, fontSize: 24, fontWeight: '900', lineHeight: 30 },
+  heroText: { color: T.muted, fontSize: 14, lineHeight: 21 },
+  kpiRow: { flexDirection: 'row', gap: 10, flexWrap: 'wrap' },
+  kpiBox: { minWidth: 120, flex: 1, backgroundColor: T.white, borderWidth: 1, borderColor: T.border, borderRadius: 12, padding: 12 },
+  kpiValue: { color: T.ink, fontSize: 24, fontWeight: '900' },
+  kpiLabel: { color: T.muted, fontSize: 12, fontWeight: '700', marginTop: 2 },
   searchBar: {
     flexDirection: 'row', alignItems: 'center', backgroundColor: T.white,
     borderWidth: 1, borderColor: '#dde3ea', borderRadius: 12,

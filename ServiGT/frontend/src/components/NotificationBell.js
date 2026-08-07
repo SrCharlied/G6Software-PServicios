@@ -9,6 +9,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useSession } from '../context/SessionContext';
 import {
@@ -162,11 +163,7 @@ export default function NotificationBell({ onPress, tone = 'dark' }) {
         activeOpacity={0.75}
         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
       >
-        <View style={styles.bellIcon}>
-          <View style={[styles.bellBody, tone === 'light' && styles.bellBodyLight]} />
-          <View style={[styles.bellBase, tone === 'light' && styles.bellInkLight]} />
-          <View style={[styles.bellClapper, tone === 'light' && styles.bellInkLight]} />
-        </View>
+        <Feather name="bell" size={18} color={tone === 'light' ? T.white : T.ink} />
         {loading ? (
           <View style={styles.loader}>
             <ActivityIndicator size="small" color={T.blue} />
@@ -261,47 +258,15 @@ export default function NotificationBell({ onPress, tone = 'dark' }) {
 
 const styles = StyleSheet.create({
   button: {
-    width: 36,
-    height: 36,
+    width: 38,
+    height: 38,
     alignItems: 'center',
     justifyContent: 'center',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: T.border,
+    backgroundColor: 'rgba(255,255,255,0.55)',
     position: 'relative',
-  },
-  bellIcon: {
-    width: 18,
-    height: 20,
-    alignItems: 'center',
-    justifyContent: 'flex-end',
-  },
-  bellBody: {
-    width: 16,
-    height: 14,
-    borderTopLeftRadius: 8,
-    borderTopRightRadius: 8,
-    borderBottomLeftRadius: 4,
-    borderBottomRightRadius: 4,
-    borderWidth: 2,
-    borderColor: T.ink,
-    borderBottomWidth: 0,
-  },
-  bellBase: {
-    width: 20,
-    height: 2,
-    borderRadius: 2,
-    backgroundColor: T.ink,
-  },
-  bellClapper: {
-    width: 5,
-    height: 5,
-    borderRadius: 3,
-    backgroundColor: T.ink,
-    marginTop: 1,
-  },
-  bellBodyLight: {
-    borderColor: T.white,
-  },
-  bellInkLight: {
-    backgroundColor: T.white,
   },
   loader: {
     position: 'absolute',

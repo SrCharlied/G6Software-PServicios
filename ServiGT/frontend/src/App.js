@@ -13,7 +13,6 @@ import { StatusBar } from 'expo-status-bar';
 import { registerRootComponent } from 'expo';
 import { ToastProvider } from './context/ToastContext';
 import Drawer from './components/Drawer';
-import { mockProviders } from './data/mockProviders';
 import LoginScreen from './screens/LoginScreen';
 import RegisterScreen from './screens/RegisterScreen';
 import ProviderDashboardScreen from './screens/ProviderDashboardScreen';
@@ -129,9 +128,9 @@ export default function App() {
     try {
       const data = await getProviders();
       setProveedores(data.proveedores || []);
-    } catch {
-      setProveedores(mockProviders);
-      setNotice('Modo demo: mostrando proveedores de ejemplo.');
+    } catch (error) {
+      setProveedores([]);
+      setNotice(error.message || 'No se pudieron cargar los proveedores.');
     } finally {
       setLoading(false);
     }

@@ -490,15 +490,18 @@ export default function RegisterScreen({ navigation, onRegisterSuccess }) {
   // ── Render principal ──────────────────────────────────────────────────
   return (
     <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
-      <View style={styles.logoWrap}><ServiGTLogo size={24} mode="dark" /></View>
-      <Text style={styles.appSubtitle}>Crear cuenta</Text>
+      <View style={styles.pageInner}>
+        <View style={styles.logoWrap}><ServiGTLogo size={28} mode="dark" /></View>
+        <Text style={styles.pageTitle}>Crear cuenta</Text>
+        <Text style={styles.appSubtitle}>Unete a la comunidad de ServiGT con datos reales de tu cuenta.</Text>
 
-      {/* Indicador de pasos solo para proveedor (o si ya paso del paso 1) */}
-      {(role === 'proveedor' || step > 1) && <StepIndicator />}
+        {/* Indicador de pasos solo para proveedor (o si ya paso del paso 1) */}
+        {(role === 'proveedor' || step > 1) && <StepIndicator />}
 
-      {step === 1 && renderStep1()}
-      {step === 2 && renderStep2()}
-      {step === 3 && renderStep3()}
+        {step === 1 && renderStep1()}
+        {step === 2 && renderStep2()}
+        {step === 3 && renderStep3()}
+      </View>
     </ScrollView>
   );
 }
@@ -507,17 +510,30 @@ export default function RegisterScreen({ navigation, onRegisterSuccess }) {
 const styles = StyleSheet.create({
   container: {
     flexGrow: 1,
-    padding: 20,
-    paddingTop: 36,
+    padding: 24,
+    paddingTop: 40,
+    paddingBottom: 40,
     backgroundColor: T.canvas,
   },
-  logoWrap: { alignItems: 'center', marginBottom: 4 },
+  pageInner: {
+    width: '100%',
+    maxWidth: 720,
+    alignSelf: 'center',
+  },
+  logoWrap: { alignItems: 'center', marginBottom: 10 },
+  pageTitle: {
+    color: T.ink,
+    fontSize: 30,
+    fontWeight: '900',
+    textAlign: 'center',
+  },
   appSubtitle: {
-    fontSize: 16,
+    fontSize: 14,
     color: T.muted,
     textAlign: 'center',
-    marginTop: 4,
-    marginBottom: 20,
+    marginTop: 6,
+    marginBottom: 24,
+    lineHeight: 20,
   },
 
   // Step indicator
@@ -559,53 +575,51 @@ const styles = StyleSheet.create({
   // Card
   card: {
     backgroundColor: T.paper,
-    borderRadius: 14,
-    padding: 20,
-    shadowColor: T.ink,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.07,
-    shadowRadius: 6,
-    elevation: 3,
+    borderRadius: 16,
+    padding: 24,
+    borderWidth: 1,
+    borderColor: T.border,
+    ...T.sh2,
   },
   cardTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#222',
+    fontSize: 22,
+    fontWeight: '900',
+    color: T.ink,
     marginBottom: 4,
   },
   cardSub: {
-    fontSize: 13,
-    color: '#777',
+    fontSize: 14,
+    color: T.muted,
     marginBottom: 18,
-    lineHeight: 18,
+    lineHeight: 20,
   },
 
   // Inputs
   inputLabel: {
     fontSize: 13,
-    fontWeight: '600',
-    color: '#444',
+    fontWeight: '700',
+    color: T.ink,
     marginBottom: 6,
     marginTop: 4,
   },
   input: {
-    backgroundColor: '#f7f9fc',
+    backgroundColor: T.inputBg,
     borderWidth: 1,
-    borderColor: '#d9e2ef',
-    borderRadius: 8,
+    borderColor: T.inputBorder,
+    borderRadius: 12,
     paddingHorizontal: 13,
     paddingVertical: 13,
     fontSize: 15,
     marginBottom: 4,
-    color: '#333',
+    color: T.text,
   },
   inputError: {
-    borderColor: '#c0392b',
+    borderColor: T.danger,
     backgroundColor: '#fff5f5',
   },
   fieldError: {
     fontSize: 12,
-    color: '#c0392b',
+    color: T.danger,
     marginBottom: 10,
     marginLeft: 2,
   },
@@ -626,8 +640,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 13,
     paddingVertical: 8,
-    borderRadius: 20,
-    borderWidth: 1.5,
+    borderRadius: 999,
+    borderWidth: 1,
     borderColor: T.inputBorder,
     backgroundColor: T.white,
   },
@@ -658,47 +672,49 @@ const styles = StyleSheet.create({
   },
   roleBtn: {
     flex: 1,
+    minHeight: 64,
     paddingVertical: 12,
-    paddingHorizontal: 8,
-    borderRadius: 10,
-    borderWidth: 1.5,
-    borderColor: '#d9e2ef',
-    backgroundColor: '#f7f9fc',
+    paddingHorizontal: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: T.border,
+    backgroundColor: T.inputBg,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   roleBtnActive: {
-    backgroundColor: '#4589d4',
-    borderColor: '#4589d4',
+    backgroundColor: '#e6effa',
+    borderColor: T.blue,
   },
-  roleText: { fontSize: 14, fontWeight: '700', color: '#555' },
-  roleTextActive: { color: '#fff' },
+  roleText: { fontSize: 14, fontWeight: '800', color: T.text },
+  roleTextActive: { color: T.deep },
   roleSub: { fontSize: 11, color: '#999', marginTop: 2 },
-  roleSubActive: { color: 'rgba(255,255,255,0.8)' },
+  roleSubActive: { color: T.muted },
 
   // Botones
   btnPrimary: {
-    backgroundColor: '#4589d4',
+    backgroundColor: T.blue,
     paddingVertical: 15,
-    borderRadius: 10,
+    borderRadius: 12,
     alignItems: 'center',
     marginTop: 6,
     marginBottom: 12,
   },
-  btnDisabled: { backgroundColor: '#a0bfef' },
+  btnDisabled: { backgroundColor: T.soft },
   btnPrimaryText: { color: '#fff', fontSize: 16, fontWeight: '700' },
   btnSecondary: {
-    borderWidth: 1.5,
-    borderColor: '#4589d4',
+    borderWidth: 1,
+    borderColor: T.soft,
     paddingVertical: 13,
     borderRadius: 10,
     alignItems: 'center',
     marginTop: 6,
     marginBottom: 12,
   },
-  btnSecondaryText: { color: '#4589d4', fontSize: 15, fontWeight: '600' },
+  btnSecondaryText: { color: T.deep, fontSize: 15, fontWeight: '700' },
 
   linkText: {
-    color: '#4589d4',
+    color: T.blue,
     textAlign: 'center',
     fontSize: 14,
     paddingVertical: 4,

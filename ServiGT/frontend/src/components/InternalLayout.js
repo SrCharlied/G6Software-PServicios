@@ -170,7 +170,7 @@ export default function InternalLayout({ children, section }) {
           </View>
           {/* La campana vive en el layout para que proveedor y admin tambien
               la tengan, no solo el home del cliente. */}
-          <NotificationBell tone="light" />
+          <NotificationBell />
         </View>
 
         <View style={styles.userBox}>
@@ -210,7 +210,7 @@ const styles = StyleSheet.create({
   },
   mobileHeader: {
     minHeight: 56,
-    backgroundColor: T.paper,
+    backgroundColor: 'rgba(246,244,238,0.94)',
     borderBottomWidth: 1,
     borderBottomColor: T.border,
     paddingHorizontal: T.s3,
@@ -318,10 +318,12 @@ const styles = StyleSheet.create({
   },
   sidebar: {
     width: SIDEBAR_WIDTH,
-    backgroundColor: T.ink,
+    backgroundColor: T.paper,
     paddingHorizontal: T.s4,
     paddingTop: T.s6,
     paddingBottom: T.s4,
+    borderRightWidth: 1,
+    borderRightColor: T.border,
   },
   brandRow: {
     flexDirection: 'row',
@@ -335,29 +337,29 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   brand: {
-    color: T.white,
+    color: T.ink,
     fontSize: 22,
     fontWeight: '800',
   },
   role: {
-    color: 'rgba(255,255,255,0.7)',
+    color: T.muted,
     fontSize: 12,
     marginTop: 4,
   },
   userBox: {
     borderTopWidth: 1,
     borderBottomWidth: 1,
-    borderColor: 'rgba(255,255,255,0.14)',
+    borderColor: T.border,
     paddingVertical: T.s4,
     marginBottom: T.s4,
   },
   userName: {
-    color: T.white,
+    color: T.ink,
     fontSize: 15,
     fontWeight: '700',
   },
   userMeta: {
-    color: 'rgba(255,255,255,0.58)',
+    color: T.muted,
     fontSize: 11,
     marginTop: 4,
   },
@@ -374,7 +376,7 @@ const styles = StyleSheet.create({
     borderRadius: T.rSm,
   },
   navItemActive: {
-    backgroundColor: 'rgba(69,137,212,0.22)',
+    backgroundColor: '#e6effa',
   },
   navMarker: {
     width: 3,
@@ -386,12 +388,12 @@ const styles = StyleSheet.create({
     backgroundColor: T.blue,
   },
   navLabel: {
-    color: 'rgba(255,255,255,0.78)',
+    color: T.text,
     fontSize: 14,
     fontWeight: '600',
   },
   navLabelActive: {
-    color: T.white,
+    color: T.deep,
     fontWeight: '700',
   },
   logoutBtn: {
@@ -399,10 +401,10 @@ const styles = StyleSheet.create({
     paddingVertical: 11,
     paddingHorizontal: T.s3,
     borderRadius: T.rSm,
-    backgroundColor: 'rgba(255,255,255,0.12)',
+    backgroundColor: '#eef4ff',
   },
   logoutText: {
-    color: T.white,
+    color: T.deep,
     fontSize: 14,
     fontWeight: '700',
   },

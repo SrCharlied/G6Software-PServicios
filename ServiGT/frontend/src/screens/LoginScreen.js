@@ -1,11 +1,10 @@
 import { useState } from 'react';
 import {
-  ActivityIndicator,
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { login, getProviderByUser } from '../services/api';
@@ -13,8 +12,11 @@ import { useToast } from '../context/ToastContext';
 import { validateEmail } from '../utils/validation';
 import ServiGTLogo from '../components/ServiGTLogo';
 import { T } from '../theme';
+import { Button, Card, Input } from '../components/ui';
 
 export default function LoginScreen({ navigation, onLogin }) {
+  const { width } = useWindowDimensions();
+  const compact = width < 760;
   const toast = useToast();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -40,7 +42,7 @@ export default function LoginScreen({ navigation, onLogin }) {
           const profileData = await getProviderByUser(user.id);
           providerProfile = profileData.proveedor;
         } catch {
-          // Aun no tiene perfil de proveedor creado
+          // Aun no tiene perfil de proveedor creado.
         }
       }
 
@@ -53,51 +55,79 @@ export default function LoginScreen({ navigation, onLogin }) {
   };
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <View style={styles.logoWrap}><ServiGTLogo size={28} mode="dark" /></View>
-      <Text style={styles.subtitle}>Iniciar sesión</Text>
+    <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
+      <View style={[styles.shell, compact && styles.shellCompact]}>
+        {!compact ? (
+          <View style={styles.brandPanel}>
+            <ServiGTLogo size={30} mode="light" />
+            <View>
+              <Text style={styles.brandTitle}>Bienvenido de vuelta</Text>
+              <Text style={styles.brandText}>
+                Gestiona servicios, solicitudes y proveedores reales desde tu cuenta de ServiGT.
+              </Text>
+            </View>
+            <View style={styles.brandStats}>
+              <View>
+                <Text style={styles.brandStatValue}>GT</Text>
+                <Text style={styles.brandStatLabel}>Marketplace local</Text>
+              </View>
+              <View>
+                <Text style={styles.brandStatValue}>24/7</Text>
+                <Text style={styles.brandStatLabel}>Solicitudes activas</Text>
+              </View>
+            </View>
+          </View>
+        ) : null}
 
-      <View style={styles.form}>
-        <Text style={styles.label}>Correo electronico</Text>
-        <TextInput
-          style={[styles.input, errors.email && styles.inputError]}
-          placeholder="correo@ejemplo.com"
-          value={email}
-          onChangeText={(v) => { setEmail(v); setErrors((e) => ({ ...e, email: null })); }}
-          keyboardType="email-address"
-          autoCapitalize="none"
-          autoCorrect={false}
-        />
-        {errors.email ? <Text style={styles.fieldError}>{errors.email}</Text> : null}
+        <View style={styles.formPanel}>
+          <View style={styles.logoWrap}><ServiGTLogo size={28} mode="dark" /></View>
+          <Text style={styles.title}>Iniciar sesion</Text>
+          <Text style={styles.subtitle}>Ingresa con tu cuenta de ServiGT</Text>
 
-        <Text style={styles.label}>Contrasena</Text>
-        <TextInput
-          style={[styles.input, errors.password && styles.inputError]}
-          placeholder="••••••••"
-          value={password}
-          onChangeText={(v) => { setPassword(v); setErrors((e) => ({ ...e, password: null })); }}
-          secureTextEntry
-        />
-        {errors.password ? <Text style={styles.fieldError}>{errors.password}</Text> : null}
+          <Card padding={20} style={styles.form}>
+            <Text style={styles.label}>Correo electronico</Text>
+            <Input
+              icon="mail"
+              placeholder="correo@ejemplo.com"
+              value={email}
+              onChangeText={(v) => { setEmail(v); setErrors((e) => ({ ...e, email: null })); }}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              autoCorrect={false}
+              error={errors.email}
+              style={styles.field}
+            />
 
-        <TouchableOpacity
-          style={[styles.button, loading && styles.buttonDisabled]}
-          onPress={handleLogin}
-          disabled={loading}
-        >
-          {loading
-            ? <ActivityIndicator color="#fff" />
-            : <Text style={styles.buttonText}>Ingresar</Text>}
-        </TouchableOpacity>
+            <Text style={styles.label}>Contrasena</Text>
+            <Input
+              icon="lock"
+              placeholder="Contrasena"
+              value={password}
+              onChangeText={(v) => { setPassword(v); setErrors((e) => ({ ...e, password: null })); }}
+              secureTextEntry
+              error={errors.password}
+              style={styles.field}
+            />
+
+            <Button
+              full
+              size="lg"
+              loading={loading}
+              onPress={handleLogin}
+            >
+              Ingresar
+            </Button>
+          </Card>
+
+          <TouchableOpacity onPress={() => navigation?.navigate('Register')}>
+            <Text style={styles.link}>No tienes cuenta? Registrate</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity onPress={() => navigation?.navigate('Home')}>
+            <Text style={styles.linkSecondary}>Volver al inicio</Text>
+          </TouchableOpacity>
+        </View>
       </View>
-
-      <TouchableOpacity onPress={() => navigation?.navigate('Register')}>
-        <Text style={styles.link}>No tienes cuenta? Registrate</Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity onPress={() => navigation?.navigate('Home')}>
-        <Text style={styles.linkSecondary}>Volver al inicio</Text>
-      </TouchableOpacity>
     </ScrollView>
   );
 }
@@ -109,76 +139,87 @@ const styles = StyleSheet.create({
     padding: 24,
     backgroundColor: T.canvas,
   },
+  shell: {
+    width: '100%',
+    maxWidth: 980,
+    minHeight: 560,
+    alignSelf: 'center',
+    flexDirection: 'row',
+    borderRadius: 18,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: T.border,
+    backgroundColor: T.paper,
+    ...T.sh2,
+  },
+  shellCompact: {
+    maxWidth: 440,
+    minHeight: 0,
+  },
+  brandPanel: {
+    flex: 1,
+    padding: 42,
+    justifyContent: 'space-between',
+    backgroundColor: T.deep,
+  },
+  brandTitle: {
+    color: T.white,
+    fontSize: 38,
+    lineHeight: 43,
+    fontWeight: '900',
+  },
+  brandText: {
+    color: 'rgba(255,255,255,0.86)',
+    fontSize: 16,
+    lineHeight: 24,
+    marginTop: 12,
+    maxWidth: 390,
+  },
+  brandStats: {
+    flexDirection: 'row',
+    gap: 26,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.18)',
+    paddingTop: 22,
+  },
+  brandStatValue: { color: T.white, fontSize: 24, fontWeight: '900' },
+  brandStatLabel: { color: 'rgba(255,255,255,0.74)', fontSize: 12, marginTop: 2 },
+  formPanel: {
+    flex: 1,
+    padding: 34,
+    justifyContent: 'center',
+  },
   logoWrap: {
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 14,
+  },
+  title: {
+    fontSize: 28,
+    fontWeight: '900',
+    color: T.ink,
   },
   subtitle: {
-    fontSize: 17,
+    fontSize: 14,
     color: T.muted,
-    textAlign: 'center',
-    marginTop: 4,
-    marginBottom: 32,
-    letterSpacing: 0.1,
+    marginTop: 6,
+    marginBottom: 24,
   },
   form: {
-    backgroundColor: T.paper,
-    borderRadius: 14,
-    padding: 20,
-    marginBottom: 20,
-    shadowColor: T.ink,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.07,
-    shadowRadius: 6,
-    elevation: 2,
+    marginBottom: 18,
   },
   label: {
-    fontSize: 13,
-    fontWeight: '600',
     color: T.ink,
+    fontSize: 13,
+    fontWeight: '700',
     marginBottom: 6,
-    marginTop: 4,
   },
-  input: {
-    backgroundColor: T.white,
-    borderWidth: 1,
-    borderColor: T.inputBorder,
-    borderRadius: 8,
-    padding: 13,
-    fontSize: 15,
-    marginBottom: 4,
-    color: T.text,
-  },
-  inputError: {
-    borderColor: T.danger,
-    backgroundColor: '#fff5f5',
-  },
-  fieldError: {
-    fontSize: 12,
-    color: T.danger,
-    marginBottom: 10,
-    marginLeft: 2,
-  },
-  button: {
-    backgroundColor: T.blue,
-    padding: 15,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginTop: 4,
-  },
-  buttonDisabled: {
-    backgroundColor: T.soft,
-  },
-  buttonText: {
-    color: T.paper,
-    fontSize: 16,
-    fontWeight: '600',
-  },
+  field: { marginBottom: 14 },
   link: {
     color: T.blue,
     textAlign: 'center',
     marginBottom: 10,
     fontSize: 14,
+    fontWeight: '700',
   },
   linkSecondary: {
     color: T.faint,

@@ -69,23 +69,23 @@ function Dropdown({ label, value, options, onSelect, placeholder = 'Selecciona..
 
 const dd = StyleSheet.create({
   wrapper: { marginBottom: 14 },
-  label: { fontSize: 13, fontWeight: '600', color: '#444', marginBottom: 6 },
+  label: { fontSize: 13, fontWeight: '700', color: T.ink, marginBottom: 6 },
   selector: {
     flexDirection: 'row', alignItems: 'center',
-    backgroundColor: '#f7f9fc', borderWidth: 1, borderColor: '#d9e2ef',
-    borderRadius: 8, paddingHorizontal: 13, paddingVertical: 13,
+    backgroundColor: T.inputBg, borderWidth: 1, borderColor: T.inputBorder,
+    borderRadius: 12, paddingHorizontal: 13, paddingVertical: 13,
   },
-  selectorText: { flex: 1, fontSize: 15, color: '#333' },
-  selectorPlaceholder: { flex: 1, fontSize: 15, color: '#aaa' },
-  arrow: { fontSize: 12, color: '#999', marginLeft: 8 },
+  selectorText: { flex: 1, fontSize: 15, color: T.text },
+  selectorPlaceholder: { flex: 1, fontSize: 15, color: T.faint },
+  arrow: { fontSize: 12, color: T.muted, marginLeft: 8 },
   list: {
-    backgroundColor: '#fff', borderWidth: 1, borderColor: '#e0e0e0',
-    borderRadius: 8, maxHeight: 220, overflow: 'hidden',
+    backgroundColor: T.paper, borderWidth: 1, borderColor: T.border,
+    borderRadius: 12, maxHeight: 220, overflow: 'hidden',
   },
-  option: { paddingHorizontal: 14, paddingVertical: 11, borderBottomWidth: 1, borderBottomColor: '#f5f5f5' },
-  optionActive: { backgroundColor: '#e3f2fd' },
-  optionText: { fontSize: 14, color: '#555' },
-  optionTextActive: { color: '#4589d4', fontWeight: '600' },
+  option: { paddingHorizontal: 14, paddingVertical: 11, borderBottomWidth: 1, borderBottomColor: T.border },
+  optionActive: { backgroundColor: T.tint },
+  optionText: { fontSize: 14, color: T.text },
+  optionTextActive: { color: T.deep, fontWeight: '700' },
 });
 
 // ── Pantalla principal ────────────────────────────────────────────────────

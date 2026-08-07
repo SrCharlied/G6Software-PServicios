@@ -13,10 +13,10 @@ export const C = {
   ink:    '#0e1424',
   paper:  '#f6f4ee',
   canvas: '#f0eee9',
-  muted:  '#64748b',
+  muted:  '#667085',
   border: 'rgba(14,20,36,0.09)',
   heroBg: '#0e1424',
-  accent: '#e07b18',
+  accent: '#1b5499',
 };
 
 // Punto de corte entre el layout ancho y el de telefono.
@@ -70,17 +70,17 @@ const s = StyleSheet.create({
     backgroundColor: C.blue,
     paddingHorizontal: 20,
     paddingVertical: 11,
-    borderRadius: 8,
+    borderRadius: 12,
     alignItems: 'center',
     height: 42,
   },
-  solidBtnText: { color: C.paper, fontWeight: '600', fontSize: 14 },
+  solidBtnText: { color: '#fff', fontWeight: '700', fontSize: 14 },
   outlineBtn: {
     borderWidth: 1.5,
     borderColor: C.blue,
     paddingHorizontal: 20,
     paddingVertical: 10,
-    borderRadius: 8,
+    borderRadius: 12,
     alignItems: 'center',
     height: 42,
   },

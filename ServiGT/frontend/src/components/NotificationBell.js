@@ -265,7 +265,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     borderWidth: 1,
     borderColor: T.border,
-    backgroundColor: 'rgba(255,255,255,0.55)',
+    backgroundColor: T.inputBg,
     position: 'relative',
   },
   loader: {
@@ -333,7 +333,7 @@ const styles = StyleSheet.create({
     flexShrink: 1,
   },
   markAllBtn: {
-    backgroundColor: '#eef4ff',
+    backgroundColor: T.tint,
     borderRadius: 8,
     paddingHorizontal: 9,
     paddingVertical: 6,
@@ -383,7 +383,7 @@ const styles = StyleSheet.create({
     backgroundColor: T.paper,
   },
   notificationUnread: {
-    backgroundColor: '#eef4ff',
+    backgroundColor: T.tint,
   },
   notificationTop: {
     flexDirection: 'row',

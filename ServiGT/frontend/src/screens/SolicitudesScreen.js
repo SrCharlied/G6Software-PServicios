@@ -6,6 +6,7 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import {
@@ -23,8 +24,30 @@ const tabs = [
 
 const ESTADOS_CON_CODIGO = new Set(['pendiente', 'aceptado']);
 
+function StatusChip({ estado }) {
+  const normalized = estado || 'pendiente';
+  const cfg = {
+    pendiente: { bg: '#fff7ed', fg: '#92400e', dot: '#f59e0b' },
+    aceptado: { bg: '#eef4ff', fg: '#1b5499', dot: T.blue },
+    en_progreso: { bg: '#eef4ff', fg: '#1b5499', dot: T.blue },
+    por_confirmar: { bg: '#fef9c3', fg: '#713f12', dot: T.amber },
+    completado: { bg: '#dcfce7', fg: '#166534', dot: T.success },
+    cancelado: { bg: '#fef2f2', fg: '#991b1b', dot: T.danger },
+    rechazado: { bg: '#fef2f2', fg: '#991b1b', dot: T.danger },
+  }[normalized] || { bg: '#eef4ff', fg: '#1b5499', dot: T.blue };
+
+  return (
+    <View style={[styles.statusChip, { backgroundColor: cfg.bg }]}>
+      <View style={[styles.statusDot, { backgroundColor: cfg.dot }]} />
+      <Text style={[styles.statusText, { color: cfg.fg }]}>{normalized.replace('_', ' ')}</Text>
+    </View>
+  );
+}
+
 export default function SolicitudesScreen({ navigation, user }) {
   const toast = useToast();
+  const { width } = useWindowDimensions();
+  const wide = width >= 900;
   const [activeTab, setActiveTab] = useState('enviadas');
   const [enviadas, setEnviadas] = useState([]);
   const [recibidas, setRecibidas] = useState([]);
@@ -100,6 +123,8 @@ export default function SolicitudesScreen({ navigation, user }) {
     const persona = activeTab === 'enviadas'
       ? item.proveedor?.nombre || 'Proveedor'
       : item.cliente?.name || 'Cliente';
+    const categoria = item.categoria?.nombre || item.proveedor?.categoria?.nombre || 'Sin categoria';
+    const monto = item.monto_acordado ?? item.monto ?? item.precio;
 
     const mostrarCodigo = activeTab === 'enviadas'
       && item.codigo_inicio
@@ -116,17 +141,23 @@ export default function SolicitudesScreen({ navigation, user }) {
       && !yaCalifico;
 
     return (
-      <View style={styles.card}>
+      <View style={[styles.card, wide && styles.cardWide]}>
         <View style={styles.cardHeader}>
-          <Text style={styles.persona} numberOfLines={1}>{persona}</Text>
-          <Text style={styles.estado}>{item.estado || 'pendiente'}</Text>
+          <View style={styles.cardIdentity}>
+            <View style={styles.serviceIcon}>
+              <Text style={styles.serviceIconText}>{categoria.charAt(0).toUpperCase()}</Text>
+            </View>
+            <View style={styles.personaBlock}>
+              <Text style={styles.persona} numberOfLines={1}>{persona}</Text>
+              <Text style={styles.categoryText} numberOfLines={1}>{categoria}</Text>
+            </View>
+          </View>
+          <StatusChip estado={item.estado} />
         </View>
         <Text style={styles.descripcion}>{item.descripcion}</Text>
         <View style={styles.metaRow}>
-          <Text style={styles.metaText}>
-            {item.categoria?.nombre || item.proveedor?.categoria?.nombre || 'Sin categoria'}
-          </Text>
           <Text style={styles.metaText}>{formatDate(item.created_at)}</Text>
+          {monto != null ? <Text style={styles.amountText}>Q{Number(monto).toFixed(2)}</Text> : null}
         </View>
 
         {mostrarCodigo ? (
@@ -184,10 +215,10 @@ export default function SolicitudesScreen({ navigation, user }) {
 
         {puedeCalificar ? (
           <TouchableOpacity
-            style={styles.rateBtn}
+            style={styles.primaryAction}
             onPress={() => navigation.navigate('CalificarProveedor', { servicioId: item.id })}
           >
-            <Text style={styles.rateBtnText}>Calificar proveedor</Text>
+            <Text style={styles.primaryActionText}>Calificar proveedor</Text>
           </TouchableOpacity>
         ) : null}
 
@@ -200,11 +231,15 @@ export default function SolicitudesScreen({ navigation, user }) {
 
   return (
     <View style={styles.container}>
+      <View style={styles.contentWrap}>
       <View style={styles.header}>
         <TouchableOpacity style={styles.backBtn} onPress={() => navigation.navigate('Home')}>
           <Text style={styles.backBtnText}>Volver</Text>
         </TouchableOpacity>
-        <Text style={styles.title}>Solicitudes</Text>
+        <View style={styles.headerCopy}>
+          <Text style={styles.title}>{user?.role === 'cliente' ? 'Mis servicios' : 'Trabajos'}</Text>
+          <Text style={styles.subtitle}>Gestiona tus servicios y solicitudes activas.</Text>
+        </View>
         <TouchableOpacity style={styles.refreshBtn} onPress={fetchSolicitudes}>
           <Text style={styles.refreshText}>Actualizar</Text>
         </TouchableOpacity>
@@ -240,6 +275,9 @@ export default function SolicitudesScreen({ navigation, user }) {
           keyExtractor={(item) => String(item.id)}
           renderItem={renderSolicitud}
           contentContainerStyle={styles.listContent}
+          numColumns={wide ? 2 : 1}
+          key={wide ? 'wide' : 'narrow'}
+          columnWrapperStyle={wide ? styles.listColumns : null}
           refreshing={loading}
           onRefresh={fetchSolicitudes}
           ListEmptyComponent={
@@ -256,75 +294,76 @@ export default function SolicitudesScreen({ navigation, user }) {
           }
         />
       )}
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: T.canvas },
+  contentWrap: { flex: 1, width: '100%', maxWidth: 1100, alignSelf: 'center', padding: 24, paddingBottom: 36 },
   header: {
-    backgroundColor: T.paper,
-    paddingHorizontal: 16,
-    paddingTop: 18,
-    paddingBottom: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e8ecf1',
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 14,
+    marginBottom: 18,
+    flexWrap: 'wrap',
   },
   backBtn: { paddingVertical: 8, paddingRight: 8 },
   backBtnText: { color: '#4589d4', fontSize: 14, fontWeight: '700' },
-  title: { flex: 1, fontSize: 20, fontWeight: '800', color: T.ink, textAlign: 'center' },
+  headerCopy: { flex: 1, minWidth: 220 },
+  title: { fontSize: 26, fontWeight: '800', color: T.ink, marginBottom: 4 },
+  subtitle: { fontSize: 14, color: T.muted, lineHeight: 20 },
   refreshBtn: { paddingVertical: 8, paddingLeft: 8 },
   refreshText: { color: '#4589d4', fontSize: 14, fontWeight: '700' },
   tabs: {
     flexDirection: 'row',
-    gap: 8,
-    padding: 16,
-    backgroundColor: T.canvas,
+    gap: 6,
+    padding: 4,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: T.border,
+    backgroundColor: T.paper,
+    marginBottom: 18,
+    alignSelf: 'flex-start',
   },
   tabBtn: {
-    flex: 1,
-    paddingVertical: 11,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#cfd8e3',
-    backgroundColor: T.paper,
+    paddingVertical: 9,
+    paddingHorizontal: 16,
+    borderRadius: 9,
     alignItems: 'center',
   },
-  tabBtnActive: { backgroundColor: '#4589d4', borderColor: '#4589d4' },
+  tabBtnActive: { backgroundColor: T.white, ...T.sh1 },
   tabBtnDisabled: { opacity: 0.5 },
   tabText: { color: '#526071', fontSize: 14, fontWeight: '700' },
-  tabTextActive: { color: '#fff' },
+  tabTextActive: { color: T.deep },
   tabTextDisabled: { color: '#8c96a3' },
-  listContent: { padding: 16, paddingTop: 0, paddingBottom: 32 },
+  listContent: { paddingBottom: 32 },
+  listColumns: { gap: 12 },
   card: {
     backgroundColor: T.paper,
-    borderRadius: 12,
+    borderRadius: 14,
     padding: 16,
     marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 3,
-    elevation: 2,
+    borderWidth: 1,
+    borderColor: T.border,
+    ...T.sh1,
   },
-  cardHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
+  cardWide: { flex: 1 },
+  cardHeader: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 },
+  cardIdentity: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12, minWidth: 0 },
+  serviceIcon: { width: 42, height: 42, borderRadius: 12, backgroundColor: '#eef4ff', alignItems: 'center', justifyContent: 'center' },
+  serviceIconText: { color: T.deep, fontWeight: '900', fontSize: 16 },
+  personaBlock: { flex: 1, minWidth: 0 },
   persona: { flex: 1, fontSize: 16, fontWeight: '800', color: T.ink },
-  estado: {
-    backgroundColor: '#eef4ff',
-    color: '#356fae',
-    paddingHorizontal: 9,
-    paddingVertical: 4,
-    borderRadius: 8,
-    overflow: 'hidden',
-    fontSize: 12,
-    fontWeight: '700',
-  },
+  categoryText: { fontSize: 12, color: T.muted, fontWeight: '600', marginTop: 3 },
+  statusChip: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 999 },
+  statusDot: { width: 6, height: 6, borderRadius: 999 },
+  statusText: { fontSize: 11, fontWeight: '800', textTransform: 'capitalize' },
   descripcion: { marginTop: 10, fontSize: 14, lineHeight: 20, color: '#526071' },
-  metaRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 12, marginTop: 12 },
+  metaRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: T.border },
   metaText: { fontSize: 12, color: '#8c96a3', fontWeight: '600' },
+  amountText: { fontSize: 16, color: T.deep, fontWeight: '900' },
   codigoBox: {
     marginTop: 14,
     backgroundColor: '#e3f0ff',
@@ -335,14 +374,14 @@ const styles = StyleSheet.create({
   codigoLabel: { fontSize: 12, color: '#1858a6', fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.6 },
   codigoValue: { fontSize: 30, fontWeight: '800', color: '#0e1424', letterSpacing: 6, marginTop: 4 },
   codigoHint:  { fontSize: 11, color: '#1858a6', marginTop: 6, textAlign: 'center' },
-  rateBtn: {
+  primaryAction: {
     marginTop: 14,
     backgroundColor: T.blue,
-    borderRadius: 8,
+    borderRadius: 10,
     paddingVertical: 12,
     alignItems: 'center',
   },
-  rateBtnText: { color: T.white, fontSize: 14, fontWeight: '800' },
+  primaryActionText: { color: T.white, fontSize: 14, fontWeight: '800' },
   confirmFinBox: {
     marginTop: 14,
     backgroundColor: '#fff4e0',

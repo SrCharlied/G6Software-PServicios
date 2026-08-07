@@ -24,14 +24,24 @@ class Proveedor extends Model
         'tarifa_hora',
         'tarifa_proyecto',
         'nivel',
+        'premium_inicio_at',
         'premium_vence_at',
+        'premium_ciclo_key',
+        'premium_renovaciones',
     ];
 
     protected $casts = [
         'tarifa_hora'           => 'decimal:2',
         'tarifa_proyecto'       => 'decimal:2',
         'calificacion_promedio' => 'decimal:2',
+        'premium_inicio_at'     => 'datetime',
         'premium_vence_at'      => 'datetime',
+        'premium_renovaciones'  => 'integer',
+    ];
+
+    protected $appends = [
+        'premium_estado',
+        'premium_dias_restantes',
     ];
 
     public function categoria()
@@ -95,5 +105,19 @@ class Proveedor extends Model
         }
 
         return $this->premium_vence_at->isFuture() ? 'activo' : 'vencido';
+    }
+
+    public function getPremiumEstadoAttribute(): string
+    {
+        return $this->premiumEstado();
+    }
+
+    public function getPremiumDiasRestantesAttribute(): int
+    {
+        if ($this->premiumEstado() !== 'activo') {
+            return 0;
+        }
+
+        return max(0, (int) ceil(now()->diffInDays($this->premium_vence_at, false)));
     }
 }

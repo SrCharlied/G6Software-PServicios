@@ -20,6 +20,7 @@ const NAV_BY_ROLE = {
   proveedor: [
     { label: 'Mi panel',       path: '/dashboard' },
     { label: 'Oportunidades',  path: '/pedidos/abiertos', match: ['/pedidos/'] },
+    { label: 'Creditos',       path: '/creditos' },
     { label: 'Solicitudes',    path: '/solicitudes' },
     { label: 'Mensajes',       path: '/chat' },
     { label: 'Mi perfil',      path: '/profile/edit' },

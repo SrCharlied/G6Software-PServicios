@@ -287,7 +287,7 @@ export default function ProviderDetailScreen({
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: T.canvas },
-  content: { paddingBottom: 40 },
+  content: { width: '100%', maxWidth: 1100, alignSelf: 'center', padding: 24, paddingBottom: 40 },
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
   loadingText: { marginTop: 12, fontSize: 15, color: T.muted, textAlign: 'center' },
 

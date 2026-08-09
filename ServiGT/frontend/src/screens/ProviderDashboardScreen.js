@@ -23,6 +23,7 @@ import {
   getDocumentos,
   getMiDisponibilidad,
   getPedidosAbiertos,
+  getPremiumMiEstado,
   getProviderByUser,
   getSolicitudesProveedor,
   iniciarServicio,
@@ -32,6 +33,7 @@ import {
 } from '../services/api';
 import { useToast } from '../context/ToastContext';
 import { T } from '../theme';
+import { PremiumBadge } from '../components/ui';
 
 const DEPARTAMENTOS_GT = [
   'Alta Verapaz', 'Baja Verapaz', 'Chimaltenango', 'Chiquimula', 'El Progreso',
@@ -496,6 +498,7 @@ export default function ProviderDashboardScreen({
   const [solicitudes, setSolicitudes] = useState([]);
   const [calificaciones, setCalificaciones] = useState([]);
   const [disponibilidad, setDisponibilidad] = useState(buildDisponibilidad());
+  const [premiumInfo, setPremiumInfo] = useState(null);
   const [activeTab, setActiveTab] = useState('solicitudes');
   const [loadingProfile, setLoadingProfile] = useState(!providerProfile);
   const [loadingDocs, setLoadingDocs] = useState(false);
@@ -607,6 +610,13 @@ export default function ProviderDashboardScreen({
     finally {
       setLoadingDocs(false); setLoadingSolicitudes(false);
       setLoadingCalificaciones(false); setLoadingDisponibilidad(false);
+    }
+
+    try {
+      const premiumData = await getPremiumMiEstado();
+      setPremiumInfo(premiumData);
+    } catch {
+      setPremiumInfo(null);
     }
   };
 
@@ -757,6 +767,9 @@ export default function ProviderDashboardScreen({
     >
       <Text style={styles.headerGreet}>{getGreeting()}</Text>
       <Text style={styles.headerTitle}>{subtitle ?? (profile?.nombre || 'Mi panel')}</Text>
+      {profile ? (
+        <PremiumBadge proveedor={profile} premium={premiumInfo} compact style={styles.headerPremium} />
+      ) : null}
       <View style={styles.headerRow}>
         {profile ? (
           <View style={[styles.headerStatus, !availableNow && styles.headerStatusOff]}>
@@ -1111,6 +1124,7 @@ export default function ProviderDashboardScreen({
           </TouchableOpacity>
         </View>
         <Text style={styles.profileName}>{profile.nombre}</Text>
+        <PremiumBadge proveedor={profile} premium={premiumInfo} showDetails style={styles.profilePremium} />
         <Text style={styles.profileDescription}>{profile.descripcion}</Text>
         <View style={styles.profileMetaWrap}>
           <Text style={styles.profileMeta}>{profile.categoria?.nombre || 'Sin categoria'}</Text>
@@ -1394,6 +1408,7 @@ const styles = StyleSheet.create({
   },
   headerGreet: { fontSize: 13, fontWeight: '600', color: 'rgba(255,255,255,0.78)', letterSpacing: 0.3 },
   headerTitle: { marginTop: 4, fontSize: 24, fontWeight: '800', color: '#fff', letterSpacing: -0.4, lineHeight: 28 },
+  headerPremium: { marginTop: 10 },
   headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: 12, marginTop: 14 },
   headerStatus: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
@@ -1434,6 +1449,7 @@ const styles = StyleSheet.create({
 
   // Profile
   profileName: { fontSize: 18, fontWeight: '700', color: T.ink, marginBottom: 8 },
+  profilePremium: { marginBottom: 12 },
   profileDescription: { fontSize: 14, color: T.text, lineHeight: 20, opacity: 0.78 },
   profileMetaWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 12 },
   profileMeta: { backgroundColor: 'rgba(69,137,212,0.10)', color: T.deep, fontSize: 12, fontWeight: '600', paddingHorizontal: 11, paddingVertical: 6, borderRadius: 999, overflow: 'hidden' },

@@ -6,6 +6,7 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { crearPedido, getCategorias } from '../services/api';
@@ -25,6 +26,8 @@ function FieldError({ message }) {
 
 export default function PublicarPedidoScreen({ navigation }) {
   const toast = useToast();
+  const { width } = useWindowDimensions();
+  const compact = width < 520;
 
   const [descripcion, setDescripcion]   = useState('');
   const [direccion, setDireccion]       = useState('');
@@ -83,7 +86,11 @@ export default function PublicarPedidoScreen({ navigation }) {
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={[styles.content, compact && styles.contentCompact]}
+      keyboardShouldPersistTaps="handled"
+    >
       <TouchableOpacity style={styles.backRow} onPress={() => navigation.goBack()}>
         <Text style={styles.backText}>Volver</Text>
       </TouchableOpacity>
@@ -97,18 +104,20 @@ export default function PublicarPedidoScreen({ navigation }) {
         </View>
       </View>
 
-      <View style={styles.stepper}>
+      <View style={[styles.stepper, compact && styles.stepperCompact]}>
         {['Que necesitas', 'Donde', 'Publicar'].map((step, index) => (
-          <View key={step} style={styles.stepItem}>
+          <View key={step} style={[styles.stepItem, compact && styles.stepItemCompact]}>
             <View style={[styles.stepDot, index === 0 && styles.stepDotActive]}>
               <Text style={[styles.stepDotText, index === 0 && styles.stepDotTextActive]}>{index + 1}</Text>
             </View>
-            <Text style={[styles.stepText, index === 0 && styles.stepTextActive]}>{step}</Text>
+            <Text style={[styles.stepText, compact && styles.stepTextCompact, index === 0 && styles.stepTextActive]}>
+              {step}
+            </Text>
           </View>
         ))}
       </View>
 
-      <View style={styles.formPanel}>
+      <View style={[styles.formPanel, compact && styles.formPanelCompact]}>
       <View style={styles.sectionHeader}>
         <Text style={styles.sectionTitle}>Datos del pedido</Text>
         <Text style={styles.sectionHint}>Tu pedido queda abierto durante 7 dias.</Text>
@@ -163,7 +172,7 @@ export default function PublicarPedidoScreen({ navigation }) {
 
       {/* Urgencia */}
       <Text style={styles.label}>Urgencia <Text style={styles.required}>*</Text></Text>
-      <View style={styles.urgenciaRow}>
+      <View style={[styles.urgenciaRow, compact && styles.urgenciaRowCompact]}>
         {URGENCIAS.map((u) => (
           <TouchableOpacity
             key={u.value}
@@ -202,18 +211,23 @@ export default function PublicarPedidoScreen({ navigation }) {
 const styles = StyleSheet.create({
   container:   { flex: 1, backgroundColor: T.canvas },
   content:     { padding: 24, paddingBottom: 56, alignItems: 'center' },
+  contentCompact: { paddingHorizontal: 16, paddingTop: 18 },
   hero:        { width: '100%', maxWidth: 760, marginBottom: 18 },
   heroCopy:    { flex: 1, minWidth: 0 },
   formPanel:   { width: '100%', maxWidth: 760, backgroundColor: T.paper, borderRadius: 14, borderWidth: 1, borderColor: T.border, padding: 24, ...T.sh2 },
+  formPanelCompact: { padding: 18 },
   title:       { fontSize: 26, fontWeight: '800', color: T.ink, marginBottom: 5 },
   subtitle:    { fontSize: 14, color: T.muted, lineHeight: 20 },
   stepper:     { width: '100%', maxWidth: 760, flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 18 },
+  stepperCompact: { gap: 4 },
   stepItem:    { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 7 },
+  stepItemCompact: { gap: 5 },
   stepDot:     { width: 28, height: 28, borderRadius: 999, alignItems: 'center', justifyContent: 'center', backgroundColor: T.inputBg },
   stepDotActive: { backgroundColor: T.blue },
   stepDotText: { fontSize: 12, color: T.muted, fontWeight: '800' },
   stepDotTextActive: { color: T.white },
   stepText:    { fontSize: 12, color: T.muted, fontWeight: '600', flexShrink: 1 },
+  stepTextCompact: { fontSize: 11 },
   stepTextActive: { color: T.ink, fontWeight: '800' },
   sectionHeader: { marginBottom: 18, paddingBottom: 14, borderBottomWidth: 1, borderBottomColor: T.border },
   sectionTitle: { fontSize: 18, fontWeight: '800', color: T.ink, marginBottom: 4 },
@@ -237,6 +251,7 @@ const styles = StyleSheet.create({
   chipText:         { fontSize: 13, color: T.muted },
   chipTextSelected: { color: T.blue, fontWeight: '700' },
   urgenciaRow: { flexDirection: 'row', gap: 10, marginBottom: 4 },
+  urgenciaRowCompact: { gap: 6 },
   urgenciaBtn: {
     flex: 1, paddingVertical: 12, borderRadius: T.rMd,
     borderWidth: 1.5, borderColor: T.border, alignItems: 'center',

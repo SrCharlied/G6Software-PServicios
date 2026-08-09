@@ -12,7 +12,7 @@ import { Feather } from '@expo/vector-icons';
 import { getProvider, getCalificacionesProveedor, getDisponibilidadProveedor, storageUrl } from '../services/api';
 import { useToast } from '../context/ToastContext';
 import { T } from '../theme';
-import { Avatar, Button, Card, StatusChip, Stars } from '../components/ui';
+import { Avatar, Button, Card, PremiumBadge, StatusChip, Stars } from '../components/ui';
 
 const DIAS = ['Dom', 'Lun', 'Mar', 'Mie', 'Jue', 'Vie', 'Sab'];
 
@@ -113,6 +113,7 @@ export default function ProviderDetailScreen({
       <Card style={styles.profileCard}>
         <Avatar uri={storageUrl(proveedor.foto_perfil)} name={proveedor.nombre} size={72} />
         <Text style={styles.provName}>{proveedor.nombre}</Text>
+        <PremiumBadge proveedor={proveedor} showDetails style={styles.premiumBlock} />
 
         <View style={styles.chipsWrap}>
           {categorias.map((cat) => (
@@ -286,7 +287,7 @@ export default function ProviderDetailScreen({
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: T.canvas },
-  content: { paddingBottom: 40 },
+  content: { width: '100%', maxWidth: 1100, alignSelf: 'center', padding: 24, paddingBottom: 40 },
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
   loadingText: { marginTop: 12, fontSize: 15, color: T.muted, textAlign: 'center' },
 
@@ -299,6 +300,7 @@ const styles = StyleSheet.create({
 
   profileCard: { alignItems: 'center', marginBottom: 14 },
   provName: { fontSize: 22, fontWeight: '800', color: T.ink, marginTop: 12, marginBottom: 8 },
+  premiumBlock: { alignSelf: 'stretch', marginBottom: 12 },
   chipsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, justifyContent: 'center', marginBottom: 4 },
   ratingRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8, marginBottom: 4 },
   ratingText: { fontSize: 13, color: T.muted },

@@ -1,5 +1,5 @@
 import { Feather } from '@expo/vector-icons';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Modal,
@@ -21,6 +21,7 @@ import {
 } from '../services/api';
 import { useToast } from '../context/ToastContext';
 import { Button, Card, StatusChip } from '../components/ui';
+import { abrirIntento, cerrarIntento, INTENTO_VACIO } from '../utils/purchaseIntent';
 import { T } from '../theme';
 
 const USD_RATE = 7.85;
@@ -53,9 +54,6 @@ const formatDate = (value) => {
   if (Number.isNaN(date.getTime())) return 'Sin fecha';
   return date.toLocaleString('es-GT', { dateStyle: 'medium', timeStyle: 'short' });
 };
-
-const makeIdempotencyKey = () =>
-  `web-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 
 function PremiumBadge({ compact = false }) {
   return (
@@ -263,6 +261,11 @@ export default function CreditosScreen() {
   const [checkoutBaseSaldo, setCheckoutBaseSaldo] = useState(0);
   const [activatingPremium, setActivatingPremium] = useState(false);
 
+  // Clave de idempotencia de la compra en curso. Vive en un ref porque no se
+  // muestra: solo tiene que sobrevivir a los reintentos. La regla de reuso esta
+  // en src/utils/purchaseIntent.js, con sus pruebas.
+  const intentoCompra = useRef(INTENTO_VACIO);
+
   const selectedPackage = useMemo(
     () => paquetes.find((paquete) => paquete.id === selectedPackageId) ?? paquetes[0],
     [paquetes, selectedPackageId],
@@ -306,6 +309,10 @@ export default function CreditosScreen() {
   };
 
   const openCheckout = (paquete) => {
+    // Conserva la clave si es el mismo paquete: cerrar el modal tras un fallo y
+    // reabrirlo sigue siendo el mismo intento de compra.
+    intentoCompra.current = abrirIntento(intentoCompra.current, paquete.id);
+
     setSelectedPackageId(paquete.id);
     setCheckoutStatus('confirmar');
     setCheckoutCompra(null);
@@ -317,18 +324,27 @@ export default function CreditosScreen() {
   const confirmCheckout = async () => {
     if (!selectedPackage) return;
 
+    // Red de seguridad: si se llega aqui sin intento abierto, se acuña ahora.
+    intentoCompra.current = abrirIntento(intentoCompra.current, selectedPackage.id);
+
     setCheckoutStatus('pendiente');
     setCheckoutError('');
     try {
       const data = await comprarCreditos({
         paqueteId: selectedPackage.id,
-        idempotencyKey: makeIdempotencyKey(),
+        idempotencyKey: intentoCompra.current.key,
       });
+      // La compra quedo registrada, sea de este envio o de uno anterior que el
+      // backend reconocio por la clave. El intento se cierra: una compra futura
+      // del mismo paquete es una intencion nueva y acuña otra clave.
+      intentoCompra.current = cerrarIntento();
       setCheckoutCompra(data.compra);
       setCheckoutStatus(data.compra?.estado || 'completada');
       await loadData({ showLoader: false, targetPage: 1 });
       toast(data.message || 'Compra completada correctamente.', 'success');
     } catch (err) {
+      // Se mantiene la clave a proposito: el reintento debe llegar con la misma
+      // para que el backend pueda reconocer una acreditacion ya hecha.
       setCheckoutError(err.message);
       setCheckoutStatus('fallida');
       toast(err.message, 'error');

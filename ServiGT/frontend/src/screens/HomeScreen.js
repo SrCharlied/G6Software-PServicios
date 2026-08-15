@@ -20,7 +20,7 @@ import NotificationBell from '../components/NotificationBell';
 import { getProviders, storageUrl } from '../services/api';
 import { mockProviders } from '../data/mockProviders';
 import { T } from '../theme';
-import { Avatar, Button, Card, StatusChip, Stars } from '../components/ui';
+import { Avatar, Button, Card, PremiumBadge, StatusChip, Stars } from '../components/ui';
 
 // Evita escribir un rango unicode de marcas diacriticas como literal de regex
 // (̀-ͯ): se filtra por code point para no depender de como el
@@ -70,6 +70,9 @@ function ProviderCard({ prov, onPress, style }) {
 
         <View style={styles.provChipsRow}>
           <StatusChip variant="info" label={prov.categoria?.nombre || 'Sin categoria'} size="sm" dot={false} />
+          {/* Impulso Premium: se ve, pero no reordena el listado ni sustituye
+              la reputacion, que sigue mandando el orden del backend. */}
+          <PremiumBadge estado={prov.premium?.estado ?? 'nunca'} size="sm" />
           {rating > 0 ? (
             <View style={styles.ratingRow}>
               <Stars value={rating} size={12} />

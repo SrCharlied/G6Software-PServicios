@@ -493,6 +493,76 @@ export const getMiCredito = async () => {
   }
 };
 
+// ── Creditos: paquetes, compra simulada e historial ───────────────────────
+
+export const getPaquetesCreditos = async () => {
+  try {
+    const response = await api.get('/creditos/paquetes');
+    return response.data;
+  } catch (error) {
+    throw new Error(getErrorMessage(error, 'No se pudieron cargar los paquetes de creditos.'));
+  }
+};
+
+/**
+ * Compra simulada. `idempotencyKey` viaja al backend para que un doble envio
+ * del formulario no acredite el paquete dos veces; se genera una vez por
+ * intento de compra, no por reintento de red.
+ */
+export const comprarCreditos = async (paqueteId, idempotencyKey) => {
+  try {
+    const response = await api.post('/creditos/comprar', {
+      paquete_id: paqueteId,
+      idempotency_key: idempotencyKey,
+    });
+    return response.data;
+  } catch (error) {
+    throw new Error(getErrorMessage(error, 'No se pudo completar la compra.'));
+  }
+};
+
+export const getTransaccionesCreditos = async ({ page = 1, perPage = 10 } = {}) => {
+  try {
+    const response = await api.get('/creditos/transacciones', {
+      params: { page, per_page: perPage },
+    });
+    return response.data;
+  } catch (error) {
+    throw new Error(getErrorMessage(error, 'No se pudo cargar el historial de creditos.'));
+  }
+};
+
+// ── Premium ───────────────────────────────────────────────────────────────
+
+export const getMiEstadoPremium = async () => {
+  try {
+    const response = await api.get('/premium/mi-estado');
+    return response.data;
+  } catch (error) {
+    throw new Error(getErrorMessage(error, 'No se pudo obtener tu estado Premium.'));
+  }
+};
+
+export const activarPremium = async (idempotencyKey) => {
+  try {
+    const response = await api.post('/premium/activar', { idempotency_key: idempotencyKey });
+    return response.data;
+  } catch (error) {
+    throw new Error(getErrorMessage(error, 'No se pudo activar Premium.'));
+  }
+};
+
+/**
+ * Clave de idempotencia para compras y activaciones. `crypto.randomUUID` no
+ * existe en todos los runtimes de React Native, de ahi el respaldo.
+ */
+export const nuevaIdempotencyKey = (prefijo = 'sgt') => {
+  if (typeof globalThis !== 'undefined' && globalThis.crypto?.randomUUID) {
+    return `${prefijo}-${globalThis.crypto.randomUUID()}`;
+  }
+  return `${prefijo}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+};
+
 export const getPedidoDetalle = async (id) => {
   try {
     const response = await api.get(`/pedidos/${id}`);
@@ -565,6 +635,28 @@ export const getAdminProveedores = async () => {
     return response.data;
   } catch (error) {
     throw new Error(getErrorMessage(error, 'No se pudieron cargar los proveedores.'));
+  }
+};
+
+export const getAdminCompras = async ({ estado = null, proveedorId = null, page = 1, perPage = 20 } = {}) => {
+  try {
+    const params = { page, per_page: perPage };
+    if (estado) params.estado = estado;
+    if (proveedorId) params.proveedor_id = proveedorId;
+    const response = await api.get('/admin/compras', { params });
+    return response.data;
+  } catch (error) {
+    throw new Error(getErrorMessage(error, 'No se pudieron cargar las compras de creditos.'));
+  }
+};
+
+export const getAdminPremium = async ({ estado = null } = {}) => {
+  try {
+    const params = estado ? { estado } : {};
+    const response = await api.get('/admin/premium', { params });
+    return response.data;
+  } catch (error) {
+    throw new Error(getErrorMessage(error, 'No se pudo cargar la vigencia Premium.'));
   }
 };
 

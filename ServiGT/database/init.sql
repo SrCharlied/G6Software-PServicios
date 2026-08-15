@@ -80,6 +80,9 @@ CREATE TABLE IF NOT EXISTS proveedores (
     calificacion_promedio DECIMAL(3,2) NOT NULL DEFAULT 0.00,
     total_calificaciones INT NOT NULL DEFAULT 0,
     nivel VARCHAR(20) NOT NULL DEFAULT 'novato' CHECK (nivel IN ('novato','intermedio','experto')),
+    premium_inicio_at TIMESTAMP WITHOUT TIME ZONE,
+    premium_vence_at TIMESTAMP WITHOUT TIME ZONE,
+    premium_renovaciones INT NOT NULL DEFAULT 0 CHECK (premium_renovaciones >= 0),
     created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
@@ -171,6 +174,27 @@ CREATE TABLE IF NOT EXISTS compras_creditos (
     updated_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX IF NOT EXISTS idx_compras_creditos_proveedor ON compras_creditos (proveedor_id, created_at DESC);
+
+-- Activaciones y renovaciones Premium (simuladas durante el MVP).
+-- Existe como tabla propia y no como columnas sueltas en proveedores porque
+-- la acreditacion de 10 creditos debe ser idempotente: `idempotency_key`
+-- protege contra el doble envio del mismo formulario y UNIQUE
+-- (proveedor_id, ciclo) garantiza que un ciclo acredite una sola vez.
+CREATE TABLE IF NOT EXISTS activaciones_premium (
+    id BIGSERIAL PRIMARY KEY,
+    proveedor_id BIGINT NOT NULL REFERENCES proveedores(id) ON DELETE CASCADE,
+    ciclo INT NOT NULL CHECK (ciclo > 0),
+    monto_gtq DECIMAL(10,2) NOT NULL CHECK (monto_gtq > 0),
+    creditos_otorgados INT NOT NULL DEFAULT 0 CHECK (creditos_otorgados >= 0),
+    inicio_at TIMESTAMP WITHOUT TIME ZONE NOT NULL,
+    vence_at TIMESTAMP WITHOUT TIME ZONE NOT NULL,
+    referencia VARCHAR(20) NOT NULL UNIQUE,
+    idempotency_key VARCHAR(100) NOT NULL UNIQUE,
+    created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (proveedor_id, ciclo)
+);
+CREATE INDEX IF NOT EXISTS idx_activaciones_premium_proveedor ON activaciones_premium (proveedor_id, created_at DESC);
 
 -- Servicios (solicitudes de trabajo)
 CREATE TABLE IF NOT EXISTS servicios (
@@ -387,6 +411,11 @@ END $$;
 -- activo, fecha pasada = vencido. El estado se deriva de esta unica columna
 -- para no duplicar la fuente de verdad en un campo de estado aparte.
 ALTER TABLE proveedores ADD COLUMN IF NOT EXISTS premium_vence_at TIMESTAMP WITHOUT TIME ZONE NULL;
+
+-- Inicio del ciclo vigente y cuantos ciclos lleva el proveedor. `renovaciones`
+-- tambien numera el ciclo que se acredita, por eso arranca en 0.
+ALTER TABLE proveedores ADD COLUMN IF NOT EXISTS premium_inicio_at TIMESTAMP WITHOUT TIME ZONE NULL;
+ALTER TABLE proveedores ADD COLUMN IF NOT EXISTS premium_renovaciones INT NOT NULL DEFAULT 0;
 
 -- transacciones_credito.tipo gano el valor 'compra'. Igual que arriba, solo
 -- se recrea el CHECK si al actual le falta, para no tomar el lock en cada arranque.

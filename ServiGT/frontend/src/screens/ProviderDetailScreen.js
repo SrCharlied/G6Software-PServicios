@@ -12,7 +12,7 @@ import { Feather } from '@expo/vector-icons';
 import { getProvider, getCalificacionesProveedor, getDisponibilidadProveedor, storageUrl } from '../services/api';
 import { useToast } from '../context/ToastContext';
 import { T } from '../theme';
-import { Avatar, Button, Card, StatusChip, Stars } from '../components/ui';
+import { Avatar, Button, Card, PremiumBadge, StatusChip, Stars } from '../components/ui';
 
 const DIAS = ['Dom', 'Lun', 'Mar', 'Mie', 'Jue', 'Vie', 'Sab'];
 
@@ -113,6 +113,13 @@ export default function ProviderDetailScreen({
       <Card style={styles.profileCard}>
         <Avatar uri={storageUrl(proveedor.foto_perfil)} name={proveedor.nombre} size={72} />
         <Text style={styles.provName}>{proveedor.nombre}</Text>
+
+        {/* El badge solo aparece con Premium vigente: un ciclo vencido deja de
+            dar visibilidad, igual que en el dashboard del proveedor. */}
+        <PremiumBadge
+          estado={proveedor.premium?.estado ?? 'nunca'}
+          diasRestantes={proveedor.premium?.dias_restantes}
+        />
 
         <View style={styles.chipsWrap}>
           {categorias.map((cat) => (

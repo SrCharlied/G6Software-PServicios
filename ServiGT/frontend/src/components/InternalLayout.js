@@ -20,13 +20,15 @@ const NAV_BY_ROLE = {
   proveedor: [
     { label: 'Mi panel',       path: '/dashboard' },
     { label: 'Oportunidades',  path: '/pedidos/abiertos', match: ['/pedidos/'] },
-    { label: 'Solicitudes',    path: '/solicitudes' },
+    { label: 'Trabajos',       path: '/solicitudes' },
+    { label: 'Créditos',       path: '/creditos',         match: ['/creditos'] },
     { label: 'Mensajes',       path: '/chat' },
     { label: 'Mi perfil',      path: '/profile/edit' },
   ],
   admin: [
-    { label: 'Panel admin', path: '/admin' },
-    { label: 'Inicio',      path: '/home' },
+    { label: 'Panel admin',        path: '/admin' },
+    { label: 'Créditos y Premium', path: '/admin/creditos' },
+    { label: 'Inicio',             path: '/home' },
   ],
 };
 

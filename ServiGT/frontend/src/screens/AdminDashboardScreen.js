@@ -19,6 +19,7 @@ import {
 } from '../services/api';
 import { useToast } from '../context/ToastContext';
 import { T } from '../theme';
+import { Button, ScreenHeader } from '../components/ui';
 
 const ESTADO_LABEL = {
   pendiente:   'Pendientes',
@@ -71,6 +72,8 @@ export default function AdminDashboardScreen({ navigation, user }) {
   const toast = useToast();
   const { width } = useWindowDimensions();
   const isDesktop = width >= 900;
+  // A 390px el hero en fila dejaba el titulo en dos letras por linea.
+  const isNarrow = width < 700;
 
   const [activeTab, setActiveTab] = useState('stats');
   const [stats, setStats] = useState(null);
@@ -194,7 +197,7 @@ export default function AdminDashboardScreen({ navigation, user }) {
 
     return (
       <View>
-        <View style={styles.heroPanel}>
+        <View style={[styles.heroPanel, isNarrow && styles.heroPanelNarrow]}>
           <View style={styles.heroCopy}>
             <Text style={styles.heroEyebrow}>Dashboard operativo</Text>
             <Text style={styles.heroTitle}>Control de ServiGT</Text>
@@ -202,9 +205,11 @@ export default function AdminDashboardScreen({ navigation, user }) {
               Supervisa usuarios, proveedores, servicios y creditos desde el mismo entorno de la app.
             </Text>
           </View>
-          <TouchableOpacity style={styles.heroButton} onPress={() => openRecargaModal()}>
-            <Text style={styles.heroButtonText}>+ Agregar creditos</Text>
-          </TouchableOpacity>
+          <View style={[styles.heroActions, isNarrow && styles.heroActionsNarrow]}>
+            <TouchableOpacity style={styles.heroButton} onPress={() => openRecargaModal()}>
+              <Text style={styles.heroButtonText}>+ Agregar creditos</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         <Text style={styles.sectionTitle}>Usuarios</Text>
@@ -427,21 +432,28 @@ export default function AdminDashboardScreen({ navigation, user }) {
   );
 
   return (
+    <View style={styles.container}>
+      <ScreenHeader
+        title="Panel admin"
+        subtitle={`Hola, ${user?.name || 'Admin'}`}
+        onBack={() => navigation.navigate('Home')}
+        backLabel="Inicio"
+        right={
+          <Button
+            kind="secondary"
+            size="sm"
+            icon="credit-card"
+            onPress={() => navigation.navigate('AdminCreditos')}
+          >
+            {isNarrow ? 'Créditos' : 'Créditos y Premium'}
+          </Button>
+        }
+      />
+
     <ScrollView
-      style={styles.container}
       contentContainerStyle={[styles.content, isDesktop && styles.contentDesktop]}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
     >
-      <View style={styles.topBar}>
-        <TouchableOpacity onPress={() => navigation.navigate('Home')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-          <Text style={styles.backText}>← Inicio</Text>
-        </TouchableOpacity>
-        <Text style={styles.topTitle}>Panel admin</Text>
-        <View style={{ width: 60 }} />
-      </View>
-
-      <Text style={styles.subtitle}>Hola, {user?.name || 'Admin'}</Text>
-
       <View style={[styles.tabsRow, isDesktop && styles.tabsRowDesktop]}>
         {TABS.map((tab) => {
           const active = activeTab === tab.key;
@@ -464,6 +476,7 @@ export default function AdminDashboardScreen({ navigation, user }) {
       </View>
       {renderRecargaModal()}
     </ScrollView>
+    </View>
   );
 }
 
@@ -471,18 +484,6 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: T.canvas },
   content:   { padding: T.s4, paddingBottom: 40 },
   contentDesktop: { width: '100%', maxWidth: 1120, alignSelf: 'center', paddingHorizontal: T.s6 },
-
-  topBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: T.s2,
-    marginBottom: T.s2,
-  },
-  backText:  { color: T.blue, fontSize: 15, fontWeight: '600' },
-  topTitle:  { fontSize: 18, fontWeight: '800', color: T.ink },
-
-  subtitle:  { fontSize: 14, color: T.muted, marginBottom: T.s4 },
 
   tabsRow: {
     flexDirection: 'row',
@@ -518,7 +519,10 @@ const styles = StyleSheet.create({
     gap: T.s4,
     ...T.sh2,
   },
-  heroCopy: { flex: 1 },
+  heroPanelNarrow: { flexDirection: 'column', alignItems: 'stretch', gap: T.s3 },
+  heroActions: { flexShrink: 0 },
+  heroActionsNarrow: { width: '100%' },
+  heroCopy: { flex: 1, minWidth: 0 },
   heroEyebrow: { color: T.soft, fontSize: 12, fontWeight: '800', textTransform: 'uppercase', marginBottom: 6 },
   heroTitle: { color: T.white, fontSize: 24, fontWeight: '900' },
   heroText: { color: 'rgba(255,255,255,0.72)', fontSize: 13, lineHeight: 19, marginTop: 4 },

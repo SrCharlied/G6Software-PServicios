@@ -12,12 +12,14 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { getPedidoDetalle, enviarCotizacion, editarCotizacion, aceptarCotizacion, getMiCredito, storageUrl } from '../services/api';
 import { useSession } from '../context/SessionContext';
 import { useToast } from '../context/ToastContext';
 import { T } from '../theme';
+import { Button, CreditBalance, EmptyState, ExpiryBar, ScreenHeader, SlotMeter } from '../components/ui';
 
 const URGENCIA_CONFIG = {
   alta:  { label: 'URGENTE', bg: '#fee2e2', text: '#991b1b', border: '#fca5a5' },
@@ -118,6 +120,8 @@ function CotizacionClienteRow({ cot, esMejorPrecio, esMejorCalif, isLast, puedeE
 export default function PedidoDetailScreen({ pedidoId, navigation }) {
   const { user } = useSession();
   const toast = useToast();
+  const { width } = useWindowDimensions();
+  const dosColumnas = width >= 1024;
   const esProveedor = user?.role === 'proveedor';
 
   const [pedido, setPedido]             = useState(null);
@@ -242,10 +246,13 @@ export default function PedidoDetailScreen({ pedidoId, navigation }) {
   if (error || !pedido) {
     return (
       <SafeAreaView style={s.centered}>
-        <Text style={s.errorText}>{error || 'No se pudo cargar el pedido.'}</Text>
-        <TouchableOpacity style={s.retryBtn} onPress={load}>
-          <Text style={s.retryText}>Reintentar</Text>
-        </TouchableOpacity>
+        <EmptyState
+          error
+          title="No se pudo cargar el pedido"
+          description={error || 'Intenta nuevamente en unos segundos.'}
+          actionLabel="Reintentar"
+          onAction={load}
+        />
       </SafeAreaView>
     );
   }
@@ -269,13 +276,17 @@ export default function PedidoDetailScreen({ pedidoId, navigation }) {
 
   return (
     <SafeAreaView style={s.container}>
+      <ScreenHeader
+        title="Detalle del pedido"
+        subtitle={pedido.categoria?.nombre || 'Sin categoría'}
+        onBack={() => navigation.goBack()}
+      />
+
       <ScrollView contentContainerStyle={s.content} showsVerticalScrollIndicator={false}>
+        <View style={[s.layout, dosColumnas && s.layoutDesktop]}>
 
-        {/* Volver */}
-        <TouchableOpacity style={s.backRow} onPress={() => navigation.goBack()}>
-          <Text style={s.backText}>← Volver</Text>
-        </TouchableOpacity>
-
+        {/* Columna izquierda: el pedido */}
+        <View style={[s.col, dosColumnas && s.colInfo]}>
         {/* Urgencia · Categoría · Tiempo */}
         <View style={s.badgeRow}>
           <View style={[s.urgBadge, { backgroundColor: urgCfg.bg, borderColor: urgCfg.border }]}>
@@ -291,6 +302,20 @@ export default function PedidoDetailScreen({ pedidoId, navigation }) {
           <Text style={s.descText}>{pedido.descripcion}</Text>
         </View>
 
+        {/* Vigencia y espacios de cotizacion: dos datos que deciden si vale la
+            pena cotizar, antes escondidos en un texto de fecha suelto. */}
+        <View style={s.card}>
+          <ExpiryBar
+            fecha={pedido.fecha_expiracion}
+            totalDias={7}
+            label={`Vigencia · vence ${fmtDate(pedido.fecha_expiracion)}`}
+            vencidoLabel="Pedido expirado"
+          />
+          <View style={s.slotWrap}>
+            <SlotMeter usados={cotizaciones.length} />
+          </View>
+        </View>
+
         {/* Meta grid */}
         <View style={s.metaGrid}>
           {pedido.direccion ? (
@@ -299,10 +324,6 @@ export default function PedidoDetailScreen({ pedidoId, navigation }) {
               <Text style={s.metaValue}>{pedido.direccion}</Text>
             </View>
           ) : null}
-          <View style={s.metaItem}>
-            <Text style={s.metaLabel}>📅 Expira</Text>
-            <Text style={s.metaValue}>{fmtDate(pedido.fecha_expiracion)}</Text>
-          </View>
           {pedido.cliente?.name ? (
             <View style={s.metaItem}>
               <Text style={s.metaLabel}>👤 Cliente</Text>
@@ -310,8 +331,10 @@ export default function PedidoDetailScreen({ pedidoId, navigation }) {
             </View>
           ) : null}
         </View>
+        </View>
 
-        {/* ── Cotizaciones ──────────────────────────────────────────────── */}
+        {/* Columna derecha: cotizaciones */}
+        <View style={[s.col, dosColumnas && s.colCot]}>
         <View style={s.card}>
           <View style={s.cotHeader}>
             <Text style={s.cardLabel}>Cotizaciones recibidas</Text>
@@ -387,6 +410,9 @@ export default function PedidoDetailScreen({ pedidoId, navigation }) {
             ))
           )}
         </View>
+        </View>
+
+        </View>
 
         <View style={{ height: esProveedor ? 100 : 32 }} />
       </ScrollView>
@@ -427,27 +453,21 @@ export default function PedidoDetailScreen({ pedidoId, navigation }) {
                   : 'Tu nombre no será visible hasta que el cliente te seleccione.'}
               </Text>
 
-              {/* Banner de costo al editar */}
-              {miCotizacion && (
-                <View style={s.creditBanner}>
-                  <Text style={s.creditBannerIcon}>💳</Text>
-                  <Text style={s.creditBannerText}>
-                    Costo: 1 crédito{'  ·  '}
-                    Saldo: {loadingSaldo ? '…' : (saldo ?? 'no disponible')}
-                  </Text>
-                </View>
-              )}
+              {/* Saldo real del proveedor. CreditBalance distingue cargando,
+                  error de API y cero legitimo, asi que ya no hace falta el
+                  banner con "…"/"no disponible". */}
+              <CreditBalance
+                compact
+                saldo={saldo}
+                loading={loadingSaldo}
+                error={saldoError}
+                onRetry={cargarSaldo}
+                style={s.modalSaldo}
+              />
 
-              {/* El saldo no se pudo consultar: se muestra el motivo real en
-                  lugar de un cero que el proveedor leeria como "sin creditos" */}
-              {miCotizacion && !loadingSaldo && !!saldoError && (
-                <View style={s.saldoErrorBox}>
-                  <Text style={s.saldoErrorText}>{saldoError}</Text>
-                  <Pressable onPress={cargarSaldo} hitSlop={8}>
-                    <Text style={s.saldoRetry}>Reintentar</Text>
-                  </Pressable>
-                </View>
-              )}
+              <View style={s.slotModalWrap}>
+                <SlotMeter usados={cotizaciones.length} />
+              </View>
 
               {/* Sin saldo warning al editar */}
               {miCotizacion && saldo !== null && !loadingSaldo && saldo < 1 && (
@@ -556,10 +576,19 @@ export default function PedidoDetailScreen({ pedidoId, navigation }) {
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: T.canvas },
   centered:  { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 32 },
-  content:   { padding: 20 },
+  content:   { padding: T.s4 },
 
-  backRow:  { marginBottom: 18 },
-  backText: { color: T.blue, fontWeight: '600', fontSize: 15 },
+  // A 1024px o mas el pedido y sus cotizaciones conviven en dos columnas en
+  // vez de estirar una sola columna a todo el ancho.
+  layout:        { gap: T.s4 },
+  layoutDesktop: { flexDirection: 'row', alignItems: 'flex-start' },
+  col:           { minWidth: 0 },
+  colInfo:       { flex: 3 },
+  colCot:        { flex: 4 },
+
+  slotWrap:      { marginTop: T.s4 },
+  modalSaldo:    { marginBottom: T.s2 },
+  slotModalWrap: { marginBottom: T.s3 },
 
   badgeRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 16, flexWrap: 'wrap' },
   urgBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6, borderWidth: 1 },
@@ -600,10 +629,6 @@ const s = StyleSheet.create({
   estadoText:         { fontSize: 10, fontWeight: '700', color: T.muted, textTransform: 'capitalize' },
   estadoTextAceptada: { color: '#065f46' },
 
-  errorText: { fontSize: 15, color: T.danger, textAlign: 'center', marginBottom: 16 },
-  retryBtn:  { backgroundColor: T.blue, paddingHorizontal: 24, paddingVertical: 10, borderRadius: T.rSm },
-  retryText: { color: '#fff', fontWeight: '600', fontSize: 14 },
-
   fabWrap:     { position: 'absolute', bottom: 24, left: 20, right: 20 },
   fab:         { backgroundColor: T.blue, paddingVertical: 16, borderRadius: T.rLg, alignItems: 'center', ...T.sh3 },
   fabText:     { color: '#fff', fontWeight: '800', fontSize: 16 },
@@ -619,14 +644,8 @@ const s = StyleSheet.create({
   inputMulti:    { height: 110, paddingTop: 12 },
   charCount:     { fontSize: 11, color: T.faint, textAlign: 'right', marginTop: 4 },
   submitError:   { color: T.danger, fontSize: 13, marginTop: 8 },
-  creditBanner:  { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#fef9c3', borderWidth: 1, borderColor: '#fde047', borderRadius: T.rSm, paddingHorizontal: 12, paddingVertical: 9, marginBottom: 4 },
-  creditBannerIcon: { fontSize: 15 },
-  creditBannerText: { fontSize: 13, fontWeight: '700', color: '#713f12', flex: 1 },
   sinSaldoBox:   { backgroundColor: '#fff7ed', borderRadius: T.rSm, padding: 12, borderWidth: 1, borderColor: '#fed7aa', marginTop: 6, marginBottom: 4 },
   sinSaldoText:  { fontSize: 13, color: '#92400e', lineHeight: 18 },
-  saldoErrorBox: { backgroundColor: '#fef2f2', borderRadius: T.rSm, padding: 12, borderWidth: 1, borderColor: '#fecaca', marginTop: 6, marginBottom: 4, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
-  saldoErrorText: { fontSize: 13, color: '#991b1b', lineHeight: 18, flex: 1 },
-  saldoRetry:    { fontSize: 13, fontWeight: '700', color: '#991b1b', textDecorationLine: 'underline' },
   modalActions:  { flexDirection: 'row', gap: 10, marginTop: 20 },
   cancelBtn:     { flex: 1, paddingVertical: 13, borderRadius: T.rSm, borderWidth: 1, borderColor: T.border, alignItems: 'center', backgroundColor: T.white },
   cancelText:    { color: T.text, fontWeight: '600', fontSize: 14 },

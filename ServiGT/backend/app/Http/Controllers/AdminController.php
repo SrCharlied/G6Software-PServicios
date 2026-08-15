@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\CompraCredito;
 use App\Models\Proveedor;
 use App\Models\CreditoProveedor;
 use App\Models\Servicio;
@@ -50,6 +51,114 @@ class AdminController extends Controller
                 'total'      => Servicio::count(),
                 'por_estado' => $serviciosPorEstado,
             ],
+            'monetizacion' => $this->kpisMonetizacion(),
+        ]);
+    }
+
+    /**
+     * KPIs de la superficie administrativa "Creditos y Premium". Los ingresos
+     * son simulados: provienen de compras en estado `completada`, no de una
+     * pasarela real.
+     */
+    private function kpisMonetizacion(): array
+    {
+        $comprasPorEstado = CompraCredito::select('estado', DB::raw('COUNT(*) as total'))
+            ->groupBy('estado')
+            ->pluck('total', 'estado');
+
+        $completadas = CompraCredito::where('estado', 'completada');
+
+        return [
+            'compras_total'        => CompraCredito::count(),
+            'compras_por_estado'   => $comprasPorEstado,
+            'compras_completadas'  => (clone $completadas)->count(),
+            'ingresos_gtq'         => round((float) (clone $completadas)->sum('monto_gtq'), 2),
+            'creditos_vendidos'    => (int) (clone $completadas)->sum('creditos_otorgados'),
+            'creditos_comprados'   => (int) TransaccionCredito::where('tipo', 'compra')->sum('monto'),
+            'bonos_premium'        => (int) TransaccionCredito::where('tipo', 'bono')->sum('monto'),
+            'premium_activos'      => Proveedor::whereNotNull('premium_vence_at')
+                ->where('premium_vence_at', '>', now())
+                ->count(),
+            'premium_vencidos'     => Proveedor::whereNotNull('premium_vence_at')
+                ->where('premium_vence_at', '<=', now())
+                ->count(),
+        ];
+    }
+
+    /**
+     * GET /api/admin/compras
+     * Historial de compras de creditos de toda la plataforma, paginado y
+     * filtrable por estado y proveedor. Alimenta la tabla administrativa.
+     */
+    public function listCompras(Request $request): JsonResponse
+    {
+        $estado      = $request->query('estado');
+        $proveedorId = $request->query('proveedor_id');
+
+        $query = CompraCredito::with(['paquete:id,nombre', 'proveedor:id,nombre,email'])
+            ->orderByDesc('created_at');
+
+        if (in_array($estado, ['pendiente', 'completada', 'fallida', 'cancelada'], true)) {
+            $query->where('estado', $estado);
+        }
+
+        if (is_numeric($proveedorId)) {
+            $query->where('proveedor_id', (int) $proveedorId);
+        }
+
+        $perPage = (int) $request->query('per_page', 20);
+        $perPage = max(1, min($perPage, 100));
+
+        $compras = $query->paginate($perPage);
+
+        $items = collect($compras->items())->map(fn (CompraCredito $compra) => [
+            'id'                 => $compra->id,
+            'proveedor_id'       => $compra->proveedor_id,
+            'proveedor'          => $compra->proveedor?->nombre,
+            'paquete'            => $compra->paquete?->nombre,
+            'monto_gtq'          => (float) $compra->monto_gtq,
+            'creditos_otorgados' => $compra->creditos_otorgados,
+            'estado'             => $compra->estado,
+            'referencia'         => $compra->referencia,
+            'completada_at'      => $compra->completada_at,
+            'created_at'         => $compra->created_at,
+        ])->values();
+
+        return response()->json([
+            'compras'       => $items,
+            'pagina_actual' => $compras->currentPage(),
+            'ultima_pagina' => $compras->lastPage(),
+            'total'         => $compras->total(),
+            'kpis'          => $this->kpisMonetizacion(),
+        ]);
+    }
+
+    /**
+     * GET /api/admin/premium
+     * Vigencia Premium por proveedor. Devuelve los tres estados (`nunca`,
+     * `activo`, `vencido`) para que la administracion pueda filtrarlos.
+     */
+    public function listPremium(Request $request): JsonResponse
+    {
+        $estado = $request->query('estado');
+
+        $proveedores = Proveedor::with('credito')
+            ->orderByRaw('premium_vence_at DESC NULLS LAST')
+            ->get()
+            ->map(fn (Proveedor $proveedor) => array_merge($proveedor->premiumResumen(), [
+                'proveedor_id' => $proveedor->id,
+                'nombre'       => $proveedor->nombre,
+                'email'        => $proveedor->email,
+                'saldo'        => (int) ($proveedor->credito->saldo ?? 0),
+            ]));
+
+        if (in_array($estado, ['nunca', 'activo', 'vencido'], true)) {
+            $proveedores = $proveedores->where('estado', $estado);
+        }
+
+        return response()->json([
+            'proveedores' => $proveedores->values(),
+            'kpis'        => $this->kpisMonetizacion(),
         ]);
     }
 

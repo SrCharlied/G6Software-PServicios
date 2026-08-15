@@ -1,16 +1,18 @@
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
+import { Feather } from '@expo/vector-icons';
 import { crearPedido, getCategorias } from '../services/api';
 import { useToast } from '../context/ToastContext';
 import { T } from '../theme';
+import { Button, Card, Input, ScreenHeader, SlotMeter } from '../components/ui';
 
 const URGENCIAS = [
   { value: 'baja',  label: 'Baja',  color: T.success },
@@ -18,22 +20,29 @@ const URGENCIAS = [
   { value: 'alta',  label: 'Alta',  color: T.danger },
 ];
 
-function FieldError({ message }) {
-  if (!message) return null;
-  return <Text style={styles.fieldError}>{message}</Text>;
+function Campo({ label, requerido, error, children }) {
+  return (
+    <View style={s.campo}>
+      <Text style={s.label}>
+        {label} {requerido ? <Text style={s.required}>*</Text> : null}
+      </Text>
+      {children}
+      {error ? <Text style={s.fieldError}>{error}</Text> : null}
+    </View>
+  );
 }
 
 export default function PublicarPedidoScreen({ navigation }) {
   const toast = useToast();
 
-  const [descripcion, setDescripcion]   = useState('');
-  const [direccion, setDireccion]       = useState('');
-  const [urgencia, setUrgencia]         = useState('');
-  const [categoriaId, setCategoriaId]   = useState(null);
-  const [categorias, setCategorias]     = useState([]);
-  const [loadingCats, setLoadingCats]   = useState(true);
-  const [submitting, setSubmitting]     = useState(false);
-  const [errors, setErrors]             = useState({});
+  const [descripcion, setDescripcion] = useState('');
+  const [direccion, setDireccion]     = useState('');
+  const [urgencia, setUrgencia]       = useState('');
+  const [categoriaId, setCategoriaId] = useState(null);
+  const [categorias, setCategorias]   = useState([]);
+  const [loadingCats, setLoadingCats] = useState(true);
+  const [submitting, setSubmitting]   = useState(false);
+  const [errors, setErrors]           = useState({});
 
   useEffect(() => {
     getCategorias()
@@ -49,15 +58,9 @@ export default function PublicarPedidoScreen({ navigation }) {
     if (!descripcion.trim() || descripcion.trim().length < 10) {
       errs.descripcion = 'La descripción debe tener al menos 10 caracteres.';
     }
-    if (!categoriaId) {
-      errs.categoriaId = 'Selecciona una categoría.';
-    }
-    if (!direccion.trim()) {
-      errs.direccion = 'La dirección es obligatoria.';
-    }
-    if (!urgencia) {
-      errs.urgencia = 'Selecciona la urgencia.';
-    }
+    if (!categoriaId) errs.categoriaId = 'Selecciona una categoría.';
+    if (!direccion.trim()) errs.direccion = 'La dirección es obligatoria.';
+    if (!urgencia) errs.urgencia = 'Selecciona la urgencia.';
     return errs;
   };
 
@@ -83,133 +86,143 @@ export default function PublicarPedidoScreen({ navigation }) {
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-      <TouchableOpacity style={styles.backRow} onPress={() => navigation.goBack()}>
-        <Text style={styles.backText}>← Volver</Text>
-      </TouchableOpacity>
-      <Text style={styles.title}>Publicar pedido</Text>
-      <Text style={styles.subtitle}>Describe tu problema y recibe propuestas de proveedores.</Text>
-
-      {/* Descripción */}
-      <Text style={styles.label}>Descripción <Text style={styles.required}>*</Text></Text>
-      <TextInput
-        style={[styles.input, styles.textArea, errors.descripcion && styles.inputError]}
-        placeholder="Describe detalladamente el problema o servicio que necesitas..."
-        placeholderTextColor={T.faint}
-        value={descripcion}
-        onChangeText={(v) => { setDescripcion(v); clearError('descripcion'); }}
-        multiline
-        numberOfLines={4}
-        maxLength={2000}
+    <SafeAreaView style={s.container}>
+      <ScreenHeader
+        title="Publicar pedido"
+        subtitle="Describe tu problema y recibe propuestas de proveedores"
+        onBack={() => navigation.goBack()}
       />
-      <FieldError message={errors.descripcion} />
 
-      {/* Categoría */}
-      <Text style={styles.label}>Categoría <Text style={styles.required}>*</Text></Text>
-      {loadingCats ? (
-        <ActivityIndicator size="small" color={T.blue} style={{ marginBottom: 16 }} />
-      ) : (
-        <View style={styles.chipRow}>
-          {categorias.map((cat) => (
-            <TouchableOpacity
-              key={cat.id}
-              style={[styles.chip, categoriaId === cat.id && styles.chipSelected]}
-              onPress={() => { setCategoriaId(cat.id); clearError('categoriaId'); }}
-            >
-              <Text style={[styles.chipText, categoriaId === cat.id && styles.chipTextSelected]}>
-                {cat.nombre}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-      )}
-      <FieldError message={errors.categoriaId} />
-
-      {/* Dirección */}
-      <Text style={styles.label}>Dirección <Text style={styles.required}>*</Text></Text>
-      <TextInput
-        style={[styles.input, errors.direccion && styles.inputError]}
-        placeholder="Zona 10, Ciudad de Guatemala..."
-        placeholderTextColor={T.faint}
-        value={direccion}
-        onChangeText={(v) => { setDireccion(v); clearError('direccion'); }}
-        maxLength={255}
-      />
-      <FieldError message={errors.direccion} />
-
-      {/* Urgencia */}
-      <Text style={styles.label}>Urgencia <Text style={styles.required}>*</Text></Text>
-      <View style={styles.urgenciaRow}>
-        {URGENCIAS.map((u) => (
-          <TouchableOpacity
-            key={u.value}
-            style={[
-              styles.urgenciaBtn,
-              urgencia === u.value && { borderColor: u.color, backgroundColor: u.color + '18' },
-            ]}
-            onPress={() => { setUrgencia(u.value); clearError('urgencia'); }}
-          >
-            <Text style={[styles.urgenciaBtnText, urgencia === u.value && { color: u.color, fontWeight: '700' }]}>
-              {u.label}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-      <FieldError message={errors.urgencia} />
-
-      {/* Submit */}
-      <TouchableOpacity
-        style={[styles.submitBtn, submitting && styles.submitBtnDisabled]}
-        onPress={handleSubmit}
-        disabled={submitting}
-        activeOpacity={0.85}
+      <ScrollView
+        contentContainerStyle={s.scroll}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
       >
-        {submitting
-          ? <ActivityIndicator color="#fff" />
-          : <Text style={styles.submitText}>Publicar pedido</Text>}
-      </TouchableOpacity>
+        {/* El formulario se limita a 640px: estirado a 1440px las lineas
+            quedaban inmanejables de leer. */}
+        <View style={s.formWrap}>
+          <Card style={s.card}>
+            <Campo label="Descripción" requerido error={errors.descripcion}>
+              <Input
+                placeholder="Describe detalladamente el problema o servicio que necesitas…"
+                value={descripcion}
+                onChangeText={(v) => { setDescripcion(v); clearError('descripcion'); }}
+                multiline
+                maxLength={2000}
+                error={errors.descripcion ? ' ' : null}
+                helperText={`${descripcion.length}/2000`}
+              />
+            </Campo>
 
-      <Text style={styles.hint}>Tu pedido estará visible para proveedores durante 7 días.</Text>
-    </ScrollView>
+            <Campo label="Categoría" requerido error={errors.categoriaId}>
+              {loadingCats ? (
+                <ActivityIndicator size="small" color={T.blue} style={s.catLoader} />
+              ) : (
+                <View style={s.chipRow}>
+                  {categorias.map((cat) => {
+                    const activa = categoriaId === cat.id;
+                    return (
+                      <TouchableOpacity
+                        key={cat.id}
+                        style={[s.chip, activa && s.chipSel]}
+                        onPress={() => { setCategoriaId(cat.id); clearError('categoriaId'); }}
+                        accessibilityRole="button"
+                        accessibilityState={{ selected: activa }}
+                      >
+                        <Text style={[s.chipText, activa && s.chipTextSel]}>{cat.nombre}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              )}
+            </Campo>
+
+            <Campo label="Dirección" requerido error={errors.direccion}>
+              <Input
+                icon="map-pin"
+                placeholder="Zona 10, Ciudad de Guatemala…"
+                value={direccion}
+                onChangeText={(v) => { setDireccion(v); clearError('direccion'); }}
+                maxLength={255}
+                error={errors.direccion ? ' ' : null}
+              />
+            </Campo>
+
+            <Campo label="Urgencia" requerido error={errors.urgencia}>
+              <View style={s.urgenciaRow}>
+                {URGENCIAS.map((u) => {
+                  const activa = urgencia === u.value;
+                  return (
+                    <TouchableOpacity
+                      key={u.value}
+                      style={[s.urgencia, activa && { borderColor: u.color, backgroundColor: `${u.color}18` }]}
+                      onPress={() => { setUrgencia(u.value); clearError('urgencia'); }}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: activa }}
+                    >
+                      <Text style={[s.urgenciaText, activa && { color: u.color, fontWeight: '700' }]}>
+                        {u.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </Campo>
+
+            <Button kind="primary" size="lg" full loading={submitting} onPress={handleSubmit}>
+              Publicar pedido
+            </Button>
+          </Card>
+
+          <Card style={s.infoCard}>
+            <View style={s.infoHead}>
+              <Feather name="info" size={14} color={T.blue} />
+              <Text style={s.infoTitle}>Qué pasa después</Text>
+            </View>
+            <Text style={s.infoText}>
+              Tu pedido queda visible 7 días. Recibirás hasta 6 cotizaciones: las 3 primeras son
+              gratuitas para los proveedores y las siguientes les cuestan 1 crédito.
+            </Text>
+            <SlotMeter usados={0} title="Cotizaciones disponibles" />
+          </Card>
+        </View>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
-  container:   { flex: 1, backgroundColor: T.canvas },
-  content:     { padding: 20, paddingBottom: 48 },
-  title:       { fontSize: 22, fontWeight: '800', color: T.ink, marginBottom: 4 },
-  subtitle:    { fontSize: 14, color: T.muted, marginBottom: 24, lineHeight: 20 },
-  label:       { fontSize: 14, fontWeight: '600', color: T.ink, marginBottom: 6 },
-  required:    { color: T.danger },
-  input:       {
-    ...T.input,
-    marginBottom: 4,
+const s = StyleSheet.create({
+  container: { flex: 1, backgroundColor: T.canvas },
+  scroll:    { padding: T.s4, paddingBottom: 48 },
+  formWrap:  { width: '100%', maxWidth: 640, alignSelf: 'center', gap: T.s4 },
+
+  card:  { gap: T.s4 },
+  campo: { gap: 6 },
+  label: { fontSize: 13, fontWeight: '700', color: T.ink },
+  required:   { color: T.danger },
+  fieldError: { fontSize: 12, color: T.danger },
+
+  catLoader: { alignSelf: 'flex-start', marginVertical: 6 },
+  chipRow:   { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  chip: {
+    paddingHorizontal: 13, paddingVertical: 7,
+    borderRadius: 999, borderWidth: 1,
+    borderColor: T.inputBorder, backgroundColor: T.white,
   },
-  textArea:    { height: 100, textAlignVertical: 'top' },
-  inputError:  { borderColor: T.danger },
-  fieldError:  { fontSize: 12, color: T.danger, marginBottom: 12 },
-  chipRow:     { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 4 },
-  chip:        {
-    ...T.chip,
-  },
-  chipSelected:     { borderColor: T.blue, backgroundColor: '#eef4ff' },
-  chipText:         { fontSize: 13, color: T.muted },
-  chipTextSelected: { color: T.blue, fontWeight: '700' },
-  urgenciaRow: { flexDirection: 'row', gap: 10, marginBottom: 4 },
-  urgenciaBtn: {
+  chipSel:     { borderColor: T.blue, backgroundColor: '#eef4ff' },
+  chipText:    { fontSize: 13, color: T.muted },
+  chipTextSel: { color: T.blue, fontWeight: '700' },
+
+  urgenciaRow: { flexDirection: 'row', gap: 10 },
+  urgencia: {
     flex: 1, paddingVertical: 12, borderRadius: T.rMd,
     borderWidth: 1.5, borderColor: T.border, alignItems: 'center',
+    backgroundColor: T.white,
   },
-  urgenciaBtnText: { fontSize: 14, color: T.muted },
-  submitBtn:   {
-    ...T.primaryButton,
-    paddingVertical: 16,
-    marginTop: 24,
-    ...T.sh2,
-  },
-  submitBtnDisabled: { opacity: 0.6 },
-  submitText:  { ...T.primaryButtonText, fontSize: 16 },
-  hint:        { marginTop: 14, fontSize: 12, color: T.faint, textAlign: 'center' },
-  backRow:     { marginBottom: 16 },
-  backText:    { fontSize: 15, color: T.blue, fontWeight: '600' },
+  urgenciaText: { fontSize: 14, color: T.muted },
+
+  infoCard:  { gap: T.s3 },
+  infoHead:  { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  infoTitle: { fontSize: 14, fontWeight: '800', color: T.ink },
+  infoText:  { fontSize: 13, color: T.muted, lineHeight: 20 },
 });

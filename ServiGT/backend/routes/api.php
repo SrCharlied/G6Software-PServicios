@@ -137,6 +137,10 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/stats',       [AdminController::class, 'stats']);
         Route::get('/usuarios',    [AdminController::class, 'listUsers']);
         Route::get('/proveedores', [AdminController::class, 'listProviders']);
+        // Superficie "Creditos y Premium": compras de toda la plataforma y
+        // vigencia Premium por proveedor.
+        Route::get('/compras',     [AdminController::class, 'listCompras']);
+        Route::get('/premium',     [AdminController::class, 'listPremium']);
         Route::post('/proveedores/{proveedorId}/creditos', [AdminController::class, 'recargarCreditos'])
             ->where('proveedorId', '[0-9]+');
     });

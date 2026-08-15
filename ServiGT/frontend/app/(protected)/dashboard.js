@@ -5,7 +5,7 @@ import InternalLayout from '../../src/components/InternalLayout';
 
 export default function DashboardRoute() {
   const router = useRouter();
-  const { user, providerProfile, setProviderProfile, signOut } = useSession();
+  const { user, providerProfile, setProviderProfile } = useSession();
 
   if (user?.role !== 'proveedor') return <Redirect href="/home" />;
 
@@ -16,10 +16,9 @@ export default function DashboardRoute() {
         router.push(`/chat?userId=${params.chatWithUserId}&name=${encodeURIComponent(params.chatWithName ?? '')}`);
         return;
       }
-      if (key === 'pedidodetail') {
-        router.push(`/pedidos/${params.pedidoId}`);
-        return;
-      }
+      if (key === 'pedidodetail')   { router.push(`/pedidos/${params.pedidoId}`); return; }
+      if (key === 'providerdetail') { router.push(`/providers/${params.providerId}`); return; }
+      if (key === 'creditos')       { router.push('/creditos'); return; }
       const map = {
         home: '/home',
         providereditprofile: '/profile/edit',
@@ -27,6 +26,7 @@ export default function DashboardRoute() {
       };
       router.push(map[key] ?? '/home');
     },
+    goBack: () => router.back(),
   };
 
   return (
@@ -36,7 +36,6 @@ export default function DashboardRoute() {
         user={user}
         providerProfile={providerProfile}
         setProviderProfile={setProviderProfile}
-        onLogout={async () => { await signOut(); router.replace('/home'); }}
       />
     </InternalLayout>
   );

@@ -2,10 +2,12 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
+  SafeAreaView,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import {
@@ -15,16 +17,46 @@ import {
 } from '../services/api';
 import { useToast } from '../context/ToastContext';
 import { T } from '../theme';
-
-const tabs = [
-  { key: 'enviadas', label: 'Enviadas' },
-  { key: 'recibidas', label: 'Recibidas' },
-];
+import { Button, Card, EmptyState, ScreenHeader, StatusChip } from '../components/ui';
 
 const ESTADOS_CON_CODIGO = new Set(['pendiente', 'aceptado']);
 
+const ESTADO_VARIANT = {
+  pendiente:     'warn',
+  aceptado:      'success',
+  en_camino:     'info',
+  en_progreso:   'info',
+  por_confirmar: 'warn',
+  completado:    'success',
+  rechazado:     'danger',
+  cancelado:     'neutral',
+};
+
+const estadoLabel = (estado) => (estado || 'pendiente').replace(/_/g, ' ');
+
+const formatDate = (value) => {
+  if (!value) return '';
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return '';
+  return d.toLocaleDateString('es-GT', { day: '2-digit', month: 'short', year: 'numeric' });
+};
+
 export default function SolicitudesScreen({ navigation, user }) {
   const toast = useToast();
+  const { width } = useWindowDimensions();
+  const columnas = width >= 1280 ? 3 : width >= 820 ? 2 : 1;
+
+  const esProveedor = user?.role === 'proveedor';
+
+  // El proveedor llama "Trabajos" a lo mismo que el cliente ve como
+  // "Mis servicios"; la ruta tecnica sigue siendo /solicitudes para ambos.
+  const tituloPantalla = esProveedor ? 'Trabajos' : 'Mis servicios';
+
+  const TABS = useMemo(() => ([
+    { key: 'enviadas',  label: esProveedor ? 'Solicitadas por mí' : 'Mis servicios' },
+    { key: 'recibidas', label: 'Recibidas' },
+  ]), [esProveedor]);
+
   const [activeTab, setActiveTab] = useState('enviadas');
   const [enviadas, setEnviadas] = useState([]);
   const [recibidas, setRecibidas] = useState([]);
@@ -33,15 +65,13 @@ export default function SolicitudesScreen({ navigation, user }) {
   const [codigoFinErrors, setCodigoFinErrors] = useState({});
   const [confirmandoId, setConfirmandoId] = useState(null);
 
-  const canSeeRecibidas = user?.role === 'proveedor';
-
   const fetchSolicitudes = useCallback(async () => {
     setLoading(true);
     try {
       const enviadasData = await getSolicitudesCliente();
       setEnviadas(enviadasData.servicios || []);
 
-      if (canSeeRecibidas) {
+      if (esProveedor) {
         const recibidasData = await getSolicitudesProveedor();
         setRecibidas(recibidasData.servicios || []);
       } else {
@@ -52,21 +82,19 @@ export default function SolicitudesScreen({ navigation, user }) {
     } finally {
       setLoading(false);
     }
-  }, [canSeeRecibidas, toast]);
+  }, [esProveedor, toast]);
 
-  useEffect(() => {
-    fetchSolicitudes();
-  }, [fetchSolicitudes]);
+  useEffect(() => { fetchSolicitudes(); }, [fetchSolicitudes]);
 
   const solicitudes = useMemo(
     () => (activeTab === 'enviadas' ? enviadas : recibidas),
-    [activeTab, enviadas, recibidas]
+    [activeTab, enviadas, recibidas],
   );
 
   const handleConfirmarFin = async (servicioId) => {
     const codigo = (codigoFinInputs[servicioId] || '').trim();
     if (!/^\d{6}$/.test(codigo)) {
-      setCodigoFinErrors((e) => ({ ...e, [servicioId]: 'El codigo debe tener 6 digitos.' }));
+      setCodigoFinErrors((e) => ({ ...e, [servicioId]: 'El código debe tener 6 dígitos.' }));
       return;
     }
     setCodigoFinErrors((e) => ({ ...e, [servicioId]: '' }));
@@ -83,19 +111,6 @@ export default function SolicitudesScreen({ navigation, user }) {
     }
   };
 
-  const formatDate = (value) => {
-    if (!value) return '';
-    try {
-      return new Date(value).toLocaleDateString('es-GT', {
-        day: '2-digit',
-        month: 'short',
-        year: 'numeric',
-      });
-    } catch {
-      return '';
-    }
-  };
-
   const renderSolicitud = ({ item }) => {
     const persona = activeTab === 'enviadas'
       ? item.proveedor?.nombre || 'Proveedor'
@@ -105,281 +120,215 @@ export default function SolicitudesScreen({ navigation, user }) {
       && item.codigo_inicio
       && ESTADOS_CON_CODIGO.has(item.estado);
 
-    const mostrarConfirmarFin = activeTab === 'enviadas'
-      && item.estado === 'por_confirmar';
+    const mostrarConfirmarFin = activeTab === 'enviadas' && item.estado === 'por_confirmar';
 
     const yaCalifico = (item.calificaciones || []).some(
-      (cal) => Number(cal.autor_id) === Number(user?.id)
+      (cal) => Number(cal.autor_id) === Number(user?.id),
     );
     const puedeCalificar = activeTab === 'enviadas'
       && item.estado === 'completado'
       && !yaCalifico;
 
     return (
-      <View style={styles.card}>
-        <View style={styles.cardHeader}>
-          <Text style={styles.persona} numberOfLines={1}>{persona}</Text>
-          <Text style={styles.estado}>{item.estado || 'pendiente'}</Text>
-        </View>
-        <Text style={styles.descripcion}>{item.descripcion}</Text>
-        <View style={styles.metaRow}>
-          <Text style={styles.metaText}>
-            {item.categoria?.nombre || item.proveedor?.categoria?.nombre || 'Sin categoria'}
-          </Text>
-          <Text style={styles.metaText}>{formatDate(item.created_at)}</Text>
-        </View>
-
-        {mostrarCodigo ? (
-          <View style={styles.codigoBox}>
-            <Text style={styles.codigoLabel}>Codigo de inicio</Text>
-            <Text style={styles.codigoValue}>{item.codigo_inicio}</Text>
-            <Text style={styles.codigoHint}>
-              Compartelo con el proveedor cuando llegue para iniciar el servicio.
-            </Text>
-          </View>
-        ) : null}
-
-        {mostrarConfirmarFin ? (
-          <View style={styles.confirmFinBox}>
-            <Text style={styles.confirmFinLabel}>Confirmar finalizacion</Text>
-            <Text style={styles.confirmFinHint}>
-              Pide al proveedor el codigo de 6 digitos para confirmar que el trabajo esta bien hecho.
-            </Text>
-            <TextInput
-              style={[
-                styles.confirmFinInput,
-                codigoFinErrors[item.id] && styles.confirmFinInputError,
-              ]}
-              placeholder="000000"
-              placeholderTextColor="#b9c2cc"
-              keyboardType="number-pad"
-              maxLength={6}
-              value={codigoFinInputs[item.id] || ''}
-              onChangeText={(v) => {
-                const clean = v.replace(/\D/g, '').slice(0, 6);
-                setCodigoFinInputs((s) => ({ ...s, [item.id]: clean }));
-                setCodigoFinErrors((e) => ({ ...e, [item.id]: '' }));
-              }}
-              editable={confirmandoId !== item.id}
+      <View style={[s.gridItem, { flexBasis: `${100 / columnas}%`, maxWidth: `${100 / columnas}%` }]}>
+        <Card style={s.card}>
+          <View style={s.cardHead}>
+            <Text style={s.persona} numberOfLines={1}>{persona}</Text>
+            <StatusChip
+              variant={ESTADO_VARIANT[item.estado] ?? 'neutral'}
+              label={estadoLabel(item.estado)}
+              size="sm"
             />
-            {codigoFinErrors[item.id] ? (
-              <Text style={styles.confirmFinError}>{codigoFinErrors[item.id]}</Text>
-            ) : null}
-            <TouchableOpacity
-              style={[
-                styles.confirmFinBtn,
-                confirmandoId === item.id && styles.confirmFinBtnDisabled,
-              ]}
-              onPress={() => handleConfirmarFin(item.id)}
-              disabled={confirmandoId === item.id}
-            >
-              {confirmandoId === item.id ? (
-                <ActivityIndicator color={T.white} />
-              ) : (
-                <Text style={styles.confirmFinBtnText}>Confirmar finalizacion</Text>
-              )}
-            </TouchableOpacity>
           </View>
-        ) : null}
 
-        {puedeCalificar ? (
-          <TouchableOpacity
-            style={styles.rateBtn}
-            onPress={() => navigation.navigate('CalificarProveedor', { servicioId: item.id })}
-          >
-            <Text style={styles.rateBtnText}>Calificar proveedor</Text>
-          </TouchableOpacity>
-        ) : null}
+          <Text style={s.descripcion} numberOfLines={3}>{item.descripcion}</Text>
 
-        {activeTab === 'enviadas' && item.estado === 'completado' && yaCalifico ? (
-          <Text style={styles.ratedText}>Ya calificaste este servicio.</Text>
-        ) : null}
+          <View style={s.metaRow}>
+            <Text style={s.metaText} numberOfLines={1}>
+              {item.categoria?.nombre || item.proveedor?.categoria?.nombre || 'Sin categoría'}
+            </Text>
+            <Text style={s.metaText}>{formatDate(item.created_at)}</Text>
+          </View>
+
+          {mostrarCodigo ? (
+            <View style={s.codigoBox}>
+              <Text style={s.codigoLabel}>CÓDIGO DE INICIO</Text>
+              <Text style={s.codigoValue}>{item.codigo_inicio}</Text>
+              <Text style={s.codigoHint}>
+                Compártelo con el proveedor cuando llegue para iniciar el servicio.
+              </Text>
+            </View>
+          ) : null}
+
+          {mostrarConfirmarFin ? (
+            <View style={s.confirmBox}>
+              <Text style={s.confirmLabel}>CONFIRMAR FINALIZACIÓN</Text>
+              <Text style={s.confirmHint}>
+                Pide al proveedor el código de 6 dígitos para confirmar que el trabajo está bien hecho.
+              </Text>
+              <TextInput
+                style={[s.confirmInput, codigoFinErrors[item.id] && s.confirmInputError]}
+                placeholder="000000"
+                placeholderTextColor="#b9c2cc"
+                keyboardType="number-pad"
+                maxLength={6}
+                value={codigoFinInputs[item.id] || ''}
+                onChangeText={(v) => {
+                  const clean = v.replace(/\D/g, '').slice(0, 6);
+                  setCodigoFinInputs((prev) => ({ ...prev, [item.id]: clean }));
+                  setCodigoFinErrors((e) => ({ ...e, [item.id]: '' }));
+                }}
+                editable={confirmandoId !== item.id}
+              />
+              {codigoFinErrors[item.id] ? (
+                <Text style={s.confirmError}>{codigoFinErrors[item.id]}</Text>
+              ) : null}
+              <Button
+                kind="primary"
+                size="sm"
+                full
+                loading={confirmandoId === item.id}
+                onPress={() => handleConfirmarFin(item.id)}
+              >
+                Confirmar finalización
+              </Button>
+            </View>
+          ) : null}
+
+          {puedeCalificar ? (
+            <Button
+              kind="primary"
+              size="sm"
+              icon="star"
+              full
+              onPress={() => navigation.navigate('CalificarProveedor', { servicioId: item.id })}
+            >
+              Calificar proveedor
+            </Button>
+          ) : null}
+
+          {activeTab === 'enviadas' && item.estado === 'completado' && yaCalifico ? (
+            <Text style={s.calificado}>Ya calificaste este servicio.</Text>
+          ) : null}
+        </Card>
       </View>
     );
   };
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.navigate('Home')}>
-          <Text style={styles.backBtnText}>Volver</Text>
-        </TouchableOpacity>
-        <Text style={styles.title}>Solicitudes</Text>
-        <TouchableOpacity style={styles.refreshBtn} onPress={fetchSolicitudes}>
-          <Text style={styles.refreshText}>Actualizar</Text>
-        </TouchableOpacity>
-      </View>
+    <SafeAreaView style={s.container}>
+      <ScreenHeader
+        title={tituloPantalla}
+        subtitle={esProveedor
+          ? 'Trabajos recibidos y servicios que solicitaste'
+          : 'Servicios que solicitaste a proveedores'}
+        onBack={() => navigation.navigate(esProveedor ? 'ProviderDashboard' : 'Home')}
+        backLabel={esProveedor ? 'Mi panel' : 'Inicio'}
+        right={
+          <Button kind="ghost" size="sm" icon="refresh-cw" onPress={fetchSolicitudes}>
+            Actualizar
+          </Button>
+        }
+      />
 
-      <View style={styles.tabs}>
-        {tabs.map((tab) => {
-          const disabled = tab.key === 'recibidas' && !canSeeRecibidas;
-          const active = activeTab === tab.key;
-          return (
-            <TouchableOpacity
-              key={tab.key}
-              style={[styles.tabBtn, active && styles.tabBtnActive, disabled && styles.tabBtnDisabled]}
-              disabled={disabled}
-              onPress={() => setActiveTab(tab.key)}
-            >
-              <Text style={[styles.tabText, active && styles.tabTextActive, disabled && styles.tabTextDisabled]}>
-                {tab.label}
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
-      </View>
+      {/* Con un solo rol activo la barra de pestañas no aporta nada. */}
+      {esProveedor ? (
+        <View style={s.tabs}>
+          {TABS.map((tab) => {
+            const activo = activeTab === tab.key;
+            return (
+              <TouchableOpacity
+                key={tab.key}
+                style={[s.tab, activo && s.tabActivo]}
+                onPress={() => setActiveTab(tab.key)}
+                accessibilityRole="tab"
+                accessibilityState={{ selected: activo }}
+              >
+                <Text style={[s.tabText, activo && s.tabTextActivo]}>{tab.label}</Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      ) : null}
 
       {loading && solicitudes.length === 0 ? (
-        <View style={styles.center}>
-          <ActivityIndicator size="large" color="#4589d4" />
-          <Text style={styles.loadingText}>Cargando solicitudes...</Text>
+        <View style={s.center}>
+          <ActivityIndicator size="large" color={T.blue} />
+          <Text style={s.loadingText}>Cargando…</Text>
         </View>
       ) : (
         <FlatList
+          key={`cols-${columnas}`}
           data={solicitudes}
           keyExtractor={(item) => String(item.id)}
           renderItem={renderSolicitud}
-          contentContainerStyle={styles.listContent}
+          numColumns={columnas}
+          columnWrapperStyle={columnas > 1 ? s.row : undefined}
+          contentContainerStyle={solicitudes.length === 0 ? s.listEmpty : s.listContent}
           refreshing={loading}
           onRefresh={fetchSolicitudes}
+          showsVerticalScrollIndicator={false}
           ListEmptyComponent={
-            <View style={styles.emptyState}>
-              <Text style={styles.emptyTitle}>
-                {activeTab === 'enviadas' ? 'No has enviado solicitudes' : 'No tienes solicitudes recibidas'}
-              </Text>
-              <Text style={styles.emptyText}>
-                {activeTab === 'enviadas'
-                  ? 'Cuando solicites un servicio, aparecera aqui.'
-                  : 'Las solicitudes de clientes apareceran aqui.'}
-              </Text>
-            </View>
+            <EmptyState
+              icon="clipboard"
+              title={activeTab === 'enviadas' ? 'Aún no tienes servicios' : 'Sin trabajos recibidos'}
+              description={
+                activeTab === 'enviadas'
+                  ? 'Cuando solicites un servicio a un proveedor aparecerá aquí.'
+                  : 'Las solicitudes que te envíen los clientes aparecerán aquí.'
+              }
+            />
           }
         />
       )}
-    </View>
+    </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
+const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: T.canvas },
-  header: {
-    backgroundColor: T.paper,
-    paddingHorizontal: 16,
-    paddingTop: 18,
-    paddingBottom: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e8ecf1',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
+
+  tabs: { flexDirection: 'row', gap: T.s2, padding: T.s4, paddingBottom: 0 },
+  tab: {
+    flex: 1, paddingVertical: 11, borderRadius: T.rSm,
+    borderWidth: 1, borderColor: T.inputBorder,
+    backgroundColor: T.paper, alignItems: 'center',
   },
-  backBtn: { paddingVertical: 8, paddingRight: 8 },
-  backBtnText: { color: '#4589d4', fontSize: 14, fontWeight: '700' },
-  title: { flex: 1, fontSize: 20, fontWeight: '800', color: T.ink, textAlign: 'center' },
-  refreshBtn: { paddingVertical: 8, paddingLeft: 8 },
-  refreshText: { color: '#4589d4', fontSize: 14, fontWeight: '700' },
-  tabs: {
-    flexDirection: 'row',
-    gap: 8,
-    padding: 16,
-    backgroundColor: T.canvas,
-  },
-  tabBtn: {
-    flex: 1,
-    paddingVertical: 11,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#cfd8e3',
-    backgroundColor: T.paper,
-    alignItems: 'center',
-  },
-  tabBtnActive: { backgroundColor: '#4589d4', borderColor: '#4589d4' },
-  tabBtnDisabled: { opacity: 0.5 },
-  tabText: { color: '#526071', fontSize: 14, fontWeight: '700' },
-  tabTextActive: { color: '#fff' },
-  tabTextDisabled: { color: '#8c96a3' },
-  listContent: { padding: 16, paddingTop: 0, paddingBottom: 32 },
-  card: {
-    backgroundColor: T.paper,
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 3,
-    elevation: 2,
-  },
-  cardHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
-  persona: { flex: 1, fontSize: 16, fontWeight: '800', color: T.ink },
-  estado: {
-    backgroundColor: '#eef4ff',
-    color: '#356fae',
-    paddingHorizontal: 9,
-    paddingVertical: 4,
-    borderRadius: 8,
-    overflow: 'hidden',
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  descripcion: { marginTop: 10, fontSize: 14, lineHeight: 20, color: '#526071' },
-  metaRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 12, marginTop: 12 },
-  metaText: { fontSize: 12, color: '#8c96a3', fontWeight: '600' },
-  codigoBox: {
-    marginTop: 14,
-    backgroundColor: '#e3f0ff',
-    borderRadius: 10,
-    padding: 14,
-    alignItems: 'center',
-  },
-  codigoLabel: { fontSize: 12, color: '#1858a6', fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.6 },
-  codigoValue: { fontSize: 30, fontWeight: '800', color: '#0e1424', letterSpacing: 6, marginTop: 4 },
+  tabActivo:     { backgroundColor: T.blue, borderColor: T.blue },
+  tabText:       { color: T.muted, fontSize: 13, fontWeight: '700' },
+  tabTextActivo: { color: T.white },
+
+  listContent: { padding: T.s4, paddingBottom: 32 },
+  listEmpty:   { flexGrow: 1, padding: T.s4 },
+  row:         { gap: 0 },
+  gridItem:    { paddingHorizontal: T.s2, paddingBottom: T.s3 },
+
+  card:        { gap: 10 },
+  cardHead:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: T.s2 },
+  persona:     { flex: 1, fontSize: 15, fontWeight: '800', color: T.ink },
+  descripcion: { fontSize: 13, lineHeight: 20, color: T.muted },
+  metaRow:     { flexDirection: 'row', justifyContent: 'space-between', gap: T.s3 },
+  metaText:    { fontSize: 11, color: T.faint, fontWeight: '600', flexShrink: 1 },
+
+  codigoBox:   { backgroundColor: '#e3f0ff', borderRadius: T.rSm, padding: 14, alignItems: 'center' },
+  codigoLabel: { fontSize: 11, color: '#1858a6', fontWeight: '800', letterSpacing: 0.6 },
+  codigoValue: { fontSize: 28, fontWeight: '800', color: T.ink, letterSpacing: 6, marginTop: 4 },
   codigoHint:  { fontSize: 11, color: '#1858a6', marginTop: 6, textAlign: 'center' },
-  rateBtn: {
-    marginTop: 14,
-    backgroundColor: T.blue,
-    borderRadius: 8,
-    paddingVertical: 12,
-    alignItems: 'center',
+
+  confirmBox:   { backgroundColor: '#fff4e0', borderRadius: T.rSm, padding: 14, gap: 8 },
+  confirmLabel: { fontSize: 11, color: '#b76e00', fontWeight: '800', letterSpacing: 0.6 },
+  confirmHint:  { fontSize: 12, color: '#7a5200', lineHeight: 16 },
+  confirmInput: {
+    backgroundColor: T.white, borderWidth: 1, borderColor: '#e3c485',
+    borderRadius: T.rSm, paddingVertical: 12, paddingHorizontal: 14,
+    fontSize: 22, fontWeight: '800', letterSpacing: 6,
+    textAlign: 'center', color: T.ink,
   },
-  rateBtnText: { color: T.white, fontSize: 14, fontWeight: '800' },
-  confirmFinBox: {
-    marginTop: 14,
-    backgroundColor: '#fff4e0',
-    borderRadius: 10,
-    padding: 14,
-  },
-  confirmFinLabel: { fontSize: 12, color: '#b76e00', fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.6 },
-  confirmFinHint:  { fontSize: 12, color: '#7a5200', marginTop: 4, lineHeight: 16 },
-  confirmFinInput: {
-    marginTop: 10,
-    backgroundColor: T.white,
-    borderWidth: 1,
-    borderColor: '#e3c485',
-    borderRadius: 8,
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-    fontSize: 22,
-    fontWeight: '800',
-    letterSpacing: 6,
-    textAlign: 'center',
-    color: T.ink,
-  },
-  confirmFinInputError: { borderColor: T.danger, backgroundColor: '#fff5f5' },
-  confirmFinError: { color: T.danger, fontSize: 12, marginTop: 6 },
-  confirmFinBtn: {
-    marginTop: 10,
-    backgroundColor: '#b76e00',
-    borderRadius: 8,
-    paddingVertical: 12,
-    alignItems: 'center',
-  },
-  confirmFinBtnDisabled: { opacity: 0.6 },
-  confirmFinBtnText: { color: T.white, fontSize: 14, fontWeight: '800' },
-  ratedText: { marginTop: 12, color: T.success, fontSize: 13, fontWeight: '700' },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
-  loadingText: { marginTop: 12, color: '#667085' },
-  emptyState: { alignItems: 'center', paddingVertical: 64, paddingHorizontal: 24 },
-  emptyTitle: { fontSize: 17, fontWeight: '800', color: T.ink, marginBottom: 8, textAlign: 'center' },
-  emptyText: { fontSize: 14, color: '#667085', textAlign: 'center', lineHeight: 20 },
+  confirmInputError: { borderColor: T.danger, backgroundColor: '#fff5f5' },
+  confirmError:      { color: T.danger, fontSize: 12 },
+
+  calificado: { color: T.success, fontSize: 12, fontWeight: '700' },
+
+  center:      { flex: 1, justifyContent: 'center', alignItems: 'center', padding: T.s6, gap: T.s3 },
+  loadingText: { color: T.muted, fontSize: 14 },
 });

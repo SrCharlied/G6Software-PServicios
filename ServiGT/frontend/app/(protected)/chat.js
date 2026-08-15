@@ -13,6 +13,10 @@ export default function ChatRoute() {
     navigate: (screen, params = {}) => {
       if (screen === 'ChatDetail') {
         router.push(`/chat?userId=${params.userId}&name=${encodeURIComponent(params.name || '')}`);
+      } else if (screen === 'ChatList') {
+        // replace y no back: al llegar desde una notificacion el historial no
+        // tiene la bandeja detras.
+        router.replace('/chat');
       } else {
         const map = { home: '/home', providerdashboard: '/dashboard' };
         router.push(map[screen.toLowerCase()] ?? '/home');

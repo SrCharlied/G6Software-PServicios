@@ -45,10 +45,10 @@ function Dropdown({ label, value, options, onSelect, placeholder = 'Selecciona..
         <Text style={dd.arrow}>{open ? '▲' : '▼'}</Text>
       </TouchableOpacity>
       {open && (
-        <View style={dd.list}>
+        <ScrollView style={dd.list} nestedScrollEnabled showsVerticalScrollIndicator>
           {options.map((opt) => {
             const label2 = typeof opt === 'string' ? opt : opt.label;
-            const val2   = typeof opt === 'string' ? opt : opt.value;
+            const val2 = typeof opt === 'string' ? opt : opt.value;
             return (
               <TouchableOpacity
                 key={val2}
@@ -61,7 +61,7 @@ function Dropdown({ label, value, options, onSelect, placeholder = 'Selecciona..
               </TouchableOpacity>
             );
           })}
-        </View>
+        </ScrollView>
       )}
     </View>
   );
@@ -95,27 +95,27 @@ export default function RegisterScreen({ navigation, onRegisterSuccess }) {
   const [errors, setErrors] = useState({});
 
   // Paso 1
-  const [name, setName]       = useState('');
-  const [email, setEmail]     = useState('');
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [role, setRole]       = useState('cliente');
+  const [role, setRole] = useState('cliente');
 
   // Paso 2
-  const [telefono, setTelefono]       = useState('');
+  const [telefono, setTelefono] = useState('');
   const [descripcion, setDescripcion] = useState('');
   const [departamento, setDepartamento] = useState('');
-  const [municipio, setMunicipio]     = useState('');
+  const [municipio, setMunicipio] = useState('');
   const [categoriaIds, setCategoriaIds] = useState([]);
-  const [categorias, setCategorias]     = useState([]);
-  const [loadingCats, setLoadingCats]   = useState(false);
+  const [categorias, setCategorias] = useState([]);
+  const [loadingCats, setLoadingCats] = useState(false);
 
   // Paso 3
-  const [documentos, setDocumentos]       = useState([]);
+  const [documentos, setDocumentos] = useState([]);
   const [tipoDocumento, setTipoDocumento] = useState(TIPOS_DOCUMENTO[0]);
-  const [uploading, setUploading]         = useState(false);
+  const [uploading, setUploading] = useState(false);
 
   // Compartido
-  const [loading, setLoading]             = useState(false);
+  const [loading, setLoading] = useState(false);
   const [registeredUser, setRegisteredUser] = useState(null);
   const [providerProfile, setProviderProfile] = useState(null);
   const fileInputRef = useRef(null);
@@ -180,14 +180,14 @@ export default function RegisterScreen({ navigation, onRegisterSuccess }) {
     setLoading(true);
     try {
       const data = await createProvider({
-        user_id:       registeredUser.id,
-        nombre:        registeredUser.name,
-        email:         registeredUser.email,
-        telefono:      telefono.trim(),
-        descripcion:   descripcion.trim(),
+        user_id: registeredUser.id,
+        nombre: registeredUser.name,
+        email: registeredUser.email,
+        telefono: telefono.trim(),
+        descripcion: descripcion.trim(),
         departamento,
-        municipio:     municipio.trim() || null,
-        categoria_id:  parseInt(categoriaIds[0], 10),
+        municipio: municipio.trim() || null,
+        categoria_id: parseInt(categoriaIds[0], 10),
         categoria_ids: categoriaIds.map((id) => parseInt(id, 10)),
       });
       setProviderProfile(data.proveedor);
@@ -233,8 +233,8 @@ export default function RegisterScreen({ navigation, onRegisterSuccess }) {
     <View style={styles.stepRow}>
       {['Cuenta', 'Perfil', 'Documentos'].map((label, i) => {
         const n = i + 1;
-        const done    = step > n;
-        const active  = step >= n;
+        const done = step > n;
+        const active = step >= n;
         const current = step === n;
         return (
           <Fragment key={n}>
@@ -244,7 +244,7 @@ export default function RegisterScreen({ navigation, onRegisterSuccess }) {
             <View style={styles.stepItem}>
               <View style={[
                 styles.stepCircle,
-                active  && styles.stepCircleActive,
+                active && styles.stepCircleActive,
                 current && styles.stepCircleCurrent,
               ]}>
                 {done
@@ -293,8 +293,8 @@ export default function RegisterScreen({ navigation, onRegisterSuccess }) {
       <Text style={styles.inputLabel}>Tipo de cuenta</Text>
       <View style={styles.roleRow}>
         {[
-          { val: 'cliente',   label: 'Cliente',    sub: 'Busco servicios' },
-          { val: 'proveedor', label: 'Proveedor',  sub: 'Ofrezco servicios' },
+          { val: 'cliente', label: 'Cliente', sub: 'Busco servicios' },
+          { val: 'proveedor', label: 'Proveedor', sub: 'Ofrezco servicios' },
         ].map((r) => (
           <TouchableOpacity
             key={r.val}
@@ -315,8 +315,8 @@ export default function RegisterScreen({ navigation, onRegisterSuccess }) {
         {loading
           ? <ActivityIndicator color="#fff" />
           : <Text style={styles.btnPrimaryText}>
-              {role === 'proveedor' ? 'Continuar →' : 'Crear cuenta'}
-            </Text>}
+            {role === 'proveedor' ? 'Continuar →' : 'Crear cuenta'}
+          </Text>}
       </TouchableOpacity>
 
       <TouchableOpacity onPress={() => navigation?.navigate('Login')}>

@@ -192,8 +192,14 @@ export default function ChatScreen({
     >
       <View style={[styles.header, embedded && styles.headerEmbedded]}>
         {!embedded ? (
-          <TouchableOpacity onPress={() => navigation.navigate('Home')} style={styles.backBtn}>
+          <TouchableOpacity
+            onPress={() => navigation.navigate('ChatList')}
+            style={styles.backBtn}
+            accessibilityRole="button"
+            accessibilityLabel="Volver a mensajes"
+          >
             <Text style={styles.backText}>←</Text>
+            <Text style={styles.backLabel}>Mensajes</Text>
           </TouchableOpacity>
         ) : null}
         <View style={styles.headerInfo}>
@@ -276,8 +282,9 @@ const styles = StyleSheet.create({
     borderBottomColor: T.border,
   },
   headerEmbedded: { paddingTop: T.s4, paddingHorizontal: T.s4, backgroundColor: T.white },
-  backBtn: { padding: T.s2 },
-  backText: { color: T.blue, fontSize: 24, fontWeight: '900' },
+  backBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: T.s2, paddingRight: T.s2 },
+  backText: { color: T.blue, fontSize: 22, fontWeight: '900' },
+  backLabel: { color: T.blue, fontSize: 13, fontWeight: '700' },
   headerInfo: { flexDirection: 'row', alignItems: 'center', gap: T.s3, flex: 1 },
   avatarSmall: {
     width: 42,

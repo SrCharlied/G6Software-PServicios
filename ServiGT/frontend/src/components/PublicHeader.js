@@ -19,9 +19,10 @@ const DRAWER_WIDTH = 300;
 
 // Etiqueta visible -> nombre de ruta que entiende usePublicNavigation.
 const NAV_ITEMS = [
-  { label: 'Inicio',    route: 'Inicio' },
-  { label: 'Servicios', route: 'Servicios' },
-  { label: 'Nosotros',  route: 'Nosotros' },
+  { label: 'Inicio',           route: 'Inicio' },
+  { label: 'Categorías',       route: 'Servicios' },
+  { label: 'Cómo funciona',    route: 'Nosotros' },
+  { label: 'Para proveedores', route: 'Register' },
 ];
 
 // ── Layout ancho ───────────────────────────────────────────────────────────
@@ -152,18 +153,18 @@ const s = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 48,
+    paddingHorizontal: 32,
     paddingVertical: 14,
     backgroundColor: C.paper,
     borderBottomWidth: 1,
     borderBottomColor: C.border,
     shadowColor: C.ink,
-    shadowOpacity: 0.05,
+    shadowOpacity: 0.04,
     shadowRadius: 8,
     elevation: 3,
   },
-  webNav: { flexDirection: 'row', alignItems: 'center', gap: 36 },
-  navLink: { fontSize: 14, color: 'rgba(14,20,36,0.65)', fontWeight: '500', letterSpacing: 0.1 },
+  webNav: { flexDirection: 'row', alignItems: 'center', gap: 24 },
+  navLink: { fontSize: 14, color: 'rgba(14,20,36,0.65)', fontWeight: '600', letterSpacing: 0 },
   navLinkActive: { color: C.deep, fontWeight: '700' },
   webCtas: { flexDirection: 'row', alignItems: 'center', gap: 10 },
 
@@ -181,7 +182,15 @@ const s = StyleSheet.create({
     shadowRadius: 4,
     elevation: 2,
   },
-  hamburger: { paddingVertical: 4, alignItems: 'flex-end' },
+  hamburger: {
+    width: 38,
+    height: 38,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: C.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   hLine: { width: 22, height: 2.5, borderRadius: 2, backgroundColor: C.ink, marginVertical: 3 },
 
   drawerModal: { flex: 1, flexDirection: 'row' },

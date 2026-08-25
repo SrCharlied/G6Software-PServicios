@@ -16,7 +16,9 @@ import ChatScreen from './ChatScreen';
 export default function ChatListScreen({ navigation, user }) {
   const toast = useToast();
   const { width } = useWindowDimensions();
-  const isDesktop = width >= 900;
+  // Los dos paneles solo se justifican cuando la conversacion conserva ancho
+  // util: por debajo de 1024px el panel de la lista se comia el chat.
+  const isDesktop = width >= 1024;
   const [conversaciones, setConversaciones] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedUserId, setSelectedUserId] = useState(null);
@@ -237,7 +239,11 @@ const styles = StyleSheet.create({
     gap: T.s4,
   },
   desktopListPane: {
-    width: 360,
+    // Antes eran 360px fijos: a 1024px dejaban la conversacion sin espacio.
+    // Ahora la lista cede ancho y nunca baja de 260px ni pasa de 360px.
+    flex: 2,
+    minWidth: 260,
+    maxWidth: 360,
     backgroundColor: T.paper,
     borderRadius: T.rMd,
     overflow: 'hidden',
@@ -245,7 +251,7 @@ const styles = StyleSheet.create({
     borderColor: T.border,
   },
   desktopChatPane: {
-    flex: 1,
+    flex: 3,
     minWidth: 0,
     backgroundColor: T.white,
     borderRadius: T.rMd,

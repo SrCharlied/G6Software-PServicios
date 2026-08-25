@@ -68,11 +68,15 @@ class CreditoController extends Controller
 
         $data = $paquetes->map(function (PaqueteCredito $paquete) use ($costoBaseCredito) {
             $total = $paquete->creditos_base + $paquete->creditos_bonus;
-            $costoPorCredito = $total > 0 ? round(((float) $paquete->precio_gtq) / $total, 2) : null;
+            $costoExacto     = $total > 0 ? ((float) $paquete->precio_gtq) / $total : null;
+            $costoPorCredito = $costoExacto !== null ? round($costoExacto, 2) : null;
 
+            // El ahorro se calcula con el costo SIN redondear: usar el valor ya
+            // redondeado hacia arriba hacia que el propio paquete de referencia
+            // reportara un ahorro negativo (Inicial salia con -0.1%).
             $ahorroPorcentaje = null;
-            if ($costoBaseCredito && $costoPorCredito !== null && $costoBaseCredito > 0) {
-                $ahorroPorcentaje = round((1 - ($costoPorCredito / $costoBaseCredito)) * 100, 1);
+            if ($costoBaseCredito && $costoExacto !== null && $costoBaseCredito > 0) {
+                $ahorroPorcentaje = round((1 - ($costoExacto / $costoBaseCredito)) * 100, 1);
             }
 
             return [

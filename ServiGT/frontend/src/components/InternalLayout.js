@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { usePathname, useRouter } from 'expo-router';
+import { Feather } from '@expo/vector-icons';
 import { Pressable, SafeAreaView, StyleSheet, Text, TouchableOpacity, useWindowDimensions, View } from 'react-native';
 import NotificationBell from './NotificationBell';
 import { useSession } from '../context/SessionContext';
@@ -12,21 +13,22 @@ const DESKTOP_MIN_WIDTH = 900;
 // hijas (por ejemplo /pedidos/12 resalta "Mis pedidos" en el cliente).
 const NAV_BY_ROLE = {
   cliente: [
-    { label: 'Inicio',       path: '/home' },
-    { label: 'Mis pedidos',  path: '/pedidos/mios',     match: ['/pedidos/'] },
-    { label: 'Mis servicios', path: '/solicitudes',     match: ['/solicitud', '/calificar/'] },
-    { label: 'Mensajes',     path: '/chat' },
+    { label: 'Inicio',       path: '/home', icon: 'home' },
+    { label: 'Mis pedidos',  path: '/pedidos/mios', icon: 'clipboard', match: ['/pedidos/'] },
+    { label: 'Mis servicios', path: '/solicitudes', icon: 'briefcase', match: ['/solicitud', '/calificar/'] },
+    { label: 'Mensajes',     path: '/chat', icon: 'message-circle' },
   ],
   proveedor: [
-    { label: 'Mi panel',       path: '/dashboard' },
-    { label: 'Oportunidades',  path: '/pedidos/abiertos', match: ['/pedidos/'] },
-    { label: 'Solicitudes',    path: '/solicitudes' },
-    { label: 'Mensajes',       path: '/chat' },
-    { label: 'Mi perfil',      path: '/profile/edit' },
+    { label: 'Mi panel',       path: '/dashboard', icon: 'grid' },
+    { label: 'Oportunidades',  path: '/pedidos/abiertos', icon: 'search', match: ['/pedidos/'] },
+    { label: 'Creditos',       path: '/creditos', icon: 'credit-card' },
+    { label: 'Solicitudes',    path: '/solicitudes', icon: 'briefcase' },
+    { label: 'Mensajes',       path: '/chat', icon: 'message-circle' },
+    { label: 'Mi perfil',      path: '/profile/edit', icon: 'user' },
   ],
   admin: [
-    { label: 'Panel admin', path: '/admin' },
-    { label: 'Inicio',      path: '/home' },
+    { label: 'Panel admin', path: '/admin', icon: 'shield' },
+    { label: 'Inicio',      path: '/home', icon: 'home' },
   ],
 };
 
@@ -48,7 +50,7 @@ function resolveActivePath(items, pathname) {
   return byPrefix?.path ?? null;
 }
 
-function SidebarItem({ label, path, active }) {
+function SidebarItem({ label, path, icon, active }) {
   const router = useRouter();
   return (
     <TouchableOpacity
@@ -59,6 +61,7 @@ function SidebarItem({ label, path, active }) {
       accessibilityState={{ selected: active }}
     >
       <View style={[styles.navMarker, active && styles.navMarkerActive]} />
+      <Feather name={icon || 'circle'} size={18} color={active ? T.blue : T.muted} />
       <Text style={[styles.navLabel, active && styles.navLabelActive]} numberOfLines={1}>
         {label}
       </Text>
@@ -66,16 +69,28 @@ function SidebarItem({ label, path, active }) {
   );
 }
 
-function MobileNavItem({ label, path, active, onNavigate }) {
+function MobileNavItem({ label, path, icon, active, onNavigate, tab = false }) {
   return (
     <TouchableOpacity
-      style={[styles.mobileNavItem, active && styles.mobileNavItemActive]}
+      style={[
+        tab ? styles.mobileTabItem : styles.mobileNavItem,
+        active && (tab ? styles.mobileTabItemActive : styles.mobileNavItemActive),
+      ]}
       onPress={() => onNavigate(path)}
       activeOpacity={0.75}
       accessibilityRole="link"
       accessibilityState={{ selected: active }}
     >
-      <Text style={[styles.mobileNavLabel, active && styles.mobileNavLabelActive]}>{label}</Text>
+      <Feather name={icon || 'circle'} size={tab ? 21 : 18} color={active ? T.blue : T.muted} />
+      <Text
+        style={[
+          tab ? styles.mobileTabLabel : styles.mobileNavLabel,
+          active && (tab ? styles.mobileTabLabelActive : styles.mobileNavLabelActive),
+        ]}
+        numberOfLines={1}
+      >
+        {label}
+      </Text>
     </TouchableOpacity>
   );
 }
@@ -139,6 +154,7 @@ export default function InternalLayout({ children, section }) {
                     key={item.path}
                     label={item.label}
                     path={item.path}
+                    icon={item.icon}
                     active={activePath === item.path}
                     onNavigate={handleNavigate}
                   />
@@ -155,6 +171,20 @@ export default function InternalLayout({ children, section }) {
         <View style={styles.mobileContent}>
           {children}
         </View>
+
+        <View style={styles.mobileTabBar}>
+          {items.slice(0, 5).map((item) => (
+            <MobileNavItem
+              key={item.path}
+              label={item.label}
+              path={item.path}
+              icon={item.icon}
+              active={activePath === item.path}
+              onNavigate={handleNavigate}
+              tab
+            />
+          ))}
+        </View>
       </SafeAreaView>
     );
   }
@@ -169,7 +199,7 @@ export default function InternalLayout({ children, section }) {
           </View>
           {/* La campana vive en el layout para que proveedor y admin tambien
               la tengan, no solo el home del cliente. */}
-          <NotificationBell tone="light" />
+          <NotificationBell />
         </View>
 
         <View style={styles.userBox}>
@@ -183,6 +213,7 @@ export default function InternalLayout({ children, section }) {
               key={item.path}
               label={item.label}
               path={item.path}
+              icon={item.icon}
               active={activePath === item.path}
             />
           ))}
@@ -209,7 +240,7 @@ const styles = StyleSheet.create({
   },
   mobileHeader: {
     minHeight: 56,
-    backgroundColor: T.paper,
+    backgroundColor: 'rgba(246,244,238,0.94)',
     borderBottomWidth: 1,
     borderBottomColor: T.border,
     paddingHorizontal: T.s3,
@@ -310,6 +341,40 @@ const styles = StyleSheet.create({
     flex: 1,
     minWidth: 0,
   },
+  mobileTabBar: {
+    minHeight: 66,
+    paddingTop: 6,
+    paddingBottom: 8,
+    paddingHorizontal: 6,
+    backgroundColor: 'rgba(246,244,238,0.96)',
+    borderTopWidth: 1,
+    borderTopColor: T.border,
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+  },
+  mobileTabItem: {
+    flex: 1,
+    minWidth: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 2,
+    paddingVertical: 6,
+    paddingHorizontal: 2,
+    borderRadius: T.rSm,
+  },
+  mobileTabItemActive: {
+    backgroundColor: 'transparent',
+  },
+  mobileTabLabel: {
+    color: T.muted,
+    fontSize: 10,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  mobileTabLabelActive: {
+    color: T.blue,
+    fontWeight: '800',
+  },
   shell: {
     flex: 1,
     flexDirection: 'row',
@@ -317,10 +382,12 @@ const styles = StyleSheet.create({
   },
   sidebar: {
     width: SIDEBAR_WIDTH,
-    backgroundColor: T.ink,
-    paddingHorizontal: T.s4,
-    paddingTop: T.s6,
+    backgroundColor: T.paper,
+    paddingHorizontal: T.s3,
+    paddingTop: T.s5,
     paddingBottom: T.s4,
+    borderRightWidth: 1,
+    borderRightColor: T.border,
   },
   brandRow: {
     flexDirection: 'row',
@@ -334,29 +401,29 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   brand: {
-    color: T.white,
+    color: T.ink,
     fontSize: 22,
     fontWeight: '800',
   },
   role: {
-    color: 'rgba(255,255,255,0.7)',
+    color: T.muted,
     fontSize: 12,
     marginTop: 4,
   },
   userBox: {
     borderTopWidth: 1,
     borderBottomWidth: 1,
-    borderColor: 'rgba(255,255,255,0.14)',
+    borderColor: T.border,
     paddingVertical: T.s4,
     marginBottom: T.s4,
   },
   userName: {
-    color: T.white,
+    color: T.ink,
     fontSize: 15,
     fontWeight: '700',
   },
   userMeta: {
-    color: 'rgba(255,255,255,0.58)',
+    color: T.muted,
     fontSize: 11,
     marginTop: 4,
   },
@@ -367,13 +434,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: T.s3,
-    paddingVertical: 11,
+    minHeight: 40,
+    paddingVertical: 9,
     paddingRight: T.s3,
     paddingLeft: T.s2,
     borderRadius: T.rSm,
   },
   navItemActive: {
-    backgroundColor: 'rgba(69,137,212,0.22)',
+    backgroundColor: '#e6effa',
   },
   navMarker: {
     width: 3,
@@ -385,12 +453,12 @@ const styles = StyleSheet.create({
     backgroundColor: T.blue,
   },
   navLabel: {
-    color: 'rgba(255,255,255,0.78)',
+    color: T.text,
     fontSize: 14,
     fontWeight: '600',
   },
   navLabelActive: {
-    color: T.white,
+    color: T.deep,
     fontWeight: '700',
   },
   logoutBtn: {
@@ -398,10 +466,10 @@ const styles = StyleSheet.create({
     paddingVertical: 11,
     paddingHorizontal: T.s3,
     borderRadius: T.rSm,
-    backgroundColor: 'rgba(255,255,255,0.12)',
+    backgroundColor: T.tint,
   },
   logoutText: {
-    color: T.white,
+    color: T.deep,
     fontSize: 14,
     fontWeight: '700',
   },

@@ -12,6 +12,7 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { getPedidoDetalle, enviarCotizacion, editarCotizacion, aceptarCotizacion, getMiCredito, storageUrl } from '../services/api';
@@ -44,7 +45,94 @@ const fmtMonto = (v)   => v != null ? `Q${Number(v).toFixed(2)}` : '—';
 
 // ── Vista cliente: card de cotización con foto, nombre, rating, monto, mensaje ──
 
-function CotizacionClienteRow({ cot, esMejorPrecio, esMejorCalif, isLast, puedeElegir, onElegir }) {
+const MAX_COTIZACIONES = 6;
+const SLOTS_GRATIS = 3;
+
+function SlotMeter({ count, slotInfo }) {
+  const usados = slotInfo?.slots_usados ?? count;
+  const gratis = slotInfo?.slots_gratis ?? Math.max(0, SLOTS_GRATIS - usados);
+  const costo = slotInfo?.costo_creditos ?? (usados < SLOTS_GRATIS ? 0 : 1);
+
+  return (
+    <View style={s.slotMeter}>
+      <View style={s.slotTop}>
+        <Text style={s.slotTitle}>Slots de cotizacion</Text>
+        <Text style={s.slotCount}>{usados}/{MAX_COTIZACIONES}</Text>
+      </View>
+      <View style={s.slotTrack}>
+        {[0, 1, 2, 3, 4, 5].map((slot) => (
+          <View
+            key={slot}
+            style={[
+              s.slotSegment,
+              slot < usados && (slot < SLOTS_GRATIS ? s.slotSegmentFree : s.slotSegmentPaid),
+            ]}
+          />
+        ))}
+      </View>
+      <Text style={s.slotHint}>
+        {gratis > 0 ? `${gratis} gratis restantes` : `Siguiente cotizacion: ${costo} credito`}
+      </Text>
+    </View>
+  );
+}
+
+function ExpiryBar({ createdAt, expiresAt }) {
+  if (!expiresAt) return null;
+
+  const created = createdAt ? new Date(createdAt).getTime() : Date.now();
+  const expires = new Date(expiresAt).getTime();
+  const now = Date.now();
+  const total = Math.max(1, expires - created);
+  const remaining = Math.max(0, expires - now);
+  const pct = Math.max(0, Math.min(100, (remaining / total) * 100));
+  const expired = remaining <= 0;
+  const hours = Math.ceil(remaining / 3600000);
+
+  return (
+    <View style={s.expiryBox}>
+      <View style={s.slotTop}>
+        <Text style={s.slotTitle}>Vigencia del pedido</Text>
+        <Text style={[s.expiryText, expired && s.expiryExpired]}>
+          {expired ? 'Expirado' : hours > 24 ? `${Math.ceil(hours / 24)} dias` : `${hours} h`}
+        </Text>
+      </View>
+      <View style={s.expiryTrack}>
+        <View style={[s.expiryFill, expired && s.expiryFillExpired, { width: `${pct}%` }]} />
+      </View>
+      <Text style={s.slotHint}>Expira el {fmtDate(expiresAt)}</Text>
+    </View>
+  );
+}
+
+function CreditBalance({ saldo, loading, error, onRetry }) {
+  if (loading) {
+    return (
+      <View style={s.creditPill}>
+        <ActivityIndicator size="small" color={T.blue} />
+        <Text style={s.creditText}>Consultando saldo</Text>
+      </View>
+    );
+  }
+
+  if (error) {
+    return (
+      <TouchableOpacity style={[s.creditPill, s.creditPillError]} onPress={onRetry} activeOpacity={0.85}>
+        <Text style={[s.creditText, s.creditTextError]}>Saldo no disponible. Reintentar</Text>
+      </TouchableOpacity>
+    );
+  }
+
+  if (saldo == null) return null;
+
+  return (
+    <View style={s.creditPill}>
+      <Text style={s.creditText}>{saldo} {saldo === 1 ? 'credito' : 'creditos'}</Text>
+    </View>
+  );
+}
+
+function CotizacionClienteRow({ cot, esMejorPrecio, esMejorCalif, isLast, puedeElegir, onElegir, style }) {
   const prov     = cot.proveedor;
   const nombre   = prov?.nombre   ?? 'Proveedor';
   const rating   = prov?.calificacion_promedio ?? 0;
@@ -52,7 +140,7 @@ function CotizacionClienteRow({ cot, esMejorPrecio, esMejorCalif, isLast, puedeE
   const inicial  = nombre.charAt(0).toUpperCase();
 
   return (
-    <View style={[cs.card, isLast && cs.cardLast]}>
+    <View style={[cs.card, style, isLast && cs.cardLast]}>
       {/* Badges */}
       {(esMejorPrecio || esMejorCalif) && (
         <View style={cs.badgeRow}>
@@ -118,15 +206,20 @@ function CotizacionClienteRow({ cot, esMejorPrecio, esMejorCalif, isLast, puedeE
 export default function PedidoDetailScreen({ pedidoId, navigation }) {
   const { user } = useSession();
   const toast = useToast();
+  const { width } = useWindowDimensions();
   const esProveedor = user?.role === 'proveedor';
 
   const [pedido, setPedido]             = useState(null);
   const [cotizaciones, setCotizaciones] = useState([]);
   const [miCotizacion, setMiCotizacion] = useState(null);
+  const [slotInfo, setSlotInfo]         = useState(null);
   const [loading, setLoading]           = useState(true);
   const [error, setError]               = useState('');
 
   const [showModal, setShowModal]       = useState(false);
+  const [screenSaldo, setScreenSaldo]   = useState(null);
+  const [screenSaldoLoading, setScreenSaldoLoading] = useState(false);
+  const [screenSaldoError, setScreenSaldoError] = useState('');
   const [saldo, setSaldo]               = useState(null);
   const [loadingSaldo, setLoadingSaldo] = useState(false);
   const [saldoError, setSaldoError]     = useState('');
@@ -142,6 +235,10 @@ export default function PedidoDetailScreen({ pedidoId, navigation }) {
 
   useEffect(() => { load(); }, [pedidoId]);
 
+  useEffect(() => {
+    if (esProveedor) cargarSaldoResumen();
+  }, [esProveedor]);
+
   const load = async () => {
     setLoading(true);
     setError('');
@@ -150,6 +247,7 @@ export default function PedidoDetailScreen({ pedidoId, navigation }) {
       setPedido(data.pedido);
       setCotizaciones(data.cotizaciones || []);
       setMiCotizacion(data.mi_cotizacion ?? null);
+      setSlotInfo(data.slot_info ?? null);
     } catch (e) {
       setError(e.message);
     } finally {
@@ -166,6 +264,15 @@ export default function PedidoDetailScreen({ pedidoId, navigation }) {
       .then((data) => setSaldo(data.saldo ?? 0))
       .catch((e) => { setSaldo(null); setSaldoError(e.message); })
       .finally(() => setLoadingSaldo(false));
+  };
+
+  const cargarSaldoResumen = () => {
+    setScreenSaldoLoading(true);
+    setScreenSaldoError('');
+    getMiCredito()
+      .then((data) => setScreenSaldo(data.saldo ?? null))
+      .catch((e) => { setScreenSaldo(null); setScreenSaldoError(e.message); })
+      .finally(() => setScreenSaldoLoading(false));
   };
 
   const openModal = () => {
@@ -266,6 +373,7 @@ export default function PedidoDetailScreen({ pedidoId, navigation }) {
   const mejorCalifIdx = maxCalif > 0
     ? cotizaciones.findIndex((c) => (c.proveedor?.calificacion_promedio ?? 0) === maxCalif)
     : -1;
+  const cotizacionesEnColumnas = width >= 900;
 
   return (
     <SafeAreaView style={s.container}>
@@ -277,6 +385,23 @@ export default function PedidoDetailScreen({ pedidoId, navigation }) {
         </TouchableOpacity>
 
         {/* Urgencia · Categoría · Tiempo */}
+        <View style={s.pageHeader}>
+          <View style={s.pageHeaderTop}>
+            <Text style={s.pageKicker}>Pedido abierto</Text>
+            {esProveedor && (
+              <CreditBalance
+                saldo={screenSaldo}
+                loading={screenSaldoLoading}
+                error={screenSaldoError}
+                onRetry={cargarSaldoResumen}
+              />
+            )}
+          </View>
+          <Text style={s.pageTitle}>{pedido.categoria?.nombre ? `Pedido de ${pedido.categoria.nombre}` : 'Detalle del pedido'}</Text>
+          <Text style={s.pageSubtitle}>Revisa el alcance, la vigencia y las cotizaciones recibidas.</Text>
+        </View>
+
+        <View style={s.detailCard}>
         <View style={s.badgeRow}>
           <View style={[s.urgBadge, { backgroundColor: urgCfg.bg, borderColor: urgCfg.border }]}>
             <Text style={[s.urgText, { color: urgCfg.text }]}>{urgCfg.label}</Text>
@@ -286,7 +411,7 @@ export default function PedidoDetailScreen({ pedidoId, navigation }) {
         </View>
 
         {/* Descripción */}
-        <View style={s.card}>
+        <View style={s.descBlock}>
           <Text style={s.cardLabel}>Descripción</Text>
           <Text style={s.descText}>{pedido.descripcion}</Text>
         </View>
@@ -311,6 +436,9 @@ export default function PedidoDetailScreen({ pedidoId, navigation }) {
           ) : null}
         </View>
 
+        <ExpiryBar createdAt={pedido.created_at} expiresAt={pedido.fecha_expiracion} />
+        </View>
+
         {/* ── Cotizaciones ──────────────────────────────────────────────── */}
         <View style={s.card}>
           <View style={s.cotHeader}>
@@ -319,6 +447,8 @@ export default function PedidoDetailScreen({ pedidoId, navigation }) {
               <Text style={s.cotCountText}>{cotizaciones.length}</Text>
             </View>
           </View>
+
+          <SlotMeter count={cotizaciones.length} slotInfo={slotInfo} />
 
           {/* Rango de precios (vista proveedor) */}
           {esProveedor && cotizaciones.length > 0 && montoMin != null && (
@@ -350,8 +480,9 @@ export default function PedidoDetailScreen({ pedidoId, navigation }) {
             </View>
           ) : esProveedor ? (
             /* Vista proveedor: anonimizada */
-            cotizaciones.map((c, i) => (
-              <View key={i} style={[s.cotRow, i === cotizaciones.length - 1 && s.cotRowLast]}>
+            <View style={[s.cotGrid, cotizacionesEnColumnas && s.cotGridWide]}>
+            {cotizaciones.map((c, i) => (
+              <View key={i} style={[s.cotRow, cotizacionesEnColumnas && s.cotRowGrid, !cotizacionesEnColumnas && i === cotizaciones.length - 1 && s.cotRowLast]}>
                 <View style={s.cotAvatar}>
                   <Text style={s.cotAvatarText}>{LETRAS[i % 26]}</Text>
                 </View>
@@ -371,20 +502,24 @@ export default function PedidoDetailScreen({ pedidoId, navigation }) {
                   </Text>
                 </View>
               </View>
-            ))
+            ))}
+            </View>
           ) : (
             /* Vista cliente: con foto, nombre, rating, monto, mensaje, badges */
-            cotizaciones.map((c, i) => (
+            <View style={[s.cotGrid, cotizacionesEnColumnas && s.cotGridWide]}>
+            {cotizaciones.map((c, i) => (
               <CotizacionClienteRow
                 key={i}
                 cot={c}
                 esMejorPrecio={i === mejorPrecioIdx}
                 esMejorCalif={i === mejorCalifIdx}
-                isLast={i === cotizaciones.length - 1}
+                isLast={!cotizacionesEnColumnas && i === cotizaciones.length - 1}
                 puedeElegir={pedido.estado === 'abierto' && c.estado === 'enviada'}
                 onElegir={setConfirmCot}
+                style={cotizacionesEnColumnas && cs.cardGrid}
               />
-            ))
+            ))}
+            </View>
           )}
         </View>
 
@@ -556,22 +691,34 @@ export default function PedidoDetailScreen({ pedidoId, navigation }) {
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: T.canvas },
   centered:  { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 32 },
-  content:   { padding: 20 },
+  content:   { padding: 24, paddingBottom: 56, width: '100%', maxWidth: 980, alignSelf: 'center' },
 
   backRow:  { marginBottom: 18 },
   backText: { color: T.blue, fontWeight: '600', fontSize: 15 },
 
-  badgeRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 16, flexWrap: 'wrap' },
-  urgBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6, borderWidth: 1 },
+  pageHeader:   { marginBottom: 18 },
+  pageHeaderTop:{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 5, flexWrap: 'wrap' },
+  pageKicker:   { fontSize: 12, color: T.blue, fontWeight: '800', textTransform: 'uppercase', marginBottom: 5 },
+  pageTitle:    { fontSize: 26, fontWeight: '800', color: T.ink, marginBottom: 6 },
+  pageSubtitle: { fontSize: 14, color: T.muted, lineHeight: 20 },
+  creditPill:   { minHeight: 30, paddingHorizontal: 12, borderRadius: 999, backgroundColor: '#eef4ff', borderWidth: 1, borderColor: T.soft, flexDirection: 'row', alignItems: 'center', gap: 7 },
+  creditPillError: { backgroundColor: '#fef2f2', borderColor: '#fecaca' },
+  creditText:   { fontSize: 12, color: T.deep, fontWeight: '800' },
+  creditTextError: { color: '#991b1b' },
+
+  badgeRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 14, flexWrap: 'wrap' },
+  urgBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999, borderWidth: 1 },
   urgText:  { fontSize: 10, fontWeight: '800', letterSpacing: 0.5 },
   catText:  { flex: 1, fontSize: 13, color: T.deep, fontWeight: '600' },
   timeText: { fontSize: 12, color: T.faint },
 
-  card:      { backgroundColor: T.white, borderRadius: T.rMd, padding: 16, marginBottom: 14, borderWidth: 1, borderColor: T.border, ...T.sh1 },
+  detailCard:{ backgroundColor: T.paper, borderRadius: 14, padding: 20, marginBottom: 18, borderWidth: 1, borderColor: T.border, ...T.sh2 },
+  card:      { backgroundColor: T.paper, borderRadius: 14, padding: 20, marginBottom: 16, borderWidth: 1, borderColor: T.border, ...T.sh2 },
+  descBlock: { paddingVertical: 10, marginBottom: 16 },
   cardLabel: { fontSize: 11, fontWeight: '700', color: T.muted, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 10 },
   descText:  { fontSize: 15, color: T.text, lineHeight: 23 },
 
-  metaGrid:  { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 14 },
+  metaGrid:  { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 16 },
   metaItem:  { flex: 1, minWidth: 130, backgroundColor: T.white, borderRadius: T.rMd, padding: 14, borderWidth: 1, borderColor: T.border },
   metaLabel: { fontSize: 11, color: T.muted, marginBottom: 4 },
   metaValue: { fontSize: 13, fontWeight: '600', color: T.ink, lineHeight: 18 },
@@ -579,13 +726,31 @@ const s = StyleSheet.create({
   cotHeader:     { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
   cotCountBadge: { backgroundColor: T.blue, borderRadius: 999, minWidth: 28, height: 28, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 8 },
   cotCountText:  { color: '#fff', fontWeight: '800', fontSize: 13 },
-  rangeBar:      { backgroundColor: '#eef4ff', borderRadius: T.rSm, padding: 10, marginBottom: 14 },
+  slotMeter:     { backgroundColor: T.white, borderRadius: T.rMd, padding: 14, marginBottom: 16, borderWidth: 1, borderColor: T.border },
+  slotTop:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 8 },
+  slotTitle:     { fontSize: 12, color: T.muted, fontWeight: '700' },
+  slotCount:     { fontSize: 12, color: T.deep, fontWeight: '800' },
+  slotTrack:     { flexDirection: 'row', gap: 4 },
+  slotSegment:   { flex: 1, height: 8, borderRadius: 999, backgroundColor: T.inputBg, borderWidth: 1, borderColor: T.border },
+  slotSegmentFree: { backgroundColor: T.success, borderColor: T.success },
+  slotSegmentPaid: { backgroundColor: T.amber, borderColor: T.amber },
+  slotHint:      { marginTop: 7, fontSize: 12, color: T.muted },
+  expiryBox:     { backgroundColor: T.white, borderRadius: T.rMd, padding: 14, marginBottom: 16, borderWidth: 1, borderColor: T.border },
+  expiryTrack:   { height: 8, borderRadius: 999, backgroundColor: T.inputBg, overflow: 'hidden' },
+  expiryFill:    { height: '100%', borderRadius: 999, backgroundColor: T.success },
+  expiryFillExpired: { backgroundColor: T.danger },
+  expiryText:    { fontSize: 12, color: T.success, fontWeight: '800' },
+  expiryExpired: { color: T.danger },
+  rangeBar:      { backgroundColor: '#eef4ff', borderRadius: T.rMd, padding: 12, marginBottom: 14, borderWidth: 1, borderColor: T.soft },
   rangeText:     { fontSize: 13, color: T.deep, fontWeight: '600', textAlign: 'center' },
-  emptyState:    { paddingVertical: 24, alignItems: 'center', borderWidth: 1, borderColor: T.inputBorder, borderStyle: 'dashed', borderRadius: T.rMd },
+  emptyState:    { paddingVertical: 28, alignItems: 'center', borderWidth: 1.5, borderColor: T.inputBorder, borderStyle: 'dashed', borderRadius: T.rMd, backgroundColor: T.white },
   emptyText:     { fontSize: 14, color: T.muted },
 
   // Cotizaciones anonimizadas (proveedor)
-  cotRow:        { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 13, borderBottomWidth: 1, borderBottomColor: T.paper },
+  cotGrid:       { gap: 12 },
+  cotGridWide:   { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'stretch' },
+  cotRow:        { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 13, borderBottomWidth: 1, borderBottomColor: T.border },
+  cotRowGrid:    { flexBasis: '48%', flexGrow: 1, borderWidth: 1, borderColor: T.border, borderRadius: T.rMd, padding: 14, backgroundColor: T.white, ...T.sh1 },
   cotRowLast:    { borderBottomWidth: 0 },
   cotAvatar:     { width: 40, height: 40, borderRadius: 20, backgroundColor: T.soft, justifyContent: 'center', alignItems: 'center' },
   cotAvatarText: { fontSize: 15, fontWeight: '800', color: T.deep },
@@ -646,6 +811,7 @@ const cs = StyleSheet.create({
   card: {
     paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: T.border,
   },
+  cardGrid: { flexBasis: '48%', flexGrow: 1, borderWidth: 1, borderColor: T.border, borderRadius: T.rMd, padding: 16, backgroundColor: T.white, ...T.sh1 },
   cardLast: { borderBottomWidth: 0 },
 
   badgeRow: { flexDirection: 'row', gap: 6, marginBottom: 10, flexWrap: 'wrap' },
@@ -672,7 +838,7 @@ const cs = StyleSheet.create({
   mensaje: { fontSize: 14, color: T.text, lineHeight: 21, marginBottom: 8 },
   tiempo:  { fontSize: 11, color: T.faint },
 
-  elegirBtn:     { marginTop: 12, backgroundColor: T.blue, borderRadius: T.rSm, paddingVertical: 11, alignItems: 'center' },
+  elegirBtn:     { marginTop: 12, backgroundColor: T.blue, borderRadius: T.rMd, paddingVertical: 12, alignItems: 'center', ...T.sh1 },
   elegirBtnText: { color: '#fff', fontWeight: '700', fontSize: 14 },
   aceptadaBadge: { marginTop: 12, backgroundColor: '#d1fae5', borderWidth: 1, borderColor: '#86efac', borderRadius: T.rSm, paddingVertical: 9, alignItems: 'center' },
   aceptadaText:  { color: '#065f46', fontWeight: '700', fontSize: 13 },

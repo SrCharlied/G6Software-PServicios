@@ -64,6 +64,22 @@ class CreditoPaquetesTest extends TestCase
         $this->assertEquals(30, $impulso['total_creditos']);
     }
 
+    public function test_el_paquete_de_referencia_no_reporta_ahorro_negativo(): void
+    {
+        Sanctum::actingAs($this->crearUsuario('proveedor'));
+
+        $paquetes = collect($this->getJson('/api/creditos/paquetes')->assertOk()->json('paquetes'));
+
+        // Inicial es el paquete sin bonus que sirve de referencia: su ahorro
+        // debe ser exactamente 0, no un -0.1 producto del redondeo.
+        $this->assertEquals(0, $paquetes->firstWhere('nombre', 'Inicial')['ahorro_porcentaje']);
+
+        // Y ningun paquete puede reportar un ahorro negativo.
+        $this->assertTrue(
+            $paquetes->every(fn ($p) => $p['ahorro_porcentaje'] === null || $p['ahorro_porcentaje'] >= 0),
+        );
+    }
+
     public function test_usuario_no_autenticado_recibe_401(): void
     {
         $this->getJson('/api/creditos/paquetes')

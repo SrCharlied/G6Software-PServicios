@@ -12,6 +12,7 @@ import {
   View,
 } from 'react-native';
 import {
+  getAdminCreditosPremium,
   getAdminProveedores,
   getAdminStats,
   getAdminUsuarios,
@@ -40,6 +41,7 @@ const TABS = [
   { key: 'stats',       label: 'Resumen' },
   { key: 'usuarios',    label: 'Usuarios' },
   { key: 'proveedores', label: 'Proveedores' },
+  { key: 'monetizacion', label: 'Creditos y Premium' },
 ];
 
 const ROLE_FILTERS = [
@@ -48,6 +50,33 @@ const ROLE_FILTERS = [
   { key: 'proveedor',  label: 'Proveedores' },
   { key: 'admin',      label: 'Admins' },
 ];
+
+const COMPRA_FILTERS = [
+  { key: null, label: 'Todos' },
+  { key: 'pendiente', label: 'Pendientes' },
+  { key: 'completada', label: 'Completadas' },
+  { key: 'fallida', label: 'Fallidas' },
+  { key: 'cancelada', label: 'Canceladas' },
+];
+
+const STATUS_STYLE = {
+  pendiente: { bg: '#fef3c7', text: '#92400e', border: '#fde68a' },
+  completada: { bg: '#f0fdf4', text: '#15803d', border: '#bbf7d0' },
+  fallida: { bg: '#fff1f2', text: '#be123c', border: '#fecdd3' },
+  cancelada: { bg: T.paper, text: T.muted, border: T.border },
+  activo: { bg: '#fbf1dc', text: '#8a5a08', border: '#f0cd8c' },
+  vencido: { bg: T.paper, text: T.muted, border: T.border },
+  nunca: { bg: T.paper, text: T.faint, border: T.border },
+};
+
+const formatMoney = (value) => `Q${Number(value || 0).toFixed(2)}`;
+
+const formatDate = (value) => {
+  if (!value) return 'Sin fecha';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 'Sin fecha';
+  return date.toLocaleString('es-GT', { dateStyle: 'medium', timeStyle: 'short' });
+};
 
 function MetricCard({ label, value, color = T.blue }) {
   return (
@@ -76,11 +105,14 @@ export default function AdminDashboardScreen({ navigation, user }) {
   const [stats, setStats] = useState(null);
   const [usuarios, setUsuarios] = useState([]);
   const [proveedores, setProveedores] = useState([]);
+  const [monetizacion, setMonetizacion] = useState(null);
   const [roleFilter, setRoleFilter] = useState(null);
+  const [compraFilter, setCompraFilter] = useState(null);
 
   const [loadingStats, setLoadingStats] = useState(true);
   const [loadingUsuarios, setLoadingUsuarios] = useState(false);
   const [loadingProveedores, setLoadingProveedores] = useState(false);
+  const [loadingMonetizacion, setLoadingMonetizacion] = useState(false);
   const [savingRecarga, setSavingRecarga] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [recargaModalVisible, setRecargaModalVisible] = useState(false);
@@ -124,15 +156,29 @@ export default function AdminDashboardScreen({ navigation, user }) {
     }
   }, [toast]);
 
+  const fetchMonetizacion = useCallback(async () => {
+    setLoadingMonetizacion(true);
+    try {
+      const data = await getAdminCreditosPremium({ estado: compraFilter });
+      setMonetizacion(data);
+    } catch (error) {
+      toast(error.message, 'error');
+    } finally {
+      setLoadingMonetizacion(false);
+    }
+  }, [compraFilter, toast]);
+
   useEffect(() => { fetchStats(); }, [fetchStats]);
   useEffect(() => { if (activeTab === 'usuarios') fetchUsuarios(); }, [activeTab, fetchUsuarios]);
   useEffect(() => { if (activeTab === 'proveedores') fetchProveedores(); }, [activeTab, fetchProveedores]);
+  useEffect(() => { if (activeTab === 'monetizacion') fetchMonetizacion(); }, [activeTab, fetchMonetizacion]);
 
   const onRefresh = async () => {
     setRefreshing(true);
     if (activeTab === 'stats')       await fetchStats();
     if (activeTab === 'usuarios')    await fetchUsuarios();
     if (activeTab === 'proveedores') await fetchProveedores();
+    if (activeTab === 'monetizacion') await fetchMonetizacion();
     setRefreshing(false);
   };
 
@@ -173,7 +219,7 @@ export default function AdminDashboardScreen({ navigation, user }) {
       });
       toast(data.message || 'Creditos agregados correctamente.', 'success');
       setRecargaModalVisible(false);
-      await Promise.all([fetchStats(), fetchProveedores()]);
+      await Promise.all([fetchStats(), fetchProveedores(), fetchMonetizacion()]);
     } catch (error) {
       toast(error.message, 'error');
     } finally {
@@ -338,6 +384,112 @@ export default function AdminDashboardScreen({ navigation, user }) {
     </View>
   );
 
+  const renderMonetizacion = () => {
+    if (loadingMonetizacion && !monetizacion) {
+      return (
+        <View style={styles.center}>
+          <ActivityIndicator color={T.blue} />
+          <Text style={styles.loadingText}>Cargando creditos y Premium...</Text>
+        </View>
+      );
+    }
+
+    const kpis = monetizacion?.kpis || {};
+    const compras = monetizacion?.compras || [];
+    const proveedoresPremium = monetizacion?.proveedores || [];
+
+    return (
+      <View>
+        <View style={styles.heroPanel}>
+          <View style={styles.heroCopy}>
+            <Text style={styles.heroEyebrow}>Monetizacion</Text>
+            <Text style={styles.heroTitle}>Creditos y Premium</Text>
+            <Text style={styles.heroText}>
+              Compras auto-acreditadas, bonos Premium y vigencia por proveedor.
+            </Text>
+          </View>
+          <TouchableOpacity style={styles.heroButton} onPress={() => openRecargaModal()}>
+            <Text style={styles.heroButtonText}>+ Acreditar manual</Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.grid}>
+          <MetricCard label="Compras del mes" value={kpis.compras_mes ?? 0} color={T.blue} />
+          <MetricCard label="Creditos vendidos" value={kpis.creditos_vendidos ?? 0} color={T.deep} />
+          <MetricCard label="Premium activos" value={kpis.premium_activos ?? 0} color="#c2810b" />
+          <MetricCard label="Bonos Premium" value={kpis.bonos_premium_mes ?? 0} color={T.success} />
+          <MetricCard label="Ingreso del mes" value={formatMoney(kpis.ingreso_mes_gtq)} color={T.success} />
+        </View>
+
+        <Text style={styles.sectionTitle}>Compras auto-acreditadas</Text>
+        <View style={styles.filterRow}>
+          {COMPRA_FILTERS.map((opt) => {
+            const active = compraFilter === opt.key;
+            return (
+              <TouchableOpacity
+                key={opt.label}
+                style={[styles.filterChip, active && styles.filterChipActive]}
+                onPress={() => setCompraFilter(opt.key)}
+              >
+                <Text style={[styles.filterChipText, active && styles.filterChipTextActive]}>
+                  {opt.label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+
+        {loadingMonetizacion ? <ActivityIndicator color={T.blue} style={styles.inlineLoader} /> : null}
+
+        {compras.length === 0 ? (
+          <Text style={styles.emptyText}>No hay compras con ese filtro.</Text>
+        ) : (
+          compras.map((compra) => (
+            <View key={compra.id} style={styles.listCard}>
+              <View style={styles.listCardTop}>
+                <Text style={styles.listCardTitle} numberOfLines={1}>
+                  {compra.proveedor_nombre || 'Proveedor'}
+                </Text>
+                <StatusPill status={compra.estado} />
+              </View>
+              <Text style={styles.listCardSub}>
+                {compra.paquete || 'Paquete'} - {formatMoney(compra.monto_gtq)} - {compra.referencia}
+              </Text>
+              <View style={styles.listCardMeta}>
+                <Text style={styles.metaText}>
+                  Creditos: {compra.estado === 'completada' ? '+' : ''}{compra.creditos_otorgados}
+                </Text>
+                <Text style={styles.metaText}>{formatDate(compra.created_at)}</Text>
+                {compra.premium?.activo ? <Text style={styles.premiumMini}>Premium</Text> : null}
+              </View>
+            </View>
+          ))
+        )}
+
+        <Text style={styles.sectionTitle}>Proveedores y Premium</Text>
+        {proveedoresPremium.map((proveedor) => (
+          <View key={proveedor.id} style={styles.listCard}>
+            <View style={styles.listCardTop}>
+              <Text style={styles.listCardTitle} numberOfLines={1}>{proveedor.nombre}</Text>
+              <StatusPill status={proveedor.premium.estado} />
+            </View>
+            <Text style={styles.listCardSub}>
+              {proveedor.categoria || 'Sin categoria'} - Saldo {proveedor.saldo} creditos
+            </Text>
+            <View style={styles.listCardMeta}>
+              <Text style={styles.metaText}>
+                Vigencia: {proveedor.premium.vence_at ? formatDate(proveedor.premium.vence_at) : 'Nunca activado'}
+              </Text>
+              <Text style={styles.metaText}>Dias: {proveedor.premium.dias_restantes}</Text>
+              <Text style={styles.metaText}>Renovaciones: {proveedor.premium.renovaciones}</Text>
+              {proveedor.verificado ? <Text style={styles.metaText}>Verificado</Text> : null}
+            </View>
+          </View>
+        ))}
+      </View>
+    );
+  };
+
   const selectedProveedor = proveedores.find((p) => p.id === selectedProveedorId);
 
   const renderRecargaModal = () => (
@@ -461,9 +613,19 @@ export default function AdminDashboardScreen({ navigation, user }) {
         {activeTab === 'stats'       && renderStats()}
         {activeTab === 'usuarios'    && renderUsuarios()}
         {activeTab === 'proveedores' && renderProveedores()}
+        {activeTab === 'monetizacion' && renderMonetizacion()}
       </View>
       {renderRecargaModal()}
     </ScrollView>
+  );
+}
+
+function StatusPill({ status }) {
+  const cfg = STATUS_STYLE[status] || STATUS_STYLE.nunca;
+  return (
+    <View style={[styles.statusPill, { backgroundColor: cfg.bg, borderColor: cfg.border }]}>
+      <Text style={[styles.statusPillText, { color: cfg.text }]}>{status}</Text>
+    </View>
   );
 }
 
@@ -489,7 +651,7 @@ const styles = StyleSheet.create({
     gap: T.s2,
     marginBottom: T.s4,
   },
-  tabsRowDesktop: { maxWidth: 520 },
+  tabsRowDesktop: { maxWidth: 760 },
   tabBtn: {
     flex: 1,
     paddingVertical: 11,
@@ -581,6 +743,27 @@ const styles = StyleSheet.create({
 
   badge:      { paddingHorizontal: 10, paddingVertical: 3, borderRadius: 10 },
   badgeText:  { fontSize: 11, fontWeight: '700' },
+  statusPill: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
+    borderWidth: 1,
+    alignSelf: 'flex-start',
+  },
+  statusPillText: { fontSize: 11, fontWeight: '800', textTransform: 'capitalize' },
+  premiumMini: {
+    color: '#8a5a08',
+    backgroundColor: '#fbf1dc',
+    borderWidth: 1,
+    borderColor: '#f0cd8c',
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    fontSize: 11,
+    fontWeight: '900',
+    overflow: 'hidden',
+  },
+  inlineLoader: { alignSelf: 'flex-start', marginBottom: T.s2 },
 
   emptyText: { fontSize: 14, color: T.muted, textAlign: 'center', padding: T.s6 },
   center:    { paddingVertical: T.s6, alignItems: 'center' },

@@ -80,6 +80,10 @@ CREATE TABLE IF NOT EXISTS proveedores (
     calificacion_promedio DECIMAL(3,2) NOT NULL DEFAULT 0.00,
     total_calificaciones INT NOT NULL DEFAULT 0,
     nivel VARCHAR(20) NOT NULL DEFAULT 'novato' CHECK (nivel IN ('novato','intermedio','experto')),
+    premium_inicio_at TIMESTAMP WITHOUT TIME ZONE NULL,
+    premium_vence_at TIMESTAMP WITHOUT TIME ZONE NULL,
+    premium_ciclo_key VARCHAR(80),
+    premium_renovaciones INT NOT NULL DEFAULT 0 CHECK (premium_renovaciones >= 0),
     created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
@@ -386,7 +390,22 @@ END $$;
 -- proveedores gana premium_vence_at: NULL = nunca activado, fecha futura =
 -- activo, fecha pasada = vencido. El estado se deriva de esta unica columna
 -- para no duplicar la fuente de verdad en un campo de estado aparte.
+ALTER TABLE proveedores ADD COLUMN IF NOT EXISTS premium_inicio_at TIMESTAMP WITHOUT TIME ZONE NULL;
 ALTER TABLE proveedores ADD COLUMN IF NOT EXISTS premium_vence_at TIMESTAMP WITHOUT TIME ZONE NULL;
+ALTER TABLE proveedores ADD COLUMN IF NOT EXISTS premium_ciclo_key VARCHAR(80);
+ALTER TABLE proveedores ADD COLUMN IF NOT EXISTS premium_renovaciones INT NOT NULL DEFAULT 0;
+
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint
+        WHERE conrelid = 'proveedores'::regclass
+          AND conname = 'proveedores_premium_renovaciones_check'
+    ) THEN
+        ALTER TABLE proveedores ADD CONSTRAINT proveedores_premium_renovaciones_check
+            CHECK (premium_renovaciones >= 0);
+    END IF;
+END $$;
 
 -- transacciones_credito.tipo gano el valor 'compra'. Igual que arriba, solo
 -- se recrea el CHECK si al actual le falta, para no tomar el lock en cada arranque.

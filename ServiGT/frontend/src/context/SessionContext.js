@@ -9,11 +9,11 @@ import {
 const SessionContext = createContext(null);
 
 export function SessionProvider({ children }) {
-  const [user, setUser]                         = useState(null);
-  const [providerProfile, setProviderProfile]   = useState(null);
-  const [sessionLoading, setSessionLoading]     = useState(true);
+  const [user, setUser] = useState(null);
+  const [providerProfile, setProviderProfile] = useState(null);
+  const [sessionLoading, setSessionLoading] = useState(true);
   const [selectedProvider, setSelectedProvider] = useState(null);
-  const [chatParams, setChatParams]             = useState({ userId: null, name: '' });
+  const [chatParams, setChatParams] = useState({ userId: null, name: '' });
 
   useEffect(() => { restore(); }, []);
 
@@ -21,13 +21,15 @@ export function SessionProvider({ children }) {
     const stored = loadStoredSession();
     if (!stored) { setSessionLoading(false); return; }
     try {
-      setUser(stored.user);
       if (stored.user.role === 'proveedor') {
         const data = await getProviderByUser(stored.user.id);
         setProviderProfile(data.proveedor);
       }
+      setUser(stored.user);
     } catch {
       clearSession();
+      setUser(null);
+      setProviderProfile(null);
     }
     setSessionLoading(false);
   };

@@ -5,6 +5,8 @@ export const T = {
   blue:   '#4589d4',   // GT Blue  (oklch 0.62 0.16 240) — Guatemalan sky blue
   deep:   '#1b5499',   // GT Deep  (oklch 0.46 0.15 250) — gradient / depth
   soft:   '#b3cfe8',   // GT Soft  (oklch 0.86 0.08 235) — light badge tint
+  sky:    '#7db2e4',
+  tint:   '#e6effa',
 
   // ── Neutral surfaces ──────────────────────────────────────
   ink:    '#0e1424',   // Near-black for headings and UI chrome
@@ -22,11 +24,13 @@ export const T = {
   danger:  '#be123c',
   warn:    '#b45309',
   amber:   '#f59e0b',  // Star ratings
+  gold:    '#c2810b',
 
   // ── UI chrome ────────────────────────────────────────────
   border:  'rgba(14,20,36,0.09)',
   inputBg: '#f9f8f5',
   inputBorder: '#d9e2ef',
+  elev: 'rgba(14,20,36,0.08)',
 
   // ── Espaciado ────────────────────────────────────────────
   s1: 4, s2: 8, s3: 12, s4: 16, s5: 20, s6: 24,
@@ -59,8 +63,8 @@ export const T = {
 
   // ── Component patterns ───────────────────────────────────────────────────
   card: {
-    backgroundColor: '#ffffff',
-    borderRadius: 12,
+    backgroundColor: '#f6f4ee',
+    borderRadius: 14,
     borderWidth: 1,
     borderColor: 'rgba(14,20,36,0.09)',
   },

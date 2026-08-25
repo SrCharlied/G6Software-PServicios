@@ -169,10 +169,11 @@ CREATE TABLE IF NOT EXISTS compras_creditos (
     estado VARCHAR(20) NOT NULL DEFAULT 'pendiente'
         CHECK (estado IN ('pendiente','completada','fallida','cancelada')),
     referencia VARCHAR(20) NOT NULL UNIQUE,
-    idempotency_key VARCHAR(100) NOT NULL UNIQUE,
+    idempotency_key VARCHAR(100) NOT NULL,
     completada_at TIMESTAMP WITHOUT TIME ZONE,
     created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+    updated_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT compras_creditos_proveedor_idem_uk UNIQUE (proveedor_id, idempotency_key)
 );
 CREATE INDEX IF NOT EXISTS idx_compras_creditos_proveedor ON compras_creditos (proveedor_id, created_at DESC);
 
@@ -420,6 +421,24 @@ BEGIN
         ALTER TABLE transacciones_credito DROP CONSTRAINT IF EXISTS transacciones_credito_tipo_check;
         ALTER TABLE transacciones_credito ADD CONSTRAINT transacciones_credito_tipo_check
             CHECK (tipo IN ('bono','gasto','recarga','compra'));
+    END IF;
+END $$;
+
+-- La unicidad de idempotency_key nacio global, pero el controlador siempre la
+-- consulta acotada al proveedor autenticado. Esa asimetria hacia que la clave
+-- de un proveedor bloqueara la de otro: la consulta no veia la fila ajena,
+-- pasaba el chequeo y reventaba contra el UNIQUE con un 500. La clave solo
+-- tiene que ser unica DENTRO de cada proveedor.
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint
+        WHERE conrelid = 'compras_creditos'::regclass
+          AND conname = 'compras_creditos_proveedor_idem_uk'
+    ) THEN
+        ALTER TABLE compras_creditos DROP CONSTRAINT IF EXISTS compras_creditos_idempotency_key_key;
+        ALTER TABLE compras_creditos ADD CONSTRAINT compras_creditos_proveedor_idem_uk
+            UNIQUE (proveedor_id, idempotency_key);
     END IF;
 END $$;
 

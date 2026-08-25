@@ -65,6 +65,59 @@ class AdminCreditosPremiumTest extends TestCase
         $this->getJson('/api/admin/creditos-premium')->assertUnauthorized();
     }
 
+    /**
+     * La superficie administrativa filtra por los cuatro estados de compra.
+     * Los tres no completados solo pueden llegar a existir por via
+     * administrativa o por un pago real futuro, asi que esta es la unica
+     * cobertura que tienen: sin ella, un cambio en el CHECK o en el filtro
+     * pasaria inadvertido.
+     */
+    public function test_el_filtro_por_estado_distingue_pendiente_fallida_y_cancelada(): void
+    {
+        $admin = $this->crearUsuario('admin');
+        $proveedor = $this->crearProveedor(saldo: 0);
+        $paquete = PaqueteCredito::where('nombre', 'Inicial')->first();
+
+        $referencias = [];
+
+        foreach (['pendiente', 'completada', 'fallida', 'cancelada'] as $estado) {
+            $referencia = 'SGT-' . str_pad((string) random_int(0, 9999999999), 10, '0', STR_PAD_LEFT);
+            $referencias[$estado] = $referencia;
+
+            CompraCredito::create([
+                'proveedor_id'       => $proveedor->id,
+                'paquete_id'         => $paquete->id,
+                'monto_gtq'          => $paquete->precio_gtq,
+                'creditos_otorgados' => 8,
+                'estado'             => $estado,
+                'referencia'         => $referencia,
+                'idempotency_key'    => "admin-{$estado}-" . uniqid(),
+                'completada_at'      => $estado === 'completada' ? now() : null,
+            ]);
+        }
+
+        Sanctum::actingAs($admin);
+
+        foreach ($referencias as $estado => $referencia) {
+            $response = $this->getJson("/api/admin/creditos-premium?estado={$estado}")
+                ->assertOk()
+                ->assertJsonPath('filtro_estado', $estado);
+
+            $compras = collect($response->json('compras'))
+                ->where('proveedor_id', $proveedor->id);
+
+            $this->assertCount(1, $compras, "El filtro {$estado} debe devolver exactamente una compra del proveedor.");
+            $this->assertEquals($referencia, $compras->first()['referencia']);
+        }
+
+        // Sin filtro, las cuatro conviven en la misma superficie.
+        Sanctum::actingAs($admin);
+        $todas = collect($this->getJson('/api/admin/creditos-premium')->assertOk()->json('compras'))
+            ->where('proveedor_id', $proveedor->id);
+
+        $this->assertCount(4, $todas);
+    }
+
     private function crearUsuario(string $role): User
     {
         $uid = uniqid($role . '.', true);

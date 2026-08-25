@@ -12,6 +12,7 @@ import {
   getCalificacionesProveedor,
   getCategorias,
   getDocumentos,
+  getMiCredito,
   getMiDisponibilidad,
   getPedidosAbiertos,
   getPremiumMiEstado,
@@ -56,6 +57,7 @@ export default function ProviderDashboardScreen({
   const [calificaciones, setCalificaciones] = useState([]);
   const [disponibilidad, setDisponibilidad] = useState(buildDisponibilidad());
   const [premiumInfo, setPremiumInfo] = useState(null);
+  const [saldo, setSaldo] = useState(null);
   const [oportunidades, setOportunidades] = useState([]);
   const [categorias, setCategorias] = useState([]);
 
@@ -162,6 +164,16 @@ export default function ProviderDashboardScreen({
       setPremiumInfo(premiumData);
     } catch {
       setPremiumInfo(null);
+    }
+
+    // El saldo tambien va aparte y por la misma razon: es informativo en esta
+    // pantalla, no bloqueante. Si el endpoint falla se queda en null y la
+    // cabecera simplemente no pinta el chip, en vez de mostrar un "0" falso.
+    try {
+      const creditoData = await getMiCredito();
+      setSaldo(Number(creditoData.saldo ?? 0));
+    } catch {
+      setSaldo(null);
     }
   };
 
@@ -391,8 +403,10 @@ export default function ProviderDashboardScreen({
       <ProviderHeader
         profile={profile}
         premiumInfo={premiumInfo}
+        saldo={saldo}
         disponibilidad={disponibilidad}
         onEditarPerfil={() => navigation.navigate('ProviderEditProfile')}
+        onVerCreditos={() => navigation.navigate('Creditos')}
         onLogout={onLogout}
       />
 

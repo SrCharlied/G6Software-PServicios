@@ -23,6 +23,7 @@ export default function DashboardRoute() {
       const map = {
         home: '/home',
         providereditprofile: '/profile/edit',
+        creditos: '/creditos',
         login: '/login',
       };
       router.push(map[key] ?? '/home');

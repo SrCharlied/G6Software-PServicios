@@ -109,6 +109,9 @@ class ProviderController extends Controller
             'tarifa_hora'       => 'nullable|numeric|min:0',
             'tarifa_proyecto'   => 'nullable|numeric|min:0',
             'nivel'             => 'nullable|in:novato,intermedio,experto',
+            // Hex de 6 digitos con almohadilla. Se valida en el servidor para
+            // que no entre nada que luego se inyecte como color en la UI.
+            'color_acento'      => 'nullable|regex:/^#[0-9a-fA-F]{6}$/',
         ]);
 
         $categoriaIds = $validated['categoria_ids'] ?? null;
@@ -165,6 +168,62 @@ class ProviderController extends Controller
         $proveedor->update(['foto_perfil' => $relativePath]);
 
         return $this->success('Foto de perfil actualizada', ['foto_perfil' => $relativePath]);
+    }
+
+    /**
+     * Imagen de portada del perfil publico. Mismo contrato que uploadFoto: se
+     * guarda la ruta relativa y el frontend la prefija con la URL base del
+     * API. Se separa en su propia carpeta para que borrar una no toque la
+     * otra.
+     */
+    public function uploadPortada(Request $request, int $id): JsonResponse
+    {
+        $proveedor = Proveedor::find($id);
+        if (!$proveedor) {
+            return $this->error('Proveedor no encontrado', 404);
+        }
+
+        if ($proveedor->user_id !== $request->user()->id) {
+            return $this->error('No tienes permiso para modificar este perfil', 403);
+        }
+
+        // La portada se muestra a lo ancho, asi que admite mas peso que el
+        // avatar: 6 MB contra los 3 MB de la foto de perfil.
+        $request->validate([
+            'portada' => 'required|image|mimes:jpg,jpeg,png,webp|max:6144',
+        ]);
+
+        $file   = $request->file('portada');
+        $nombre = time() . '_' . $file->getClientOriginalName();
+        $ruta   = $file->storeAs('portadas/' . $id, $nombre, 'public');
+
+        $relativePath = '/storage/' . $ruta;
+
+        $proveedor->update(['portada' => $relativePath]);
+
+        return $this->success('Portada actualizada', ['portada' => $relativePath]);
+    }
+
+    /**
+     * Quita la portada y devuelve el perfil al degradado de marca. Es una
+     * accion propia y no un update con null porque el formulario manda campos
+     * parciales: sin esto no habria forma de distinguir "no toques la portada"
+     * de "borrala".
+     */
+    public function deletePortada(Request $request, int $id): JsonResponse
+    {
+        $proveedor = Proveedor::find($id);
+        if (!$proveedor) {
+            return $this->error('Proveedor no encontrado', 404);
+        }
+
+        if ($proveedor->user_id !== $request->user()->id) {
+            return $this->error('No tienes permiso para modificar este perfil', 403);
+        }
+
+        $proveedor->update(['portada' => null]);
+
+        return $this->success('Portada eliminada', ['portada' => null]);
     }
 
     public function uploadDocumento(Request $request, int $id): JsonResponse

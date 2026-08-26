@@ -12,7 +12,7 @@ import { Feather } from '@expo/vector-icons';
 import { getProvider, getCalificacionesProveedor, getDisponibilidadProveedor, storageUrl } from '../services/api';
 import { useToast } from '../context/ToastContext';
 import { T } from '../theme';
-import { Avatar, Button, Card, PremiumBadge, StatusChip, Stars } from '../components/ui';
+import { Avatar, Button, Card, PremiumBadge, ProfileCover, StatusChip, Stars } from '../components/ui';
 
 const DIAS = ['Dom', 'Lun', 'Mar', 'Mie', 'Jue', 'Vie', 'Sab'];
 
@@ -111,6 +111,13 @@ export default function ProviderDetailScreen({
   const ProfileColumn = (
     <View style={twoColumns ? styles.colLeft : undefined}>
       <Card style={styles.profileCard}>
+        <ProfileCover
+          portadaUri={storageUrl(proveedor.portada)}
+          colorAcento={proveedor.color_acento}
+          height={110}
+          radius={14}
+          style={styles.cover}
+        />
         <Avatar uri={storageUrl(proveedor.foto_perfil)} name={proveedor.nombre} size={72} />
         <Text style={styles.provName}>{proveedor.nombre}</Text>
         <PremiumBadge proveedor={proveedor} showDetails style={styles.premiumBlock} />
@@ -299,6 +306,7 @@ const styles = StyleSheet.create({
   colRight: { flex: 1, gap: 14 },
 
   profileCard: { alignItems: 'center', marginBottom: 14 },
+  cover: { width: 'auto', alignSelf: 'stretch', marginTop: -16, marginHorizontal: -16, marginBottom: 14 },
   provName: { fontSize: 22, fontWeight: '800', color: T.ink, marginTop: 12, marginBottom: 8 },
   premiumBlock: { alignSelf: 'stretch', marginBottom: 12 },
   chipsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, justifyContent: 'center', marginBottom: 4 },

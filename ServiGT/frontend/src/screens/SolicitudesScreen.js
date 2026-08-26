@@ -16,6 +16,7 @@ import {
 } from '../services/api';
 import { useToast } from '../context/ToastContext';
 import { T } from '../theme';
+import { Button, ScreenHeader } from '../components/ui';
 
 const tabs = [
   { key: 'enviadas', label: 'Enviadas' },
@@ -232,18 +233,18 @@ export default function SolicitudesScreen({ navigation, user }) {
   return (
     <View style={styles.container}>
       <View style={styles.contentWrap}>
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.navigate('Home')}>
-          <Text style={styles.backBtnText}>Volver</Text>
-        </TouchableOpacity>
-        <View style={styles.headerCopy}>
-          <Text style={styles.title}>{user?.role === 'cliente' ? 'Mis servicios' : 'Trabajos'}</Text>
-          <Text style={styles.subtitle}>Gestiona tus servicios y solicitudes activas.</Text>
-        </View>
-        <TouchableOpacity style={styles.refreshBtn} onPress={fetchSolicitudes}>
-          <Text style={styles.refreshText}>Actualizar</Text>
-        </TouchableOpacity>
-      </View>
+      <ScreenHeader
+        variant="inline"
+        style={styles.header}
+        title={user?.role === 'cliente' ? 'Mis servicios' : 'Trabajos'}
+        subtitle="Gestiona tus servicios y solicitudes activas."
+        onBack={() => navigation.navigate('Home')}
+        right={
+          <Button kind="ghost" size="sm" icon="refresh-cw" onPress={fetchSolicitudes}>
+            Actualizar
+          </Button>
+        }
+      />
 
       <View style={styles.tabs}>
         {tabs.map((tab) => {
@@ -302,20 +303,9 @@ export default function SolicitudesScreen({ navigation, user }) {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: T.canvas },
   contentWrap: { flex: 1, width: '100%', maxWidth: 1100, alignSelf: 'center', padding: 24, paddingBottom: 36 },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
-    marginBottom: 18,
-    flexWrap: 'wrap',
-  },
-  backBtn: { paddingVertical: 8, paddingRight: 8 },
-  backBtnText: { color: '#4589d4', fontSize: 14, fontWeight: '700' },
-  headerCopy: { flex: 1, minWidth: 220 },
-  title: { fontSize: 26, fontWeight: '800', color: T.ink, marginBottom: 4 },
-  subtitle: { fontSize: 14, color: T.muted, lineHeight: 20 },
-  refreshBtn: { paddingVertical: 8, paddingLeft: 8 },
-  refreshText: { color: '#4589d4', fontSize: 14, fontWeight: '700' },
+  // El layout, el enlace de volver y la tipografia del titulo los aporta
+  // ScreenHeader; aqui solo queda la separacion con el contenido.
+  header: { marginBottom: 18 },
   tabs: {
     flexDirection: 'row',
     gap: 6,

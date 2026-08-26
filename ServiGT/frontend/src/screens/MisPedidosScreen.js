@@ -11,9 +11,9 @@ import {
   View,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { getMisPedidos } from '../services/api';
+import { getMisPedidos, getSolicitudesCliente, storageUrl } from '../services/api';
 import { T } from '../theme';
-import { Button, Card, StatusChip } from '../components/ui';
+import { Avatar, Button, Card, ScreenHeader, StatusChip } from '../components/ui';
 
 // Mapea el dominio (urgencia/estado de pedido) a la variante semantica de
 // StatusChip, en vez de que cada pantalla traiga su propio bg/text/border.
@@ -22,6 +22,35 @@ const URGENCIA_LABEL   = { alta: 'URGENTE', media: 'MEDIA', baja: 'BAJA' };
 
 const ESTADO_VARIANT = { abierto: 'info', cerrado: 'success', cancelado: 'danger', expirado: 'neutral' };
 const ESTADO_LABEL   = { abierto: 'Abierto', cerrado: 'Cerrado', cancelado: 'Cancelado', expirado: 'Expirado' };
+
+// Los servicios directos recorren el ciclo de vida del trabajo, no el de una
+// convocatoria, asi que tienen su propia tabla de estados.
+const SERVICIO_VARIANT = {
+  pendiente:     'warn',
+  aceptado:      'info',
+  en_camino:     'info',
+  en_progreso:   'info',
+  por_confirmar: 'warn',
+  completado:    'success',
+  cancelado:     'danger',
+  rechazado:     'danger',
+};
+const SERVICIO_LABEL = {
+  pendiente:     'Pendiente',
+  aceptado:      'Aceptado',
+  en_camino:     'En camino',
+  en_progreso:   'En progreso',
+  por_confirmar: 'Por confirmar',
+  completado:    'Completado',
+  cancelado:     'Cancelado',
+  rechazado:     'Rechazado',
+};
+
+// Las dos superficies que conviven en la pantalla. Un pedido es una
+// convocatoria abierta que recibe cotizaciones; un servicio directo es un
+// encargo a un proveedor concreto. Se separan porque no se gestionan igual.
+const VISTA_PEDIDOS   = 'pedidos';
+const VISTA_SERVICIOS = 'servicios';
 
 const timeAgo = (iso) => {
   if (!iso) return '';
@@ -81,17 +110,70 @@ function PedidoCard({ pedido, onPress, style }) {
   );
 }
 
+function ServicioCard({ servicio, onPress, style }) {
+  const proveedor = servicio.proveedor;
+
+  return (
+    <TouchableOpacity activeOpacity={0.86} onPress={onPress} style={style}>
+      <Card style={s.card}>
+        <View style={s.topRow}>
+          <StatusChip
+            variant={SERVICIO_VARIANT[servicio.estado] ?? 'neutral'}
+            label={SERVICIO_LABEL[servicio.estado] ?? servicio.estado}
+            size="sm"
+          />
+          <Text style={s.timeText}>{timeAgo(servicio.created_at)}</Text>
+        </View>
+
+        <View style={s.provRow}>
+          <Avatar name={proveedor?.nombre} uri={storageUrl(proveedor?.foto_perfil)} size={34} />
+          <View style={s.provCopy}>
+            <Text style={s.provName} numberOfLines={1}>
+              {proveedor?.nombre || 'Proveedor'}
+            </Text>
+            {servicio.categoria?.nombre || proveedor?.categoria?.nombre ? (
+              <Text style={s.catText}>
+                {servicio.categoria?.nombre || proveedor?.categoria?.nombre}
+              </Text>
+            ) : null}
+          </View>
+        </View>
+
+        <Text style={s.descText} numberOfLines={2}>{servicio.descripcion}</Text>
+
+        <View style={s.footRow}>
+          {servicio.direccion ? (
+            <View style={s.locationRow}>
+              <Feather name="map-pin" size={12} color={T.muted} />
+              <Text style={s.locationText} numberOfLines={1}>{servicio.direccion}</Text>
+            </View>
+          ) : (
+            <View style={{ flex: 1 }} />
+          )}
+          {servicio.monto_acordado ? (
+            <Text style={s.montoText}>Q{Number(servicio.monto_acordado).toFixed(2)}</Text>
+          ) : null}
+        </View>
+      </Card>
+    </TouchableOpacity>
+  );
+}
+
 export default function MisPedidosScreen({ navigation }) {
   const { width } = useWindowDimensions();
   const numColumns = width >= 1300 ? 3 : width >= 820 ? 2 : 1;
 
+  const [vista, setVista]             = useState(VISTA_PEDIDOS);
   const [pedidos, setPedidos]         = useState([]);
+  const [servicios, setServicios]     = useState([]);
   const [page, setPage]               = useState(1);
   const [lastPage, setLastPage]       = useState(1);
   const [loading, setLoading]         = useState(true);
   const [refreshing, setRefreshing]   = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError]             = useState('');
+
+  const enPedidos = vista === VISTA_PEDIDOS;
 
   const cargar = useCallback(async (pagina = 1, append = false, silent = false) => {
     if (pagina === 1 && !silent) setLoading(true);
@@ -112,15 +194,31 @@ export default function MisPedidosScreen({ navigation }) {
     }
   }, []);
 
-  useEffect(() => { cargar(1); }, [cargar]);
+  // Los servicios directos no vienen paginados por el backend, asi que se
+  // cargan de una sola vez junto a la primera pagina de pedidos. Si fallan no
+  // tumban la pantalla: los pedidos siguen siendo utiles por si solos.
+  const cargarServicios = useCallback(async () => {
+    try {
+      const data = await getSolicitudesCliente();
+      setServicios(data.servicios || []);
+    } catch {
+      setServicios([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    cargar(1);
+    cargarServicios();
+  }, [cargar, cargarServicios]);
 
   const onRefresh = () => {
     setRefreshing(true);
     cargar(1, false, true);
+    cargarServicios();
   };
 
   const onEndReached = () => {
-    if (!loadingMore && page < lastPage) cargar(page + 1, true);
+    if (enPedidos && !loadingMore && page < lastPage) cargar(page + 1, true);
   };
 
   // ── Loading ──────────────────────────────────────────────────────────────
@@ -132,60 +230,112 @@ export default function MisPedidosScreen({ navigation }) {
     );
   }
 
+  const datos = enPedidos ? pedidos : servicios;
+
+  const selector = (
+    <View style={s.selector}>
+      {[
+        { key: VISTA_PEDIDOS,   label: 'Pedidos',           icon: 'clipboard', total: pedidos.length },
+        { key: VISTA_SERVICIOS, label: 'Servicios directos', icon: 'user-check', total: servicios.length },
+      ].map((opcion) => {
+        const activa = vista === opcion.key;
+        return (
+          <TouchableOpacity
+            key={opcion.key}
+            style={[s.selectorItem, activa && s.selectorItemActive]}
+            onPress={() => setVista(opcion.key)}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: activa }}
+          >
+            <Feather name={opcion.icon} size={14} color={activa ? T.deep : T.muted} />
+            <Text style={[s.selectorText, activa && s.selectorTextActive]} numberOfLines={1}>
+              {opcion.label}
+            </Text>
+            <View style={[s.selectorCount, activa && s.selectorCountActive]}>
+              <Text style={[s.selectorCountText, activa && s.selectorCountTextActive]}>
+                {opcion.total}
+              </Text>
+            </View>
+          </TouchableOpacity>
+        );
+      })}
+    </View>
+  );
+
+  const vacio = enPedidos ? (
+    <View style={s.emptyWrap}>
+      <View style={s.emptyIconWrap}>
+        <Feather name="clipboard" size={40} color={T.blue} />
+      </View>
+      <Text style={s.emptyTitle}>Sin pedidos aún</Text>
+      <Text style={s.emptyDesc}>
+        Publica tu primer pedido y recibe propuestas de proveedores verificados.
+      </Text>
+      <Button kind="primary" size="lg" onPress={() => navigation.navigate('PublicarPedido')}>
+        Publicar mi primer pedido
+      </Button>
+    </View>
+  ) : (
+    <View style={s.emptyWrap}>
+      <View style={s.emptyIconWrap}>
+        <Feather name="user-check" size={40} color={T.blue} />
+      </View>
+      <Text style={s.emptyTitle}>Sin servicios directos</Text>
+      <Text style={s.emptyDesc}>
+        Cuando contrates a un proveedor directamente desde su perfil, el servicio aparecerá aquí.
+      </Text>
+      <Button kind="secondary" size="lg" onPress={() => navigation.navigate('Home')}>
+        Buscar proveedores
+      </Button>
+    </View>
+  );
+
   return (
     <SafeAreaView style={s.container}>
-      {/* Header fijo */}
-      <View style={s.header}>
-        <TouchableOpacity
-          onPress={() => navigation.goBack()}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          style={s.headerBack}
-        >
-          <Feather name="arrow-left" size={16} color={T.blue} />
-          <Text style={s.backText}>Volver</Text>
-        </TouchableOpacity>
-        <Text style={s.headerTitle}>Mis pedidos</Text>
-        <View style={{ width: 70 }} />
-      </View>
+      <ScreenHeader title="Mis pedidos" onBack={() => navigation.goBack()} />
 
       <FlatList
-        key={`cols-${numColumns}`}
-        data={pedidos}
-        keyExtractor={(item) => String(item.id)}
+        key={`${vista}-cols-${numColumns}`}
+        data={datos}
+        keyExtractor={(item) => `${vista}-${item.id}`}
         numColumns={numColumns}
         columnWrapperStyle={numColumns > 1 ? s.row : undefined}
-        renderItem={({ item }) => (
-          <PedidoCard
-            pedido={item}
-            onPress={() => navigation.navigate('PedidoDetail', { pedidoId: item.id })}
-            style={numColumns > 1 ? s.gridItem : undefined}
-          />
-        )}
+        renderItem={({ item }) =>
+          enPedidos ? (
+            <PedidoCard
+              pedido={item}
+              onPress={() => navigation.navigate('PedidoDetail', { pedidoId: item.id })}
+              style={numColumns > 1 ? s.gridItem : undefined}
+            />
+          ) : (
+            <ServicioCard
+              servicio={item}
+              onPress={() => navigation.navigate('Solicitudes')}
+              style={numColumns > 1 ? s.gridItem : undefined}
+            />
+          )
+        }
         ListHeaderComponent={
-          pedidos.length > 0 ? (
-            <View style={s.listHeader}>
-              <Text style={s.listCount}>{pedidos.length} pedido(s)</Text>
-              <Button kind="primary" size="sm" icon="plus" onPress={() => navigation.navigate('PublicarPedido')}>
-                Nuevo pedido
-              </Button>
-            </View>
-          ) : null
+          <View>
+            {selector}
+            {datos.length > 0 ? (
+              <View style={s.listHeader}>
+                <Text style={s.listCount}>
+                  {enPedidos
+                    ? `${pedidos.length} pedido(s)`
+                    : `${servicios.length} servicio(s) directo(s)`}
+                </Text>
+                {enPedidos ? (
+                  <Button kind="primary" size="sm" icon="plus" onPress={() => navigation.navigate('PublicarPedido')}>
+                    Nuevo pedido
+                  </Button>
+                ) : null}
+              </View>
+            ) : null}
+          </View>
         }
         ListEmptyComponent={
-          !error ? (
-            <View style={s.emptyWrap}>
-              <View style={s.emptyIconWrap}>
-                <Feather name="clipboard" size={40} color={T.blue} />
-              </View>
-              <Text style={s.emptyTitle}>Sin pedidos aún</Text>
-              <Text style={s.emptyDesc}>
-                Publica tu primer pedido y recibe propuestas de proveedores verificados.
-              </Text>
-              <Button kind="primary" size="lg" onPress={() => navigation.navigate('PublicarPedido')}>
-                Publicar mi primer pedido
-              </Button>
-            </View>
-          ) : (
+          !error ? vacio : (
             <View style={s.centered}>
               <Text style={s.errorText}>{error}</Text>
               <Button kind="primary" onPress={() => cargar(1)}>
@@ -197,11 +347,11 @@ export default function MisPedidosScreen({ navigation }) {
         ListFooterComponent={
           loadingMore
             ? <ActivityIndicator size="small" color={T.blue} style={{ padding: 16 }} />
-            : pedidos.length > 0
+            : datos.length > 0
               ? <Text style={s.footerText}>ServiGT Guatemala</Text>
               : null
         }
-        contentContainerStyle={pedidos.length === 0 ? s.flatEmpty : s.flatContent}
+        contentContainerStyle={datos.length === 0 ? s.flatEmpty : s.flatContent}
         showsVerticalScrollIndicator={false}
         onEndReached={onEndReached}
         onEndReachedThreshold={0.4}
@@ -217,20 +367,30 @@ const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: T.canvas },
   centered:  { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 32, gap: 14 },
 
-  // Header
-  header: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 16, paddingVertical: 14,
-    backgroundColor: T.paper, borderBottomWidth: 1, borderBottomColor: T.border,
-    ...T.sh1,
-  },
-  headerBack:  { flexDirection: 'row', alignItems: 'center', gap: 4, width: 70 },
-  backText:    { color: T.blue, fontWeight: '600', fontSize: 14 },
-  headerTitle: { fontSize: 17, fontWeight: '800', color: T.ink },
-
   // List layout
   flatContent: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 32 },
   flatEmpty:   { flexGrow: 1, paddingHorizontal: 16, paddingTop: 12 },
+
+  // Selector de superficie
+  selector: {
+    flexDirection: 'row', gap: 6, marginBottom: 14,
+    backgroundColor: T.paper, borderWidth: 1, borderColor: T.border,
+    borderRadius: 999, padding: 4,
+  },
+  selectorItem: {
+    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: 6, paddingHorizontal: 10, paddingVertical: 8, borderRadius: 999,
+  },
+  selectorItemActive: { backgroundColor: T.tint },
+  selectorText: { fontSize: 13, fontWeight: '700', color: T.muted, flexShrink: 1 },
+  selectorTextActive: { color: T.deep },
+  selectorCount: {
+    minWidth: 22, paddingHorizontal: 6, paddingVertical: 1, borderRadius: 999,
+    backgroundColor: T.canvas, alignItems: 'center',
+  },
+  selectorCountActive: { backgroundColor: T.white },
+  selectorCountText: { fontSize: 11, fontWeight: '800', color: T.muted },
+  selectorCountTextActive: { color: T.deep },
 
   listHeader: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
@@ -248,6 +408,12 @@ const s = StyleSheet.create({
 
   catText:  { fontSize: 12, color: T.blue, fontWeight: '600', marginBottom: 5 },
   descText: { fontSize: 14, color: T.text, lineHeight: 21, marginBottom: 12 },
+
+  // Card de servicio directo
+  provRow:  { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 8 },
+  provCopy: { flex: 1, minWidth: 0 },
+  provName: { fontSize: 14, fontWeight: '700', color: T.ink },
+  montoText: { fontSize: 13, fontWeight: '800', color: T.deep },
 
   footRow:      { flexDirection: 'row', alignItems: 'center', gap: 8 },
   locationRow:  { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 4 },

@@ -12,6 +12,7 @@ import {
 import { calificarServicio, getServicio } from '../services/api';
 import { useToast } from '../context/ToastContext';
 import { T } from '../theme';
+import { ScreenHeader } from '../components/ui';
 
 const StarsInput = ({ value, onChange }) => (
   <View style={styles.starsRow}>
@@ -122,9 +123,7 @@ export default function CalificarProveedorScreen({ navigation, servicioId, user 
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <TouchableOpacity style={styles.backBtn} onPress={() => navigation.navigate('Solicitudes')}>
-        <Text style={styles.backText}>Volver</Text>
-      </TouchableOpacity>
+      <ScreenHeader style={styles.backBtn} onBack={() => navigation.navigate('Solicitudes')} variant="inline" />
 
       <View style={[styles.headerCard, wide && styles.headerCardWide]}>
         <Text style={styles.eyebrow}>Calificar al proveedor</Text>
@@ -209,8 +208,7 @@ const styles = StyleSheet.create({
     backgroundColor: T.canvas,
   },
   loadingText: { marginTop: 12, color: T.muted, fontSize: 14 },
-  backBtn: { alignSelf: 'flex-start', paddingVertical: 8, paddingRight: 12, marginBottom: 14 },
-  backText: { color: T.blue, fontSize: 14, fontWeight: '800' },
+  backBtn: { alignSelf: 'flex-start', marginBottom: 14 },
   headerCard: {
     backgroundColor: T.paper,
     borderRadius: 14,

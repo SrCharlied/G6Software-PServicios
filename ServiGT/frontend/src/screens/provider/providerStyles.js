@@ -152,6 +152,7 @@ export const styles = StyleSheet.create({
   linkText: { color: T.blue, fontWeight: '700', fontSize: 13 },
 
   // Profile
+  profileCover: { width: 'auto', alignSelf: 'stretch', marginTop: -T.s4, marginHorizontal: -T.s4, marginBottom: 12 },
   profileName: { fontSize: 18, fontWeight: '700', color: T.ink, marginBottom: 8 },
   profilePremium: { marginBottom: 12 },
   profileDescription: { fontSize: 14, color: T.text, lineHeight: 20, opacity: 0.78 },

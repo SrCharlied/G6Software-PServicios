@@ -62,6 +62,8 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Foto de perfil del proveedor
     Route::post('/providers/{id}/foto', [ProviderController::class, 'uploadFoto'])->where('id', '[0-9]+');
+    Route::post('/providers/{id}/portada', [ProviderController::class, 'uploadPortada'])->where('id', '[0-9]+');
+    Route::delete('/providers/{id}/portada', [ProviderController::class, 'deletePortada'])->where('id', '[0-9]+');
 
     // Documentos del proveedor
     Route::get('/providers/{id}/documentos',  [ProviderController::class, 'getDocumentos']);

@@ -28,6 +28,8 @@ class Proveedor extends Model
         'premium_vence_at',
         'premium_ciclo_key',
         'premium_renovaciones',
+        'portada',
+        'color_acento',
     ];
 
     protected $casts = [

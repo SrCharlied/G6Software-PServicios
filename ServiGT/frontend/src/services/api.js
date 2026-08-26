@@ -225,6 +225,28 @@ export const uploadFotoPerfil = async (proveedorId, file) => {
   }
 };
 
+export const uploadPortada = async (proveedorId, file) => {
+  try {
+    const formData = new FormData();
+    formData.append('portada', file);
+    const response = await api.post(`/providers/${proveedorId}/portada`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response.data;
+  } catch (error) {
+    throw new Error(getErrorMessage(error, 'No se pudo subir la portada.'));
+  }
+};
+
+export const deletePortada = async (proveedorId) => {
+  try {
+    const response = await api.delete(`/providers/${proveedorId}/portada`);
+    return response.data;
+  } catch (error) {
+    throw new Error(getErrorMessage(error, 'No se pudo quitar la portada.'));
+  }
+};
+
 export const uploadDocumento = async (proveedorId, file, tipoDocumento) => {
   try {
     const formData = new FormData();

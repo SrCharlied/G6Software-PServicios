@@ -84,6 +84,8 @@ CREATE TABLE IF NOT EXISTS proveedores (
     premium_vence_at TIMESTAMP WITHOUT TIME ZONE NULL,
     premium_ciclo_key VARCHAR(80),
     premium_renovaciones INT NOT NULL DEFAULT 0 CHECK (premium_renovaciones >= 0),
+    portada VARCHAR(500),
+    color_acento VARCHAR(7),
     created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
@@ -395,6 +397,12 @@ ALTER TABLE proveedores ADD COLUMN IF NOT EXISTS premium_inicio_at TIMESTAMP WIT
 ALTER TABLE proveedores ADD COLUMN IF NOT EXISTS premium_vence_at TIMESTAMP WITHOUT TIME ZONE NULL;
 ALTER TABLE proveedores ADD COLUMN IF NOT EXISTS premium_ciclo_key VARCHAR(80);
 ALTER TABLE proveedores ADD COLUMN IF NOT EXISTS premium_renovaciones INT NOT NULL DEFAULT 0;
+
+-- Personalizacion del perfil del proveedor: imagen de portada y color de
+-- acento. Ambas opcionales; un perfil sin ellas se dibuja con el degradado
+-- de marca de siempre.
+ALTER TABLE proveedores ADD COLUMN IF NOT EXISTS portada VARCHAR(500);
+ALTER TABLE proveedores ADD COLUMN IF NOT EXISTS color_acento VARCHAR(7);
 
 DO $$
 BEGIN

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Notificacion;
 use App\Models\Servicio;
+use App\Http\Resources\ServicioResource;
 use App\Traits\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -41,7 +42,9 @@ class ServicioController extends Controller
             ]);
         }
 
-        return $this->success('Solicitud enviada exitosamente', ['servicio' => $servicio], 201);
+        return $this->success('Solicitud enviada exitosamente', [
+            'servicio' => new ServicioResource($servicio),
+        ], 201);
     }
 
     public function show(int $id, Request $request): JsonResponse
@@ -60,7 +63,7 @@ class ServicioController extends Controller
             return $this->error('No tienes permiso para ver este servicio', 403);
         }
 
-        return $this->success('OK', ['servicio' => $servicio]);
+        return $this->success('OK', ['servicio' => new ServicioResource($servicio)]);
     }
 
     public function solicitudesProveedor(Request $request): JsonResponse
@@ -82,7 +85,10 @@ class ServicioController extends Controller
 
         $servicios = $query->orderBy('created_at', 'desc')->get();
 
-        return $this->success('OK', ['servicios' => $servicios, 'total' => $servicios->count()]);
+        return $this->success('OK', [
+            'servicios' => ServicioResource::collection($servicios),
+            'total' => $servicios->count(),
+        ]);
     }
 
     public function solicitudesCliente(Request $request): JsonResponse
@@ -97,7 +103,7 @@ class ServicioController extends Controller
 
         $servicios = $query->orderBy('created_at', 'desc')->get();
 
-        return $this->success('OK', ['servicios' => $servicios]);
+        return $this->success('OK', ['servicios' => ServicioResource::collection($servicios)]);
     }
 
     public function aceptar(int $id, Request $request): JsonResponse
@@ -119,7 +125,9 @@ class ServicioController extends Controller
             'datos'           => ['servicio_id' => $servicio->id],
         ]);
 
-        return $this->success('Solicitud aceptada', ['servicio' => $servicio]);
+        $servicio->loadMissing(['cliente', 'proveedor.categoria', 'categoria']);
+
+        return $this->success('Solicitud aceptada', ['servicio' => new ServicioResource($servicio)]);
     }
 
     public function rechazar(int $id, Request $request): JsonResponse
@@ -146,7 +154,9 @@ class ServicioController extends Controller
             'datos'           => ['servicio_id' => $servicio->id],
         ]);
 
-        return $this->success('Solicitud rechazada', ['servicio' => $servicio]);
+        $servicio->loadMissing(['cliente', 'proveedor.categoria', 'categoria']);
+
+        return $this->success('Solicitud rechazada', ['servicio' => new ServicioResource($servicio)]);
     }
 
     public function actualizarEstado(int $id, Request $request): JsonResponse
@@ -164,7 +174,9 @@ class ServicioController extends Controller
             $this->notificarServicioCalificable($servicio);
         }
 
-        return $this->success('Estado actualizado', ['servicio' => $servicio]);
+        $servicio->loadMissing(['cliente', 'proveedor.categoria', 'categoria']);
+
+        return $this->success('Estado actualizado', ['servicio' => new ServicioResource($servicio)]);
     }
 
     public function iniciar(int $id, Request $request): JsonResponse
@@ -194,7 +206,9 @@ class ServicioController extends Controller
             'datos'           => ['servicio_id' => $servicio->id],
         ]);
 
-        return $this->success('Servicio iniciado', ['servicio' => $servicio]);
+        $servicio->loadMissing(['cliente', 'proveedor.categoria', 'categoria']);
+
+        return $this->success('Servicio iniciado', ['servicio' => new ServicioResource($servicio)]);
     }
 
     public function finalizar(int $id, Request $request): JsonResponse
@@ -221,8 +235,10 @@ class ServicioController extends Controller
             'datos'           => ['servicio_id' => $servicio->id],
         ]);
 
+        $request->attributes->set('exponer_codigo_fin_servicio', $servicio->id);
+
         return $this->success('Servicio listo para confirmar', [
-            'servicio'   => $servicio,
+            'servicio'   => new ServicioResource($servicio->loadMissing(['cliente', 'proveedor.categoria', 'categoria'])),
             'codigo_fin' => $codigoFin,
         ]);
     }
@@ -259,7 +275,9 @@ class ServicioController extends Controller
 
         $this->notificarServicioCalificable($servicio);
 
-        return $this->success('Servicio completado', ['servicio' => $servicio]);
+        $servicio->loadMissing(['cliente', 'proveedor.categoria', 'categoria']);
+
+        return $this->success('Servicio completado', ['servicio' => new ServicioResource($servicio)]);
     }
 
     // ── Helper ────────────────────────────────────────────────────────────────

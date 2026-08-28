@@ -179,11 +179,33 @@ CREATE TABLE IF NOT EXISTS compras_creditos (
 );
 CREATE INDEX IF NOT EXISTS idx_compras_creditos_proveedor ON compras_creditos (proveedor_id, created_at DESC);
 
+-- Publicaciones de servicios ofrecidos por proveedores
+CREATE TABLE IF NOT EXISTS publicaciones_servicio (
+    id BIGSERIAL PRIMARY KEY,
+    proveedor_id BIGINT NOT NULL REFERENCES proveedores(id) ON DELETE CASCADE,
+    categoria_id BIGINT REFERENCES categorias(id) ON DELETE SET NULL,
+    titulo VARCHAR(120) NOT NULL,
+    descripcion TEXT NOT NULL,
+    precio_referencial DECIMAL(10,2),
+    imagen VARCHAR(500),
+    estado VARCHAR(20) NOT NULL DEFAULT 'activa'
+        CHECK (estado IN ('activa','inactiva')),
+    created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_publicaciones_servicio_visible
+    ON publicaciones_servicio (estado, categoria_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_publicaciones_servicio_proveedor
+    ON publicaciones_servicio (proveedor_id, estado);
+
 -- Servicios (solicitudes de trabajo)
 CREATE TABLE IF NOT EXISTS servicios (
     id BIGSERIAL PRIMARY KEY,
     cliente_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     proveedor_id BIGINT NOT NULL REFERENCES proveedores(id) ON DELETE CASCADE,
+    publicacion_id BIGINT REFERENCES publicaciones_servicio(id) ON DELETE SET NULL,
+    publicacion_titulo VARCHAR(120),
+    publicacion_precio_referencial DECIMAL(10,2),
     categoria_id BIGINT REFERENCES categorias(id) ON DELETE SET NULL,
     descripcion TEXT NOT NULL,
     estado VARCHAR(20) NOT NULL DEFAULT 'pendiente'
@@ -403,6 +425,47 @@ ALTER TABLE proveedores ADD COLUMN IF NOT EXISTS premium_renovaciones INT NOT NU
 -- de marca de siempre.
 ALTER TABLE proveedores ADD COLUMN IF NOT EXISTS portada VARCHAR(500);
 ALTER TABLE proveedores ADD COLUMN IF NOT EXISTS color_acento VARCHAR(7);
+
+-- Publicaciones y trazabilidad nullable desde servicios. El snapshot conserva
+-- datos minimos aunque luego la publicacion se edite o elimine.
+CREATE TABLE IF NOT EXISTS publicaciones_servicio (
+    id BIGSERIAL PRIMARY KEY,
+    proveedor_id BIGINT NOT NULL REFERENCES proveedores(id) ON DELETE CASCADE,
+    categoria_id BIGINT REFERENCES categorias(id) ON DELETE SET NULL,
+    titulo VARCHAR(120) NOT NULL,
+    descripcion TEXT NOT NULL,
+    precio_referencial DECIMAL(10,2),
+    imagen VARCHAR(500),
+    estado VARCHAR(20) NOT NULL DEFAULT 'activa'
+        CHECK (estado IN ('activa','inactiva')),
+    created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_publicaciones_servicio_visible
+    ON publicaciones_servicio (estado, categoria_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_publicaciones_servicio_proveedor
+    ON publicaciones_servicio (proveedor_id, estado);
+
+ALTER TABLE servicios ADD COLUMN IF NOT EXISTS publicacion_id BIGINT REFERENCES publicaciones_servicio(id) ON DELETE SET NULL;
+ALTER TABLE servicios ADD COLUMN IF NOT EXISTS publicacion_titulo VARCHAR(120);
+ALTER TABLE servicios ADD COLUMN IF NOT EXISTS publicacion_precio_referencial DECIMAL(10,2);
+
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint
+        WHERE conrelid = 'servicios'::regclass
+          AND contype = 'f'
+          AND conkey = ARRAY[(
+              SELECT attnum FROM pg_attribute
+              WHERE attrelid = 'servicios'::regclass AND attname = 'publicacion_id'
+          )]::smallint[]
+    ) THEN
+        ALTER TABLE servicios
+            ADD CONSTRAINT servicios_publicacion_id_fkey
+            FOREIGN KEY (publicacion_id) REFERENCES publicaciones_servicio(id) ON DELETE SET NULL;
+    END IF;
+END $$;
 
 DO $$
 BEGIN

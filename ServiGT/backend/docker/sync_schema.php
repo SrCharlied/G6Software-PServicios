@@ -68,6 +68,21 @@ try {
 }
 
 // ── Seed admin por defecto ─────────────────────────────────────────────────
+$requiredSchemaChecks = [
+    "SELECT to_regclass('publicaciones_servicio') IS NOT NULL",
+    "SELECT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'servicios' AND column_name = 'publicacion_id'
+    )",
+];
+
+foreach ($requiredSchemaChecks as $checkSql) {
+    if (!$pdo->query($checkSql)->fetchColumn()) {
+        fwrite(STDERR, "[!] El esquema no contiene la estructura esperada de publicaciones.\n");
+        exit(1);
+    }
+}
+
 $adminEmail    = getenv('ADMIN_EMAIL')    ?: 'admin@gmail.com';
 $adminPassword = getenv('ADMIN_PASSWORD') ?: 'admin';
 $adminName     = getenv('ADMIN_NAME')     ?: 'Administrador ServiGT';
@@ -158,7 +173,7 @@ foreach ($sampleProviders as $i => $p) {
 }
 
 if ($createdProviders > 0) {
-    echo "[*] Proveedores de ejemplo creados: {$createdProviders} (password: {$providerPassword})\n";
+    echo "[*] Proveedores de ejemplo creados: {$createdProviders}\n";
 }
 
 echo "[*] Esquema PostgreSQL sincronizado.\n";

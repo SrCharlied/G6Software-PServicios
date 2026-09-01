@@ -114,6 +114,20 @@ class PublicacionServicioLimiteTest extends TestCase
         $this->assertDatabaseCount('publicaciones_servicio', 3);
     }
 
+    public function test_meta_de_paginacion_refleja_solo_publicaciones_visibles(): void
+    {
+        [$proveedor, $categoria] = $this->crearProveedor(premiumVencido: true);
+        $this->crearPublicacion($proveedor, $categoria, 'activa', now()->subDays(3));
+        $this->crearPublicacion($proveedor, $categoria, 'activa', now()->subDays(2));
+        $this->crearPublicacion($proveedor, $categoria, 'activa', now()->subDay());
+
+        $this->getJson('/api/publicaciones?proveedor_id=' . $proveedor->id . '&per_page=2')
+            ->assertOk()
+            ->assertJsonCount(1, 'publicaciones')
+            ->assertJsonPath('meta.total', 1)
+            ->assertJsonPath('meta.last_page', 1);
+    }
+
     private function payload(Categoria $categoria, string $titulo): array
     {
         return [

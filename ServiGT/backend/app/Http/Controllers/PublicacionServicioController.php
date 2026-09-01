@@ -43,11 +43,26 @@ class PublicacionServicioController extends Controller
             $query->where('proveedor_id', $validated['proveedor_id']);
         }
 
-        $publicaciones = $query->paginate((int) ($validated['per_page'] ?? 15));
-        $visibles = $this->filtrarVisiblesPorLimite($publicaciones->getCollection());
+        // La ventana de visibilidad (limite gratis/Premium) se aplica en PHP,
+        // asi que la paginacion tambien se resuelve aqui: paginar en la BD
+        // antes de filtrar dejaria un meta.total/last_page que no corresponde
+        // a lo que realmente se devuelve.
+        $perPage = (int) ($validated['per_page'] ?? 15);
+        $page = (int) $request->input('page', 1);
+
+        $visiblesTotal = $this->filtrarVisiblesPorLimite($query->get());
+        $itemsPagina = $visiblesTotal->forPage($page, $perPage)->values();
+
+        $publicaciones = new \Illuminate\Pagination\LengthAwarePaginator(
+            $itemsPagina,
+            $visiblesTotal->count(),
+            $perPage,
+            $page,
+            ['path' => $request->url(), 'query' => $request->query()]
+        );
 
         return $this->success('OK', [
-            'publicaciones' => PublicacionServicioResource::collection($visibles),
+            'publicaciones' => PublicacionServicioResource::collection($publicaciones->items()),
             'meta' => [
                 'total' => $publicaciones->total(),
                 'per_page' => $publicaciones->perPage(),

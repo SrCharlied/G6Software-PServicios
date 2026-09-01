@@ -180,7 +180,6 @@ export default function RegisterScreen({ navigation, onRegisterSuccess }) {
     setLoading(true);
     try {
       const data = await createProvider({
-        user_id: registeredUser.id,
         nombre: registeredUser.name,
         email: registeredUser.email,
         telefono: telefono.trim(),

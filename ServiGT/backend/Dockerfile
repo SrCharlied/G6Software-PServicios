@@ -27,6 +27,7 @@ COPY app/Http/Resources/ /app/app/Http/Resources/
 COPY app/Console/Commands/ /app/app/Console/Commands/
 COPY app/Models/ /app/app/Models/
 COPY app/Observers/ /app/app/Observers/
+COPY app/Policies/ /app/app/Policies/
 COPY app/Providers/ /app/app/Providers/
 COPY app/Traits/ /app/app/Traits/
 COPY config/cors.php /app/config/cors.php

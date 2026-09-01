@@ -5,13 +5,16 @@ namespace App\Http\Controllers;
 use App\Models\DocumentoProveedor;
 use App\Models\Proveedor;
 use App\Traits\ApiResponse;
+use Illuminate\Database\QueryException;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 
 class ProviderController extends Controller
 {
-    use ApiResponse;
+    use ApiResponse, AuthorizesRequests;
 
     public function index(): JsonResponse
     {
@@ -49,8 +52,11 @@ class ProviderController extends Controller
 
     public function store(Request $request): JsonResponse
     {
+        if (Proveedor::where('user_id', $request->user()->id)->exists()) {
+            return $this->error('Ya tienes un perfil de proveedor.', 422);
+        }
+
         $validated = $request->validate([
-            'user_id'           => 'nullable|exists:users,id',
             'nombre'            => 'required|string|max:255',
             'email'             => 'required|email|unique:proveedores,email',
             'telefono'          => 'nullable|string|max:20',
@@ -73,7 +79,25 @@ class ProviderController extends Controller
             $validated['categoria_id'] = $categoriaIds[0];
         }
 
-        $proveedor = Proveedor::create($validated);
+        // La identidad se deriva de la sesion, nunca del payload: evita que un
+        // cliente cree un perfil de proveedor a nombre de otro usuario.
+        $validated['user_id'] = $request->user()->id;
+
+        try {
+            // Transaccion propia: si el insert choca contra el indice unico,
+            // Laravel hace ROLLBACK TO SAVEPOINT solo de este bloque en vez de
+            // dejar abortada la transaccion completa de la peticion.
+            $proveedor = DB::transaction(fn () => Proveedor::create($validated));
+        } catch (QueryException $e) {
+            // El chequeo de arriba no cierra la carrera: si otra peticion del
+            // mismo usuario gano entre el exists() y este insert, el arbitro
+            // final es el indice unico de la BD (idx_proveedores_user_id_unique).
+            if (!$this->esViolacionDeUnicidad($e)) {
+                throw $e;
+            }
+
+            return $this->error('Ya tienes un perfil de proveedor.', 422);
+        }
 
         if (!empty($categoriaIds)) {
             $proveedor->categorias()->sync($categoriaIds);
@@ -93,9 +117,7 @@ class ProviderController extends Controller
             return $this->error('Proveedor no encontrado', 404);
         }
 
-        if ($proveedor->user_id !== $request->user()->id) {
-            return $this->error('No tienes permiso para editar este perfil', 403);
-        }
+        $this->authorize('manage', $proveedor);
 
         $validated = $request->validate([
             'nombre'            => 'sometimes|required|string|max:255',
@@ -128,12 +150,14 @@ class ProviderController extends Controller
         return $this->success('Perfil actualizado correctamente', ['proveedor' => $proveedor]);
     }
 
-    public function getDocumentos(int $id): JsonResponse
+    public function getDocumentos(Request $request, int $id): JsonResponse
     {
         $proveedor = Proveedor::find($id);
         if (!$proveedor) {
             return $this->error('Proveedor no encontrado', 404);
         }
+
+        $this->authorize('manage', $proveedor);
 
         return $this->success('OK', [
             'documentos' => DocumentoProveedor::where('proveedor_id', $id)
@@ -149,9 +173,7 @@ class ProviderController extends Controller
             return $this->error('Proveedor no encontrado', 404);
         }
 
-        if ($proveedor->user_id !== $request->user()->id) {
-            return $this->error('No tienes permiso para modificar este perfil', 403);
-        }
+        $this->authorize('manage', $proveedor);
 
         $request->validate([
             'foto' => 'required|image|mimes:jpg,jpeg,png,webp|max:3072',
@@ -183,9 +205,7 @@ class ProviderController extends Controller
             return $this->error('Proveedor no encontrado', 404);
         }
 
-        if ($proveedor->user_id !== $request->user()->id) {
-            return $this->error('No tienes permiso para modificar este perfil', 403);
-        }
+        $this->authorize('manage', $proveedor);
 
         // La portada se muestra a lo ancho, asi que admite mas peso que el
         // avatar: 6 MB contra los 3 MB de la foto de perfil.
@@ -217,9 +237,7 @@ class ProviderController extends Controller
             return $this->error('Proveedor no encontrado', 404);
         }
 
-        if ($proveedor->user_id !== $request->user()->id) {
-            return $this->error('No tienes permiso para modificar este perfil', 403);
-        }
+        $this->authorize('manage', $proveedor);
 
         $proveedor->update(['portada' => null]);
 
@@ -233,6 +251,8 @@ class ProviderController extends Controller
             return $this->error('Proveedor no encontrado', 404);
         }
 
+        $this->authorize('manage', $proveedor);
+
         $request->validate([
             'documento'      => 'required|file|mimes:pdf,jpg,jpeg,png|max:5120',
             'tipo_documento' => 'required|string|max:100',
@@ -240,16 +260,41 @@ class ProviderController extends Controller
 
         $file          = $request->file('documento');
         $nombreArchivo = time() . '_' . $file->getClientOriginalName();
-        $ruta          = $file->storeAs('documentos/' . $id, $nombreArchivo, 'public');
+        // Disco privado: los documentos de identidad nunca deben quedar
+        // accesibles por una URL publica. Se sirven solo via descargarDocumento().
+        $ruta          = $file->storeAs('documentos/' . $id, $nombreArchivo, 'local');
 
         $documento = DocumentoProveedor::create([
             'proveedor_id'      => $id,
             'tipo_documento'    => $request->tipo_documento,
             'nombre_archivo'    => $file->getClientOriginalName(),
-            'ruta_archivo'      => Storage::url($ruta),
+            'ruta_archivo'      => $ruta,
             'estado_validacion' => 'pendiente',
         ]);
 
         return $this->success('Documento subido correctamente', ['documento' => $documento], 201);
+    }
+
+    public function descargarDocumento(Request $request, int $id, int $documentoId): JsonResponse|\Symfony\Component\HttpFoundation\StreamedResponse
+    {
+        // La autorizacion se deriva del dueno real del documento, no del {id}
+        // de la ruta: un id de proveedor manipulado en la URL no debe alterar
+        // el resultado.
+        $documento = DocumentoProveedor::with('proveedor')->find($documentoId);
+        if (!$documento || !$documento->proveedor) {
+            return $this->error('Documento no encontrado', 404);
+        }
+
+        $this->authorize('manage', $documento->proveedor);
+
+        return Storage::disk('local')->download($documento->ruta_archivo, $documento->nombre_archivo);
+    }
+
+    /**
+     * 23505 es el SQLSTATE de unique_violation en PostgreSQL.
+     */
+    private function esViolacionDeUnicidad(QueryException $e): bool
+    {
+        return (string) $e->getCode() === '23505';
     }
 }

@@ -5,9 +5,11 @@ namespace App\Http\Controllers;
 use App\Models\DocumentoProveedor;
 use App\Models\Proveedor;
 use App\Traits\ApiResponse;
+use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 
 class ProviderController extends Controller
@@ -81,7 +83,21 @@ class ProviderController extends Controller
         // cliente cree un perfil de proveedor a nombre de otro usuario.
         $validated['user_id'] = $request->user()->id;
 
-        $proveedor = Proveedor::create($validated);
+        try {
+            // Transaccion propia: si el insert choca contra el indice unico,
+            // Laravel hace ROLLBACK TO SAVEPOINT solo de este bloque en vez de
+            // dejar abortada la transaccion completa de la peticion.
+            $proveedor = DB::transaction(fn () => Proveedor::create($validated));
+        } catch (QueryException $e) {
+            // El chequeo de arriba no cierra la carrera: si otra peticion del
+            // mismo usuario gano entre el exists() y este insert, el arbitro
+            // final es el indice unico de la BD (idx_proveedores_user_id_unique).
+            if (!$this->esViolacionDeUnicidad($e)) {
+                throw $e;
+            }
+
+            return $this->error('Ya tienes un perfil de proveedor.', 422);
+        }
 
         if (!empty($categoriaIds)) {
             $proveedor->categorias()->sync($categoriaIds);
@@ -272,5 +288,13 @@ class ProviderController extends Controller
         $this->authorize('manage', $documento->proveedor);
 
         return Storage::disk('local')->download($documento->ruta_archivo, $documento->nombre_archivo);
+    }
+
+    /**
+     * 23505 es el SQLSTATE de unique_violation en PostgreSQL.
+     */
+    private function esViolacionDeUnicidad(QueryException $e): bool
+    {
+        return (string) $e->getCode() === '23505';
     }
 }

@@ -41,6 +41,50 @@ class ProviderAuthorizationTest extends TestCase
         ]);
     }
 
+    public function test_carrera_al_crear_perfil_devuelve_422_y_no_500(): void
+    {
+        $user = User::factory()->proveedor()->create();
+        Sanctum::actingAs($user);
+
+        $yaInsertada = false;
+
+        // Simula la peticion rival que gana la carrera justo entre el
+        // exists() de esta peticion y su insert: se engancha al SELECT del
+        // chequeo de duplicados (antes de que empiece la transaccion propia
+        // del insert) e inserta directo por debajo del ORM.
+        \Illuminate\Support\Facades\DB::listen(function ($query) use (&$yaInsertada, $user) {
+            if ($yaInsertada) {
+                return;
+            }
+            if (!str_contains($query->sql, 'select exists')) {
+                return;
+            }
+            if (!in_array($user->id, $query->bindings, true)) {
+                return;
+            }
+            $yaInsertada = true;
+
+            \Illuminate\Support\Facades\DB::table('proveedores')->insert([
+                'user_id'      => $user->id,
+                'nombre'       => 'Rival de la carrera',
+                'email'        => 'rival-' . uniqid() . '@example.com',
+                'departamento' => 'Guatemala',
+                'created_at'   => now(),
+                'updated_at'   => now(),
+            ]);
+        });
+
+        $this->postJson('/api/providers', [
+            'nombre'       => 'Perfil perdedor de la carrera',
+            'email'        => 'perdedor-' . uniqid() . '@example.com',
+            'departamento' => 'Guatemala',
+        ])
+            ->assertStatus(422)
+            ->assertJsonPath('success', false);
+
+        $this->assertDatabaseCount('proveedores', 1);
+    }
+
     public function test_usuario_no_puede_crear_dos_perfiles_de_proveedor(): void
     {
         $user = User::factory()->proveedor()->create();

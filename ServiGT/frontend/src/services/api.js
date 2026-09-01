@@ -212,6 +212,21 @@ export const getDocumentos = async (proveedorId) => {
   }
 };
 
+// La ruta del archivo es privada y requiere Bearer: no se puede enlazar como
+// una URL publica (a diferencia de foto_perfil/portada), hay que pasar por el
+// interceptor de axios para que adjunte el token.
+export const descargarDocumento = async (proveedorId, documentoId) => {
+  try {
+    const response = await api.get(
+      `/providers/${proveedorId}/documentos/${documentoId}/descargar`,
+      { responseType: 'blob' }
+    );
+    return response.data;
+  } catch (error) {
+    throw new Error(getErrorMessage(error, 'No se pudo descargar el documento.'));
+  }
+};
+
 export const uploadFotoPerfil = async (proveedorId, file) => {
   try {
     const formData = new FormData();

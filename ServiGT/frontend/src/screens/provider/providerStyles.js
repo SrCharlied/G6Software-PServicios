@@ -177,6 +177,7 @@ export const styles = StyleSheet.create({
   documentInfo: { flex: 1 },
   documentType: { fontSize: 12, fontWeight: '700', color: T.ink, marginBottom: 3 },
   documentName: { fontSize: 13, color: T.muted },
+  documentDownloadText: { fontSize: 13, fontWeight: '600', color: T.blue },
   emptyInlineText: { fontSize: 14, color: T.faint, textAlign: 'center', paddingVertical: 12 },
 
   // Tabs

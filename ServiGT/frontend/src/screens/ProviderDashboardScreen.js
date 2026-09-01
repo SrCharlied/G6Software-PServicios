@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Platform,
   ScrollView,
   Text,
   TouchableOpacity,
@@ -8,6 +9,7 @@ import {
 } from 'react-native';
 import {
   aceptarServicio,
+  descargarDocumento,
   finalizarServicio,
   getCalificacionesProveedor,
   getCategorias,
@@ -217,6 +219,29 @@ export default function ProviderDashboardScreen({
       toast(`"${file.name}" subido correctamente.`, 'success');
     } catch (error) { toast(error.message, 'error'); }
     finally { setUploading(false); }
+  };
+
+  const handleDescargar = async (doc) => {
+    if (!profile) return;
+
+    if (Platform.OS !== 'web') {
+      toast('La descarga de documentos esta disponible en la version web.', 'error');
+      return;
+    }
+
+    try {
+      const blob = await descargarDocumento(profile.id, doc.id);
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = doc.nombre_archivo;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      toast(error.message, 'error');
+    }
   };
 
   const handleAccept = async (id) => {
@@ -436,6 +461,7 @@ export default function ProviderDashboardScreen({
         loading={loadingDocs}
         subiendo={uploading}
         onUpload={handleUpload}
+        onDescargar={handleDescargar}
       />
 
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabsRow}>

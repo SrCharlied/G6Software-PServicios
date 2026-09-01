@@ -47,8 +47,11 @@ services:
       DB_USERNAME: pservicios_user
       DB_PASSWORD: pservicios_secret
     volumes:
-      # Persistir fotos y documentos entre rebuilds
+      # Persistir fotos publicas entre rebuilds
       - backend_storage:/app/storage/app/public
+      # Documentos de identidad: disco privado (Laravel 11 'local'), nunca
+      # servido por /storage. Se persiste por separado para que sobreviva rebuild.
+      - backend_private_storage:/app/storage/app/private
       # Fuente unica del esquema. sync_schema.php lo aplica en cada arranque
       # de forma idempotente, asi converge cualquier BD sin borrar datos.
       # Se monta el DIRECTORIO, no el archivo: al montar un archivo suelto el
@@ -138,6 +141,7 @@ services:
 volumes:
   pgdata:
   backend_storage:
+  backend_private_storage:
 
 networks:
   servigt_net:

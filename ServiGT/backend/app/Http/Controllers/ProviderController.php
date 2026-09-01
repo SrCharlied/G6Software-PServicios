@@ -244,16 +244,33 @@ class ProviderController extends Controller
 
         $file          = $request->file('documento');
         $nombreArchivo = time() . '_' . $file->getClientOriginalName();
-        $ruta          = $file->storeAs('documentos/' . $id, $nombreArchivo, 'public');
+        // Disco privado: los documentos de identidad nunca deben quedar
+        // accesibles por una URL publica. Se sirven solo via descargarDocumento().
+        $ruta          = $file->storeAs('documentos/' . $id, $nombreArchivo, 'local');
 
         $documento = DocumentoProveedor::create([
             'proveedor_id'      => $id,
             'tipo_documento'    => $request->tipo_documento,
             'nombre_archivo'    => $file->getClientOriginalName(),
-            'ruta_archivo'      => Storage::url($ruta),
+            'ruta_archivo'      => $ruta,
             'estado_validacion' => 'pendiente',
         ]);
 
         return $this->success('Documento subido correctamente', ['documento' => $documento], 201);
+    }
+
+    public function descargarDocumento(Request $request, int $id, int $documentoId): JsonResponse|\Symfony\Component\HttpFoundation\StreamedResponse
+    {
+        // La autorizacion se deriva del dueno real del documento, no del {id}
+        // de la ruta: un id de proveedor manipulado en la URL no debe alterar
+        // el resultado.
+        $documento = DocumentoProveedor::with('proveedor')->find($documentoId);
+        if (!$documento || !$documento->proveedor) {
+            return $this->error('Documento no encontrado', 404);
+        }
+
+        $this->authorize('manage', $documento->proveedor);
+
+        return Storage::disk('local')->download($documento->ruta_archivo, $documento->nombre_archivo);
     }
 }

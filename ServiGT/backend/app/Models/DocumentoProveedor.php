@@ -20,6 +20,14 @@ class DocumentoProveedor extends Model
         'estado_validacion',
     ];
 
+    /**
+     * La ruta fisica en el disco privado nunca debe salir en una respuesta
+     * JSON: la descarga se hace via el endpoint autorizado, no exponiendo el path.
+     */
+    protected $hidden = [
+        'ruta_archivo',
+    ];
+
     public function proveedor(): BelongsTo
     {
         return $this->belongsTo(Proveedor::class);

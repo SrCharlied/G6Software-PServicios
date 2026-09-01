@@ -71,6 +71,8 @@ Route::middleware('auth:sanctum')->group(function () {
     // Documentos del proveedor
     Route::get('/providers/{id}/documentos',  [ProviderController::class, 'getDocumentos']);
     Route::post('/providers/{id}/documentos', [ProviderController::class, 'uploadDocumento'])->middleware('throttle:uploads');
+    Route::get('/providers/{id}/documentos/{documentoId}/descargar', [ProviderController::class, 'descargarDocumento'])
+        ->where(['id' => '[0-9]+', 'documentoId' => '[0-9]+']);
 
     // ── Servicios ────────────────────────────────────────────────────────────
     // Cliente solicita un servicio

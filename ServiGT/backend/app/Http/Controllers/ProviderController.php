@@ -5,13 +5,14 @@ namespace App\Http\Controllers;
 use App\Models\DocumentoProveedor;
 use App\Models\Proveedor;
 use App\Traits\ApiResponse;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 
 class ProviderController extends Controller
 {
-    use ApiResponse;
+    use ApiResponse, AuthorizesRequests;
 
     public function index(): JsonResponse
     {
@@ -49,8 +50,11 @@ class ProviderController extends Controller
 
     public function store(Request $request): JsonResponse
     {
+        if (Proveedor::where('user_id', $request->user()->id)->exists()) {
+            return $this->error('Ya tienes un perfil de proveedor.', 422);
+        }
+
         $validated = $request->validate([
-            'user_id'           => 'nullable|exists:users,id',
             'nombre'            => 'required|string|max:255',
             'email'             => 'required|email|unique:proveedores,email',
             'telefono'          => 'nullable|string|max:20',
@@ -73,6 +77,10 @@ class ProviderController extends Controller
             $validated['categoria_id'] = $categoriaIds[0];
         }
 
+        // La identidad se deriva de la sesion, nunca del payload: evita que un
+        // cliente cree un perfil de proveedor a nombre de otro usuario.
+        $validated['user_id'] = $request->user()->id;
+
         $proveedor = Proveedor::create($validated);
 
         if (!empty($categoriaIds)) {
@@ -93,9 +101,7 @@ class ProviderController extends Controller
             return $this->error('Proveedor no encontrado', 404);
         }
 
-        if ($proveedor->user_id !== $request->user()->id) {
-            return $this->error('No tienes permiso para editar este perfil', 403);
-        }
+        $this->authorize('manage', $proveedor);
 
         $validated = $request->validate([
             'nombre'            => 'sometimes|required|string|max:255',
@@ -128,12 +134,14 @@ class ProviderController extends Controller
         return $this->success('Perfil actualizado correctamente', ['proveedor' => $proveedor]);
     }
 
-    public function getDocumentos(int $id): JsonResponse
+    public function getDocumentos(Request $request, int $id): JsonResponse
     {
         $proveedor = Proveedor::find($id);
         if (!$proveedor) {
             return $this->error('Proveedor no encontrado', 404);
         }
+
+        $this->authorize('manage', $proveedor);
 
         return $this->success('OK', [
             'documentos' => DocumentoProveedor::where('proveedor_id', $id)
@@ -149,9 +157,7 @@ class ProviderController extends Controller
             return $this->error('Proveedor no encontrado', 404);
         }
 
-        if ($proveedor->user_id !== $request->user()->id) {
-            return $this->error('No tienes permiso para modificar este perfil', 403);
-        }
+        $this->authorize('manage', $proveedor);
 
         $request->validate([
             'foto' => 'required|image|mimes:jpg,jpeg,png,webp|max:3072',
@@ -183,9 +189,7 @@ class ProviderController extends Controller
             return $this->error('Proveedor no encontrado', 404);
         }
 
-        if ($proveedor->user_id !== $request->user()->id) {
-            return $this->error('No tienes permiso para modificar este perfil', 403);
-        }
+        $this->authorize('manage', $proveedor);
 
         // La portada se muestra a lo ancho, asi que admite mas peso que el
         // avatar: 6 MB contra los 3 MB de la foto de perfil.
@@ -217,9 +221,7 @@ class ProviderController extends Controller
             return $this->error('Proveedor no encontrado', 404);
         }
 
-        if ($proveedor->user_id !== $request->user()->id) {
-            return $this->error('No tienes permiso para modificar este perfil', 403);
-        }
+        $this->authorize('manage', $proveedor);
 
         $proveedor->update(['portada' => null]);
 
@@ -232,6 +234,8 @@ class ProviderController extends Controller
         if (!$proveedor) {
             return $this->error('Proveedor no encontrado', 404);
         }
+
+        $this->authorize('manage', $proveedor);
 
         $request->validate([
             'documento'      => 'required|file|mimes:pdf,jpg,jpeg,png|max:5120',

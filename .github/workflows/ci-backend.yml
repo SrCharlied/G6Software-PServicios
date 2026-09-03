@@ -1,0 +1,144 @@
+# Task 1.3 — CI backend reproducible con PostgreSQL.
+#
+# Ejecuta la suite tal como la define AGENTS.md §11: a traves del perfil `test`
+# de Docker Compose, que levanta `db_test` y le aplica `database/init.sql` por
+# `docker-entrypoint-initdb.d`.
+#
+# POR QUE NO SE INVOCA `php artisan test` A SECAS
+# -----------------------------------------------
+# `backend/phpunit.xml` declara `DB_CONNECTION=sqlite` con `:memory:` y
+# `force="true"`. Bajo Compose eso no se cumple —el entorno del proceso gana y
+# la app resuelve `pgsql` sobre el host `db_test`—, pero si el job corre la
+# imagen del backend sin ese entorno, la aplicacion si cae al SQLite en memoria,
+# donde no existen casi ninguna de las 19 tablas del esquema. El resultado son
+# decenas de fallos por `no such table`: un falso rojo en cada PR.
+# Una auditoria externa llego exactamente a ese resultado en agosto de 2026 y
+# concluyo por error que la linea base estaba rota. No repetir.
+#
+# POR QUE NO HAY FILTRO `paths`
+# -----------------------------
+# Este workflow esta pensado para ser un required check de la rama `dev`. Un
+# filtro `paths`/`paths-ignore` hace que el job no arranque en los PR que no
+# tocan backend, y un required check que nunca reporta deja el PR bloqueado en
+# "Expected — Waiting for status" para siempre. Se paga el build en todos los PR
+# a cambio de que el check siempre concluya.
+
+name: CI backend
+
+on:
+  pull_request:
+    branches: [dev]
+  push:
+    branches: [dev]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-backend-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  phpunit:
+    name: PHPUnit sobre PostgreSQL
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    # Compose deriva el nombre del proyecto del directorio que contiene el
+    # compose file, y de ahi sale el nombre de la imagen construida. Fijarlo
+    # aqui hace que `servigt-backend_test:latest` sea determinista aunque el
+    # runner haga checkout en otra ruta.
+    env:
+      COMPOSE_PROJECT_NAME: servigt
+
+    defaults:
+      run:
+        working-directory: ServiGT
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Construir la imagen de pruebas
+        run: docker compose --profile test build backend_test
+
+      - name: Registrar la imagen probada
+        id: imagen
+        run: |
+          DIGEST="$(docker image inspect servigt-backend_test:latest --format '{{ .Id }}')"
+          LARAVEL="$(docker compose --profile test run --rm --entrypoint php backend_test artisan --version | tr -d '\r' | tail -1)"
+          echo "digest=${DIGEST}" >> "$GITHUB_OUTPUT"
+          echo "laravel=${LARAVEL}" >> "$GITHUB_OUTPUT"
+          echo "fecha=$(date -u '+%Y-%m-%d %H:%M UTC')" >> "$GITHUB_OUTPUT"
+
+      # El comando canonico. `run --rm` propaga el codigo de salida de PHPUnit,
+      # asi que un test rojo tumba el job sin necesidad de inspeccionar la
+      # salida.
+      - name: Ejecutar la suite backend
+        id: suite
+        run: |
+          set -o pipefail
+          docker compose --profile test run --rm backend_test 2>&1 | tee suite.log
+
+      # Se corre siempre para que un fallo tambien deje evidencia adjunta.
+      - name: Extraer conteo de tests y assertions
+        if: always()
+        id: conteo
+        run: |
+          RESUMEN="$(sed -r 's/\x1B\[[0-9;]*[mK]//g' suite.log | grep -E '^\s*Tests:' | tail -1 | sed 's/^[[:space:]]*//')"
+          echo "resumen=${RESUMEN:-sin resultado}" >> "$GITHUB_OUTPUT"
+
+      # Composer audit sobre el composer.lock que genera `create-project` dentro
+      # de la imagen. Informa pero NO bloquea: mientras la task 1.4 no versione
+      # un manifest propio, cada build resuelve un arbol distinto y un advisory
+      # nuevo en una dependencia transitiva tumbaria un PR sin relacion alguna.
+      # Cuando 1.4 entre, quitar `continue-on-error` y volverlo bloqueante.
+      - name: Auditar dependencias de Composer (informativo hasta 1.4)
+        id: audit
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          docker compose --profile test run --rm --entrypoint composer backend_test \
+            audit --no-interaction --format=plain 2>&1 | tee audit.log
+
+      - name: Publicar evidencia en el resumen del run
+        if: always()
+        run: |
+          {
+            echo "## Evidencia de ejecucion — CI backend"
+            echo
+            echo "| Campo | Valor |"
+            echo "|---|---|"
+            echo "| Comando | \`docker compose --profile test run --rm backend_test\` |"
+            echo "| Imagen | \`${{ steps.imagen.outputs.digest }}\` |"
+            echo "| Framework | ${{ steps.imagen.outputs.laravel }} |"
+            echo "| Base de datos | PostgreSQL 16 (\`db_test\`) con \`database/init.sql\` |"
+            echo "| Fecha | ${{ steps.imagen.outputs.fecha }} |"
+            echo "| Commit | \`${{ github.sha }}\` |"
+            echo "| Resultado | ${{ steps.conteo.outputs.resumen }} |"
+            echo "| Composer audit | ${{ steps.audit.outcome }} (informativo hasta la task 1.4) |"
+            echo
+            echo "<details><summary>Salida de Composer audit</summary>"
+            echo
+            echo '```'
+            sed -r 's/\x1B\[[0-9;]*[mK]//g' audit.log 2>/dev/null | tail -60 || echo "sin salida"
+            echo '```'
+            echo
+            echo "</details>"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Adjuntar logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-suite-${{ github.run_id }}
+          path: |
+            ServiGT/suite.log
+            ServiGT/audit.log
+          retention-days: 14
+          if-no-files-found: warn
+
+      - name: Limpiar contenedores y volumenes del perfil de pruebas
+        if: always()
+        run: docker compose --profile test down -v --remove-orphans

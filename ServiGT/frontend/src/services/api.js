@@ -174,6 +174,17 @@ export const getProvider = async (id) => {
   }
 };
 
+// Perfil propio derivado de la sesion. Sustituye a getProviderByUser como via
+// normal: el backend ya no acepta consultar el perfil de otro usuario por id.
+export const getMiProveedor = async () => {
+  try {
+    const response = await api.get('/providers/me');
+    return response.data;
+  } catch (error) {
+    throw new Error(getErrorMessage(error, 'No se encontro tu perfil de proveedor.'));
+  }
+};
+
 export const getProviderByUser = async (userId) => {
   try {
     const response = await api.get(`/providers/user/${userId}`);

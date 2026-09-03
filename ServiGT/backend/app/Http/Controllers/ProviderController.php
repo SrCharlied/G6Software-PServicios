@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\DocumentoProveedor;
+use App\Http\Resources\ProveedorResource;
 use App\Models\Proveedor;
 use App\Traits\ApiResponse;
 use Illuminate\Database\QueryException;
@@ -22,24 +23,55 @@ class ProviderController extends Controller
             ->orderBy('calificacion_promedio', 'desc')
             ->get();
 
-        return $this->success('OK', ['proveedores' => $proveedores]);
+        return $this->success('OK', [
+            'proveedores' => ProveedorResource::coleccion($proveedores, ProveedorResource::CATALOGO),
+        ]);
     }
 
     public function show(int $id): JsonResponse
     {
-        $proveedor = Proveedor::with(['categoria', 'categorias', 'documentos', 'disponibilidad'])
+        // Sin `documentos`: son privados y ya tienen su propia ruta autorizada.
+        $proveedor = Proveedor::with(['categoria', 'categorias', 'disponibilidad'])
             ->find($id);
 
         if (!$proveedor) {
             return $this->error('Proveedor no encontrado', 404);
         }
 
-        return $this->success('OK', ['proveedor' => $proveedor]);
+        return $this->success('OK', [
+            'proveedor' => (new ProveedorResource($proveedor, ProveedorResource::DETALLE))->resolve(),
+        ]);
     }
 
-    public function showByUser(int $userId): JsonResponse
+    /**
+     * Perfil propio derivado de la sesion. Reemplaza a `showByUser` como via
+     * normal: el consumidor real siempre fue el usuario autenticado mirandose
+     * a si mismo, asi que pasar su id por la URL solo agregaba un parametro
+     * manipulable sin ganar nada.
+     */
+    public function me(Request $request): JsonResponse
     {
-        $proveedor = Proveedor::with(['categoria', 'categorias', 'documentos', 'disponibilidad'])
+        $proveedor = Proveedor::with(['categoria', 'categorias', 'disponibilidad'])
+            ->where('user_id', $request->user()->id)
+            ->first();
+
+        if (!$proveedor) {
+            return $this->error('Perfil de proveedor no encontrado', 404);
+        }
+
+        return $this->success('OK', [
+            'proveedor' => (new ProveedorResource($proveedor, ProveedorResource::PROPIO))->resolve(),
+        ]);
+    }
+
+    /**
+     * Lookup legado por id de usuario. Se conserva por compatibilidad, pero
+     * ahora exige ser el duenno o administrador: antes cualquier autenticado
+     * podia leer el perfil ajeno con sus documentos.
+     */
+    public function showByUser(Request $request, int $userId): JsonResponse
+    {
+        $proveedor = Proveedor::with(['categoria', 'categorias', 'disponibilidad'])
             ->where('user_id', $userId)
             ->first();
 
@@ -47,7 +79,11 @@ class ProviderController extends Controller
             return $this->error('Perfil de proveedor no encontrado', 404);
         }
 
-        return $this->success('OK', ['proveedor' => $proveedor]);
+        $this->authorize('manage', $proveedor);
+
+        return $this->success('OK', [
+            'proveedor' => (new ProveedorResource($proveedor, ProveedorResource::PROPIO))->resolve(),
+        ]);
     }
 
     public function store(Request $request): JsonResponse
@@ -107,7 +143,9 @@ class ProviderController extends Controller
 
         $proveedor->load(['categoria', 'categorias']);
 
-        return $this->success('Proveedor creado exitosamente', ['proveedor' => $proveedor], 201);
+        return $this->success('Proveedor creado exitosamente', [
+            'proveedor' => (new ProveedorResource($proveedor, ProveedorResource::PROPIO))->resolve(),
+        ], 201);
     }
 
     public function update(Request $request, int $id): JsonResponse
@@ -145,9 +183,11 @@ class ProviderController extends Controller
         }
 
         $proveedor->update($validated);
-        $proveedor->load(['categoria', 'categorias', 'documentos', 'disponibilidad']);
+        $proveedor->load(['categoria', 'categorias', 'disponibilidad']);
 
-        return $this->success('Perfil actualizado correctamente', ['proveedor' => $proveedor]);
+        return $this->success('Perfil actualizado correctamente', [
+            'proveedor' => (new ProveedorResource($proveedor, ProveedorResource::PROPIO))->resolve(),
+        ]);
     }
 
     public function getDocumentos(Request $request, int $id): JsonResponse

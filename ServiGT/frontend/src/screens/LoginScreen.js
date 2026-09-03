@@ -7,7 +7,7 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
-import { login, getProviderByUser } from '../services/api';
+import { login, getMiProveedor } from '../services/api';
 import { useToast } from '../context/ToastContext';
 import { validateEmail } from '../utils/validation';
 import ServiGTLogo from '../components/ServiGTLogo';
@@ -39,7 +39,7 @@ export default function LoginScreen({ navigation, onLogin }) {
       let providerProfile = null;
       if (user.role === 'proveedor') {
         try {
-          const profileData = await getProviderByUser(user.id);
+          const profileData = await getMiProveedor();
           providerProfile = profileData.proveedor;
         } catch {
           // Aun no tiene perfil de proveedor creado.

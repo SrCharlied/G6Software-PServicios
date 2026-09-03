@@ -120,7 +120,10 @@ export default function ProviderDetailScreen({
         />
         <Avatar uri={storageUrl(proveedor.foto_perfil)} name={proveedor.nombre} size={72} />
         <Text style={styles.provName}>{proveedor.nombre}</Text>
-        <PremiumBadge proveedor={proveedor} showDetails style={styles.premiumBlock} />
+        {/* Indicador derivado minimo: el perfil publico ya no recibe la fecha
+            de vencimiento ni el conteo de renovaciones, que son datos
+            operativos del proveedor. */}
+        <PremiumBadge proveedor={proveedor} style={styles.premiumBlock} />
 
         <View style={styles.chipsWrap}>
           {categorias.map((cat) => (
@@ -167,31 +170,22 @@ export default function ProviderDetailScreen({
         </Card>
       ) : null}
 
-      {user && !esMiPerfil ? (
+      {user && esCliente && !esMiPerfil ? (
         <Card style={[styles.card, { gap: 10 }]}>
-          {esCliente && (
-            <Button
-              kind="primary"
-              full
-              icon="send"
-              onPress={() => navigation.navigate('SolicitudForm', { provider: proveedor })}
-            >
-              Solicitar servicio
-            </Button>
-          )}
           <Button
-            kind="secondary"
+            kind="primary"
             full
-            icon="message-circle"
-            onPress={() =>
-              navigation.navigate('Chat', {
-                chatWithUserId: proveedor.user_id,
-                chatWithName: proveedor.nombre,
-              })
-            }
+            icon="send"
+            onPress={() => navigation.navigate('SolicitudForm', { provider: proveedor })}
           >
-            Enviar mensaje
+            Solicitar servicio
           </Button>
+          {/* El chat se abre desde el servicio, no desde el perfil publico: la
+              regla ratificada exige una relacion previa y el backend responde
+              403 sin ella. Dejar el boton aqui ofrecia una accion imposible. */}
+          <Text style={styles.contactHint}>
+            Podras escribirle cuando la solicitud este en curso.
+          </Text>
         </Card>
       ) : !user ? (
         <Card style={[styles.card, { alignItems: 'center', gap: 10 }]}>
@@ -309,6 +303,7 @@ const styles = StyleSheet.create({
   cover: { width: 'auto', alignSelf: 'stretch', marginTop: -16, marginHorizontal: -16, marginBottom: 14 },
   provName: { fontSize: 22, fontWeight: '800', color: T.ink, marginTop: 12, marginBottom: 8 },
   premiumBlock: { alignSelf: 'stretch', marginBottom: 12 },
+  contactHint: { color: T.muted, fontSize: 12, textAlign: 'center' },
   chipsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, justifyContent: 'center', marginBottom: 4 },
   ratingRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8, marginBottom: 4 },
   ratingText: { fontSize: 13, color: T.muted },

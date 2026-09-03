@@ -16,9 +16,9 @@ import {
   getDocumentos,
   getMiCredito,
   getMiDisponibilidad,
+  getMiProveedor,
   getPedidosAbiertos,
   getPremiumMiEstado,
-  getProviderByUser,
   getSolicitudesProveedor,
   iniciarServicio,
   rechazarServicio,
@@ -132,7 +132,7 @@ export default function ProviderDashboardScreen({
   const loadProfile = async () => {
     setLoadingProfile(true);
     try {
-      const data = await getProviderByUser(user.id);
+      const data = await getMiProveedor();
       setProfile(data.proveedor);
       setProviderProfile(data.proveedor);
     } catch { setProfile(null); }

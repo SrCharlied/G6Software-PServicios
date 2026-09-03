@@ -40,6 +40,13 @@ class CalificacionController extends Controller
             return $this->error('El servicio no tiene un proveedor valido para calificar', 422);
         }
 
+        // Defensa en profundidad: `ServicioController::store` ya impide crear
+        // un servicio hacia el perfil propio, pero los servicios creados antes
+        // de ese guard siguen en la base y no deben poder autocalificarse.
+        if ($servicio->proveedor->user_id === $userId) {
+            return $this->error('No puedes calificar tu propio perfil de proveedor.', 403);
+        }
+
         $yaCalifico = Calificacion::where('servicio_id', $servicio->id)
             ->where('autor_id', $userId)
             ->exists();

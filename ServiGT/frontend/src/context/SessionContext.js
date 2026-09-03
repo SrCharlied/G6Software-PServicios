@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import {
   clearSession,
-  getProviderByUser,
+  getMiProveedor,
   loadStoredSession,
   logout as apiLogout,
 } from '../services/api';
@@ -22,7 +22,7 @@ export function SessionProvider({ children }) {
     if (!stored) { setSessionLoading(false); return; }
     try {
       if (stored.user.role === 'proveedor') {
-        const data = await getProviderByUser(stored.user.id);
+        const data = await getMiProveedor();
         setProviderProfile(data.proveedor);
       }
       setUser(stored.user);

@@ -59,7 +59,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
 
     // Perfil de proveedor
-    Route::get('/providers/user/{userId}', [ProviderController::class, 'showByUser']);
+    Route::get('/providers/me',           [ProviderController::class, 'me']);
+    Route::get('/providers/user/{userId}', [ProviderController::class, 'showByUser'])->where('userId', '[0-9]+');
     Route::post('/providers',              [ProviderController::class, 'store']);
     Route::put('/providers/{id}',          [ProviderController::class, 'update'])->where('id', '[0-9]+');
 

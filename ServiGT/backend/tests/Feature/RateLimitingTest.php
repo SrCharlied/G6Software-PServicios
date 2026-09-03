@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Categoria;
 use App\Models\PaqueteCredito;
 use App\Models\Proveedor;
+use App\Models\Servicio;
 use App\Models\User;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\Cache;
@@ -82,20 +83,30 @@ class RateLimitingTest extends TestCase
 
     public function test_mensajes_usa_limite_por_usuario_autenticado(): void
     {
+        // El chat exige un servicio en comun desde la task 2.3, asi que la
+        // relacion se crea aqui a proposito: lo que mide esta prueba es el
+        // limite por minuto, no la autorizacion de contacto.
+        $proveedor = $this->crearProveedor();
         $emisor = User::factory()->cliente()->create();
-        $receptor = User::factory()->cliente()->create();
+
+        Servicio::create([
+            'cliente_id'   => $emisor->id,
+            'proveedor_id' => $proveedor->id,
+            'descripcion'  => 'Servicio que habilita la conversacion',
+            'estado'       => 'aceptado',
+        ]);
 
         Sanctum::actingAs($emisor);
 
         for ($i = 0; $i < 30; $i++) {
             $this->postJson('/api/mensajes', [
-                'receptor_id' => $receptor->id,
+                'receptor_id' => $proveedor->user_id,
                 'contenido' => 'Mensaje normal dentro del limite '.$i,
             ])->assertCreated();
         }
 
         $this->postJson('/api/mensajes', [
-            'receptor_id' => $receptor->id,
+            'receptor_id' => $proveedor->user_id,
             'contenido' => 'Mensaje que excede el limite',
         ])->assertStatus(429);
     }

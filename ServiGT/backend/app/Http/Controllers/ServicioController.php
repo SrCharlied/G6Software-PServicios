@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Notificacion;
+use App\Models\Proveedor;
 use App\Models\Servicio;
 use App\Http\Resources\ServicioResource;
 use App\Traits\ApiResponse;
@@ -24,7 +25,23 @@ class ServicioController extends Controller
             'monto_acordado' => 'nullable|numeric|min:0',
         ]);
 
-        $validated['cliente_id']    = $request->user()->id;
+        $user = $request->user();
+
+        // Solo un cliente contrata. Antes bastaba con estar autenticado, asi
+        // que un proveedor podia crear servicios y aparecer en ambos lados.
+        if ($user->role !== 'cliente') {
+            return $this->error('Solo un cliente puede solicitar un servicio.', 403);
+        }
+
+        // Y nadie se contrata a si mismo: era la primera pieza de la cadena
+        // que permitia inflar la calificacion propia sin que interviniera
+        // ningun tercero.
+        $proveedorSolicitado = Proveedor::find($validated['proveedor_id']);
+        if ($proveedorSolicitado && $proveedorSolicitado->user_id === $user->id) {
+            return $this->error('No puedes solicitarte un servicio a ti mismo.', 403);
+        }
+
+        $validated['cliente_id']    = $user->id;
         $validated['estado']        = 'pendiente';
         $validated['codigo_inicio'] = str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
 

@@ -7,9 +7,9 @@ WORKDIR /app
 ARG EXPO_PUBLIC_API_URL=http://localhost:8080/api
 ENV EXPO_PUBLIC_API_URL=${EXPO_PUBLIC_API_URL}
 
-# Copiar package.json e instalar dependencias
+# Copiar package.json + lockfile e instalar dependencias desde el lockfile
 COPY package*.json ./
-RUN npm install
+RUN npm ci
 
 # Copiar el resto del proyecto
 COPY . .

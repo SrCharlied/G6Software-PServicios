@@ -37,6 +37,19 @@ return Application::configure(basePath: dirname(__DIR__))
         // a las respuestas de error que ese middleware anota (task 6.3).
         $middleware->append(SecurityHeaders::class);
 
+        // Sin esto, una peticion no autenticada que NO mande
+        // `Accept: application/json` nunca llegaba al render de
+        // AuthenticationException de mas abajo: el middleware `Authenticate`
+        // intentaba redirigir a la ruta `login`, que no existe en una API sin
+        // vistas, y el RouteNotFoundException resultante se convertia en un 500.
+        //
+        // Se veia solo desde el navegador o con curl a pelo —la app siempre
+        // manda el Accept, y las pruebas usan `getJson`/`postJson`, que tambien
+        // lo mandan—, asi que el contrato de la task 4.3 quedaba roto justo en
+        // el camino que nadie ejercitaba. Devolver null hace que el middleware
+        // lance la excepcion en vez de redirigir.
+        $middleware->redirectGuestsTo(fn () => null);
+
         $middleware->alias([
             'admin' => \App\Http\Middleware\EnsureIsAdmin::class,
         ]);

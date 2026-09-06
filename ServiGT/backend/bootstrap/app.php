@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Middleware\CorrelationId;
+use App\Http\Middleware\SecurityHeaders;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
@@ -15,13 +16,26 @@ use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
-        web: __DIR__.'/../routes/web.php',
+        // `web:` se retira a proposito (task 6.3). Ese grupo arrastra sesion y
+        // cookies, y el backend no tiene ninguna vista ni flujo de sesion de
+        // navegador: la autenticacion es por token Bearer. Con `web:` puesto,
+        // pedir `/` devolvia dos Set-Cookie —una de ellas sin HttpOnly— en un
+        // servicio que no las usa para nada.
         api: __DIR__.'/../routes/api.php',
         commands: __DIR__.'/../routes/console.php',
         health: '/up',
+        then: function (): void {
+            // La ruta raiz se registra suelta, sin grupo de middleware, para
+            // que siga respondiendo sin abrir sesion.
+            require __DIR__.'/../routes/web.php';
+        },
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->append(CorrelationId::class);
+
+        // Va despues de CorrelationId para que las cabeceras se apliquen tambien
+        // a las respuestas de error que ese middleware anota (task 6.3).
+        $middleware->append(SecurityHeaders::class);
 
         $middleware->alias([
             'admin' => \App\Http\Middleware\EnsureIsAdmin::class,

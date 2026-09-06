@@ -9,7 +9,19 @@ import {
   View,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { getProvider, getCalificacionesProveedor, getDisponibilidadProveedor, storageUrl } from '../services/api';
+import {
+  getProvider,
+  getCalificacionesProveedor,
+  getDisponibilidadProveedor,
+  getPublicaciones,
+  storageUrl,
+} from '../services/api';
+import PublicacionCard from '../components/ui/PublicacionCard';
+import {
+  PublicacionesCargando,
+  PublicacionesError,
+  PublicacionesVacias,
+} from '../components/ui/PublicacionEstados';
 import { useToast } from '../context/ToastContext';
 import { T } from '../theme';
 import { Avatar, Button, Card, PremiumBadge, ProfileCover, StatusChip, Stars } from '../components/ui';
@@ -24,6 +36,7 @@ export default function ProviderDetailScreen({
   providerProfile,
   selectedProvider,
   providerId,
+  onSolicitarPublicacion,
 }) {
   const toast = useToast();
   const { width } = useWindowDimensions();
@@ -32,6 +45,14 @@ export default function ProviderDetailScreen({
   const [calificaciones, setCalificaciones] = useState([]);
   const [disponibilidad, setDisponibilidad] = useState([]);
   const [loading, setLoading] = useState(!selectedProvider);
+
+  // Publicaciones del proveedor (task 5.6). Se piden al catalogo publico
+  // filtrando por proveedor, asi que la ventana de visibilidad —cuantas
+  // publicaciones se muestran segun el limite gratis/Premium— la decide el
+  // backend. Aqui no se recorta nada.
+  const [publicaciones, setPublicaciones] = useState([]);
+  const [publicacionesCargando, setPublicacionesCargando] = useState(true);
+  const [publicacionesError, setPublicacionesError] = useState(null);
 
   const esCliente = user && user.role !== 'proveedor';
   const esMiPerfil = user && providerProfile?.id === proveedor?.id;
@@ -64,6 +85,26 @@ export default function ProviderDetailScreen({
       toast(error.message, 'error');
     } finally {
       setLoading(false);
+    }
+
+    cargarPublicaciones(id);
+  };
+
+  const cargarPublicaciones = async (id) => {
+    setPublicacionesCargando(true);
+    setPublicacionesError(null);
+
+    try {
+      const data = await getPublicaciones({ proveedorId: id });
+      setPublicaciones(data.publicaciones ?? []);
+    } catch (error) {
+      // No se cae a una lista vacia: "no pudimos cargarlas" y "no tiene
+      // publicaciones" son cosas distintas para quien esta decidiendo si
+      // contratar.
+      setPublicacionesError(error.message);
+      setPublicaciones([]);
+    } finally {
+      setPublicacionesCargando(false);
     }
   };
 
@@ -169,6 +210,39 @@ export default function ProviderDetailScreen({
           <Text style={styles.descText}>{proveedor.descripcion}</Text>
         </Card>
       ) : null}
+
+      {/* Servicios ofrecidos (task 5.6). Se muestran a cualquiera; el boton de
+          contratar solo aparece para un cliente autenticado que no sea el
+          duenno del perfil, y aun asi la autorizacion real la hace el
+          backend. */}
+      <Card style={styles.card}>
+        <Text style={styles.cardTitle}>Servicios que ofrece</Text>
+
+        {publicacionesCargando ? (
+          <PublicacionesCargando />
+        ) : publicacionesError ? (
+          <PublicacionesError
+            mensaje={publicacionesError}
+            onReintentar={() => proveedor?.id && cargarPublicaciones(proveedor.id)}
+          />
+        ) : publicaciones.length === 0 ? (
+          <PublicacionesVacias mensaje="Este proveedor todavia no publico servicios." />
+        ) : (
+          <View style={styles.publicacionesLista}>
+            {publicaciones.map((publicacion) => (
+              <PublicacionCard
+                key={publicacion.id}
+                publicacion={publicacion}
+                resolverImagen={storageUrl}
+                accionLabel={user && esCliente && !esMiPerfil ? 'Solicitar' : undefined}
+                onAccion={user && esCliente && !esMiPerfil
+                  ? () => onSolicitarPublicacion?.(proveedor, publicacion)
+                  : undefined}
+              />
+            ))}
+          </View>
+        )}
+      </Card>
 
       {user && esCliente && !esMiPerfil ? (
         <Card style={[styles.card, { gap: 10 }]}>
@@ -287,6 +361,7 @@ export default function ProviderDetailScreen({
 }
 
 const styles = StyleSheet.create({
+  publicacionesLista: { flexDirection: 'row', flexWrap: 'wrap', gap: 14, marginTop: 12 },
   container: { flex: 1, backgroundColor: T.canvas },
   content: { width: '100%', maxWidth: 1100, alignSelf: 'center', padding: 24, paddingBottom: 40 },
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },

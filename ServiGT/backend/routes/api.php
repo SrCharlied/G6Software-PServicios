@@ -115,7 +115,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/mensajes/conversaciones', [MessageController::class, 'misConversaciones']);
 
     // ── Pedidos (Marketplace de Demanda) ─────────────────────────────────────
-    Route::post('/pedidos',                              [PedidoController::class, 'store']);
+    Route::post('/pedidos',                              [PedidoController::class, 'store'])->middleware('throttle:pedidos');
     Route::get('/pedidos/mios',                          [PedidoController::class, 'mios']);
     Route::post('/pedidos/{pedidoId}/cotizaciones',                       [CotizacionController::class, 'store'])->where('pedidoId', '[0-9]+');
     Route::put('/pedidos/{pedidoId}/cotizaciones/{cotizacionId}',         [CotizacionController::class, 'update'])->where(['pedidoId' => '[0-9]+', 'cotizacionId' => '[0-9]+']);

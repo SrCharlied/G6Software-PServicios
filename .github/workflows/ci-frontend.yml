@@ -1,0 +1,127 @@
+# Task 1.5 — CI frontend reproducible, audits y normalizacion de Git.
+#
+# POR QUE `npm ci` Y NO `npm install`
+# -----------------------------------
+# `npm install` reescribe el arbol con lo que este publicado en ese instante, y
+# ademas lo hace en silencio cuando `package.json` y el lockfile divergen. `npm
+# ci` falla si divergen y borra `node_modules` antes de instalar, asi que el job
+# valida la misma cadena de suministro que instala la imagen de Docker (task
+# 1.2).
+#
+# POR QUE `continue-on-error` EN EL AUDIT
+# ---------------------------------------
+# El arbol de Expo SDK 52 arrastra advisories transitivos (metro, tar, postcss,
+# @xmldom/xmldom) que solo se cierran subiendo de SDK mayor: eso es un cambio
+# de alcance propio, no una correccion compatible. El job publica el reporte
+# para que quede evidencia en cada PR, pero no bloquea por el. Lo que si bloquea
+# es Jest, el build web y `git diff --check`.
+#
+# POR QUE NO HAY FILTRO `paths`
+# -----------------------------
+# Mismo motivo que en `ci-backend.yml`: un required check con filtro `paths`
+# nunca reporta en los PR que no tocan frontend y deja el PR bloqueado en
+# "Expected — Waiting for status" para siempre.
+
+name: CI frontend
+
+on:
+  pull_request:
+    branches: [dev]
+  push:
+    branches: [dev]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-frontend-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  jest:
+    name: Jest y build web
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    defaults:
+      run:
+        working-directory: ServiGT/frontend
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # La imagen de Docker del frontend corre sobre node:18; el job usa la
+      # misma linea para que un fallo aqui sea reproducible alli.
+      - name: Preparar Node 18
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: npm
+          cache-dependency-path: ServiGT/frontend/package-lock.json
+
+      - name: Instalar desde el lockfile
+        run: npm ci --no-audit --no-fund
+
+      - name: Jest
+        run: npx jest --ci
+
+      - name: Build web
+        run: npm run build:web
+
+      # Informativo: deja el inventario de advisories en el log del job sin
+      # tumbarlo. Las altas/criticas vivas estan justificadas en la matriz
+      # OWASP (`ServiGT/docs/security/owasp-top10-matriz.md`, fila A03).
+      - name: npm audit
+        id: audit
+        continue-on-error: true
+        run: npm audit --audit-level=high
+
+      # Deteccion basica de secretos. Solo reporta el archivo y la linea: nunca
+      # imprime el valor encontrado, para no publicar el secreto en el log
+      # publico del job al mismo tiempo que se denuncia.
+      - name: Deteccion basica de secretos
+        working-directory: .
+        run: |
+          set -o pipefail
+          PATRONES='(AKIA[0-9A-Z]{16}|-----BEGIN [A-Z ]*PRIVATE KEY-----|ghp_[A-Za-z0-9]{30,}|xox[abprs]-[A-Za-z0-9-]{10,}|sk-[A-Za-z0-9]{32,})'
+          HALLAZGOS="$(git grep -nIE "$PATRONES" -- \
+            ':!*.lock' ':!*package-lock.json' ':!*.svg' ':!.github/workflows/ci-frontend.yml' \
+            | cut -d: -f1,2 || true)"
+          if [ -n "$HALLAZGOS" ]; then
+            echo "Posibles secretos (archivo:linea, valor omitido a proposito):"
+            echo "$HALLAZGOS"
+            exit 1
+          fi
+          echo "Sin coincidencias de secretos conocidos."
+
+      # `.gitattributes` normaliza finales de linea; esto verifica que nadie
+      # haya vuelto a introducir CRLF o espacios al final de linea.
+      - name: git diff --check
+        working-directory: .
+        run: |
+          git diff --check
+          git add --renormalize . >/dev/null
+          if ! git diff --cached --quiet; then
+            echo "Hay archivos sin normalizar segun .gitattributes:"
+            git diff --cached --name-only
+            exit 1
+          fi
+          echo "Finales de linea normalizados."
+
+      - name: Resumen
+        if: always()
+        working-directory: .
+        run: |
+          {
+            echo "### CI frontend"
+            echo ""
+            echo "| Paso | Resultado |"
+            echo "|---|---|"
+            echo "| Node | $(node --version) / npm $(npm --version) |"
+            echo "| Jest | ver paso \`Jest\` |"
+            echo "| Build web | ver paso \`Build web\` |"
+            echo "| npm audit | ${{ steps.audit.outcome }} (informativo) |"
+            echo "| Fecha | $(date -u '+%Y-%m-%d %H:%M UTC') |"
+          } >> "$GITHUB_STEP_SUMMARY"

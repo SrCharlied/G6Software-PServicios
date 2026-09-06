@@ -6,7 +6,7 @@ import { useSession } from '../../../src/context/SessionContext';
 export default function ProviderDetailRoute() {
   const router = useRouter();
   const { id } = useLocalSearchParams();
-  const { user, providerProfile, selectedProvider, setSelectedProvider } = useSession();
+  const { user, providerProfile, selectedProvider, setSelectedProvider, setSelectedPublicacion } = useSession();
 
   const navigation = {
     navigate: (name, params = {}) => {
@@ -16,6 +16,10 @@ export default function ProviderDetailRoute() {
         if (params.provider || params.selectedProvider) {
           setSelectedProvider(params.provider || params.selectedProvider);
         }
+        // Sin publicacion en los params es una solicitud libre: hay que
+        // limpiar la anterior o el formulario arrastraria la publicacion de
+        // una visita previa.
+        setSelectedPublicacion(params.publicacion ?? null);
         router.push('/solicitud');
         return;
       }
@@ -43,6 +47,11 @@ export default function ProviderDetailRoute() {
         providerProfile={providerProfile}
         selectedProvider={preloaded}
         providerId={id}
+        onSolicitarPublicacion={(proveedor, publicacion) => {
+          if (proveedor) setSelectedProvider(proveedor);
+          setSelectedPublicacion(publicacion);
+          router.push('/solicitud');
+        }}
       />
     </InternalLayout>
   );

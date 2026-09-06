@@ -10,7 +10,11 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+// La cache de conversaciones pasa por el adapter de storage (task 3.4) en vez
+// de hablarle al almacenamiento directamente: asi usa el backend correcto en
+// cada plataforma y, sobre todo, queda dentro del barrido que borra los datos
+// privados al cerrar sesion. Antes estos mensajes sobrevivian al logout.
+import { claveCacheChat, guardarCacheChat, leerCacheChat } from '../services/storage';
 import { getConversacion, sendMensaje } from '../services/api';
 import { useToast } from '../context/ToastContext';
 import { T } from '../theme';
@@ -35,7 +39,7 @@ export default function ChatScreen({
     mensajesRef.current = mensajes;
   }, [mensajes]);
 
-  const getStorageKey = () => `chat_${user?.id}_${chatWithUserId}`;
+  const getStorageKey = () => claveCacheChat(user?.id, chatWithUserId);
 
   useEffect(() => {
     if (!chatWithUserId) return undefined;
@@ -58,14 +62,14 @@ export default function ChatScreen({
   const loadMensajes = async () => {
     let locales = [];
     try {
-      const localData = await AsyncStorage.getItem(getStorageKey());
+      const localData = await leerCacheChat(getStorageKey());
       if (localData) {
         locales = JSON.parse(localData);
         setMensajes(locales);
         setLoading(false);
       }
-    } catch (e) {
-      console.log('Error AsyncStorage', e);
+    } catch {
+      /* cache ilegible: se sigue con lo que traiga la red */
     }
 
     if (locales.length === 0) setLoading(true);
@@ -82,7 +86,7 @@ export default function ChatScreen({
         const filtrados = locales.filter((m) => !String(m.id).startsWith('temp-'));
         const finales = [...filtrados, ...data.mensajes];
         setMensajes(finales);
-        AsyncStorage.setItem(getStorageKey(), JSON.stringify(finales));
+        guardarCacheChat(getStorageKey(), JSON.stringify(finales));
       }
     } catch (error) {
       if (locales.length === 0) toast(error.message, 'error');
@@ -104,7 +108,7 @@ export default function ChatScreen({
         const filtrados = actuales.filter((m) => !String(m.id).startsWith('temp-'));
         const nuevos = [...filtrados, ...data.mensajes];
         setMensajes(nuevos);
-        AsyncStorage.setItem(getStorageKey(), JSON.stringify(nuevos));
+        guardarCacheChat(getStorageKey(), JSON.stringify(nuevos));
       }
     } catch {
       // Evita ruido visual durante polling.
@@ -133,7 +137,7 @@ export default function ChatScreen({
       const data = await sendMensaje(chatWithUserId, contenido);
       setMensajes((prev) => {
         const nuevos = prev.map((m) => (m.id === tempMsg.id ? data.mensaje : m));
-        AsyncStorage.setItem(getStorageKey(), JSON.stringify(nuevos));
+        guardarCacheChat(getStorageKey(), JSON.stringify(nuevos));
         return nuevos;
       });
     } catch (error) {

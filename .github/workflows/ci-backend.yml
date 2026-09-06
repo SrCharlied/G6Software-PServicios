@@ -72,6 +72,15 @@ jobs:
           echo "laravel=${LARAVEL}" >> "$GITHUB_OUTPUT"
           echo "fecha=$(date -u '+%Y-%m-%d %H:%M UTC')" >> "$GITHUB_OUTPUT"
 
+      # El lockfile es la fuente de verdad de la cadena de suministro (task
+      # 1.4). Si alguien edita `composer.json` sin regenerar `composer.lock`,
+      # `composer install` seguiria instalando el arbol viejo sin avisar; esto
+      # lo convierte en un fallo explicito.
+      - name: Verificar que composer.lock corresponde a composer.json
+        run: |
+          docker compose --profile test run --rm --entrypoint composer backend_test \
+            validate --no-check-publish --no-check-all
+
       # El comando canonico. `run --rm` propaga el codigo de salida de PHPUnit,
       # asi que un test rojo tumba el job sin necesidad de inspeccionar la
       # salida.
@@ -89,14 +98,12 @@ jobs:
           RESUMEN="$(sed -r 's/\x1B\[[0-9;]*[mK]//g' suite.log | grep -E '^\s*Tests:' | tail -1 | sed 's/^[[:space:]]*//')"
           echo "resumen=${RESUMEN:-sin resultado}" >> "$GITHUB_OUTPUT"
 
-      # Composer audit sobre el composer.lock que genera `create-project` dentro
-      # de la imagen. Informa pero NO bloquea: mientras la task 1.4 no versione
-      # un manifest propio, cada build resuelve un arbol distinto y un advisory
-      # nuevo en una dependencia transitiva tumbaria un PR sin relacion alguna.
-      # Cuando 1.4 entre, quitar `continue-on-error` y volverlo bloqueante.
-      - name: Auditar dependencias de Composer (informativo hasta 1.4)
+      # Composer audit sobre el `composer.lock` versionado en el repositorio
+      # (task 1.4). Ahora bloquea: el arbol es determinista, asi que un advisory
+      # nuevo se corrige actualizando el lockfile en un PR propio y no aparece
+      # de la nada en un PR sin relacion.
+      - name: Auditar dependencias de Composer
         id: audit
-        continue-on-error: true
         run: |
           set -o pipefail
           docker compose --profile test run --rm --entrypoint composer backend_test \
@@ -117,7 +124,7 @@ jobs:
             echo "| Fecha | ${{ steps.imagen.outputs.fecha }} |"
             echo "| Commit | \`${{ github.sha }}\` |"
             echo "| Resultado | ${{ steps.conteo.outputs.resumen }} |"
-            echo "| Composer audit | ${{ steps.audit.outcome }} (informativo hasta la task 1.4) |"
+            echo "| Composer audit | ${{ steps.audit.outcome }} (bloqueante desde la task 1.4) |"
             echo
             echo "<details><summary>Salida de Composer audit</summary>"
             echo
@@ -139,6 +146,11 @@ jobs:
           retention-days: 14
           if-no-files-found: warn
 
+      # OJO si copias este comando a tu maquina: `down -v` borra TODOS los
+      # volumenes del proyecto Compose, no solo los del perfil `test`. En el
+      # runner da igual porque es efimero; en local se lleva por delante
+      # `pgdata` y con el la base de desarrollo. Para limpiar solo la suite:
+      # `docker compose --profile test rm -sfv backend_test db_test`.
       - name: Limpiar contenedores y volumenes del perfil de pruebas
         if: always()
         run: docker compose --profile test down -v --remove-orphans

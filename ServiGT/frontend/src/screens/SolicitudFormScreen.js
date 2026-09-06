@@ -11,6 +11,11 @@ export default function SolicitudFormScreen({
   navigation,
   user,
   selectedProvider,
+  // Publicacion de origen cuando la solicitud nace del perfil publico
+  // (task 5.6). Solo se usa para dar contexto visual y para mandar su id: el
+  // backend deriva proveedor, categoria, titulo y precio de la fila, asi que
+  // manipular esto desde el cliente no cambia lo que se contrata.
+  publicacion = null,
 }) {
   const toast = useToast();
   const { width } = useWindowDimensions();
@@ -53,14 +58,23 @@ export default function SolicitudFormScreen({
 
     setSubmitting(true);
     try {
-      await createServicio({
-        proveedor_id: selectedProvider.id,
-        categoria_id: selectedProvider.categoria_id || null,
-        descripcion: descripcion.trim(),
-        direccion: direccion.trim() || null,
-        fecha_agendada: fecha.trim() || null,
-        monto_acordado: monto ? parseFloat(monto) : null,
-      });
+      // Con publicacion se manda solo su id: el backend ignora `proveedor_id`,
+      // `categoria_id` y cualquier precio que venga del cliente en ese camino.
+      await createServicio(publicacion
+        ? {
+          publicacion_id: publicacion.id,
+          descripcion: descripcion.trim(),
+          direccion: direccion.trim() || null,
+          fecha_agendada: fecha.trim() || null,
+        }
+        : {
+          proveedor_id: selectedProvider.id,
+          categoria_id: selectedProvider.categoria_id || null,
+          descripcion: descripcion.trim(),
+          direccion: direccion.trim() || null,
+          fecha_agendada: fecha.trim() || null,
+          monto_acordado: monto ? parseFloat(monto) : null,
+        });
 
       toast(`Solicitud enviada a ${selectedProvider.nombre}. Te notificaremos cuando responda.`, 'success');
       navigation.navigate('Home');
@@ -110,6 +124,21 @@ export default function SolicitudFormScreen({
             {selectedProvider.categoria?.nombre || 'Servicio'} - {[selectedProvider.municipio, selectedProvider.departamento].filter(Boolean).join(', ') || 'Guatemala'}
           </Text>
           {selectedProvider.telefono ? <Text style={styles.summaryPhone}>{selectedProvider.telefono}</Text> : null}
+
+          {publicacion ? (
+            <View style={styles.publicacionResumen}>
+              <Text style={styles.summaryKicker}>Publicacion</Text>
+              <Text style={styles.publicacionTitulo}>{publicacion.titulo}</Text>
+              <Text style={styles.publicacionPrecio}>
+                {publicacion.precio_referencial != null
+                  ? `Q${Number(publicacion.precio_referencial).toFixed(2)} referencial`
+                  : 'Precio a cotizar'}
+              </Text>
+              <Text style={styles.publicacionNota}>
+                El precio referencial no es el monto final: se acuerda con el proveedor.
+              </Text>
+            </View>
+          ) : null}
         </Card>
 
         <Card padding={24} style={styles.card}>
@@ -148,16 +177,24 @@ export default function SolicitudFormScreen({
             style={styles.field}
           />
 
-          <Text style={styles.label}>Monto acordado (Q)</Text>
-          <Input
-            icon="dollar-sign"
-            placeholder="Opcional - monto en quetzales"
-            value={monto}
-            onChangeText={(v) => { setMonto(v); clearError('monto'); }}
-            keyboardType="decimal-pad"
-            error={errors.monto}
-            style={styles.field}
-          />
+          {/* Cuando la solicitud nace de una publicacion no se pide monto: el
+              backend lo ignora en ese camino para que nadie deje cerrado un
+              precio que el proveedor no acepto. Mostrar el campo aqui seria
+              ofrecer un dato que no viaja. */}
+          {publicacion ? null : (
+            <>
+              <Text style={styles.label}>Monto acordado (Q)</Text>
+              <Input
+                icon="dollar-sign"
+                placeholder="Opcional - monto en quetzales"
+                value={monto}
+                onChangeText={(v) => { setMonto(v); clearError('monto'); }}
+                keyboardType="decimal-pad"
+                error={errors.monto}
+                style={styles.field}
+              />
+            </>
+          )}
 
           <Button kind="primary" full loading={submitting} onPress={handleSubmit} style={{ marginTop: 8 }}>
             Enviar solicitud
@@ -219,6 +256,10 @@ const styles = StyleSheet.create({
   summaryCard: { width: '100%', maxWidth: 280 },
   providerAvatar: { width: 58, height: 58, borderRadius: 18, backgroundColor: '#e6effa', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: T.soft },
   providerAvatarText: { color: T.deep, fontSize: 24, fontWeight: '900' },
+  publicacionResumen: { marginTop: 14, paddingTop: 14, borderTopWidth: 1, borderTopColor: T.border, gap: 2 },
+  publicacionTitulo: { fontSize: 15, fontWeight: '700', color: T.ink },
+  publicacionPrecio: { fontSize: 14, fontWeight: '700', color: T.deep },
+  publicacionNota: { fontSize: 12, color: T.faint, marginTop: 4 },
   summaryKicker: { color: T.faint, fontSize: 11, fontWeight: '900', textTransform: 'uppercase', marginTop: 14 },
   summaryName: { color: T.ink, fontSize: 19, fontWeight: '900', marginTop: 4 },
   summaryMeta: { color: T.muted, fontSize: 13, lineHeight: 19, marginTop: 6 },

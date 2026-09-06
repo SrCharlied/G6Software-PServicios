@@ -20,6 +20,7 @@ const NAV_BY_ROLE = {
   ],
   proveedor: [
     { label: 'Mi panel',       path: '/dashboard', icon: 'grid' },
+    { label: 'Publicaciones',  path: '/publicaciones', icon: 'layers' },
     { label: 'Oportunidades',  path: '/pedidos/abiertos', icon: 'search', match: ['/pedidos/'] },
     { label: 'Creditos',       path: '/creditos', icon: 'credit-card' },
     { label: 'Trabajos',       path: '/solicitudes', icon: 'briefcase' },

@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { register, createProvider, getCategorias, uploadDocumento } from '../services/api';
 import { useToast } from '../context/ToastContext';
-import { validateEmail, validatePhone, validatePassword, validateRequired } from '../utils/validation';
+import { validateEmail, validatePhone, validatePassword, validateRequired, passwordRequisitos } from '../utils/validation';
 import ServiGTLogo from '../components/ServiGTLogo';
 import { T } from '../theme';
 
@@ -145,7 +145,7 @@ export default function RegisterScreen({ navigation, onRegisterSuccess }) {
     if (!validateRequired(name)) errs.name = 'El nombre es requerido.';
     if (!validateRequired(email)) errs.email = 'El correo es requerido.';
     else if (!validateEmail(email)) errs.email = 'El formato del correo no es valido.';
-    if (!validatePassword(password)) errs.password = 'La contrasena debe tener al menos 6 caracteres.';
+    if (!validatePassword(password)) errs.password = passwordRequisitos;
     if (Object.keys(errs).length) { setErrors(errs); return; }
     setErrors({});
 

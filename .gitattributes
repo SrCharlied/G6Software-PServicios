@@ -1,0 +1,34 @@
+# Normalizacion de finales de linea (task 1.5).
+#
+# `* text=auto` deja que Git decida por contenido: los archivos de texto se
+# guardan con LF en el repositorio y se entregan en el formato nativo del
+# sistema de quien hace checkout. Sin esto, un commit hecho en Windows podia
+# introducir CRLF y romper `docker/entrypoint.sh` dentro del contenedor —de ahi
+# el `sed -i 's/\r$//'` que sigue en el Dockerfile como red de seguridad.
+* text=auto
+
+# Archivos que deben conservar LF sin importar la plataforma: los ejecuta un
+# shell de Linux dentro de la imagen.
+*.sh            text eol=lf
+Dockerfile      text eol=lf
+*.yml           text eol=lf
+*.yaml          text eol=lf
+
+# Binarios: nunca se normalizan ni se muestran como diff de texto.
+*.png           binary
+*.jpg           binary
+*.jpeg          binary
+*.gif           binary
+*.ico           binary
+*.webp          binary
+*.pdf           binary
+*.docx          binary
+*.ttf           binary
+*.otf           binary
+*.woff          binary
+*.woff2         binary
+
+# Lockfiles: son texto, pero generarlos produce diffs enormes que no aportan
+# nada en review. Se marcan como generados para que GitHub los colapse.
+package-lock.json   linguist-generated=true
+composer.lock       linguist-generated=true

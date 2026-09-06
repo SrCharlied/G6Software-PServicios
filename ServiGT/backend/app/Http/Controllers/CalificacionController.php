@@ -72,9 +72,14 @@ class CalificacionController extends Controller
     // Crear calificacion (solo si el servicio esta completado)
     public function store(Request $request): JsonResponse
     {
+        // `destinatario_id` deja de aceptarse del cuerpo (matriz OWASP, fila
+        // A01/API3). Antes se validaba solo que existiera el usuario y que
+        // quien calificaba fuera parte del servicio, pero no que el destinatario
+        // fuera la contraparte real: un cliente podia inflar —o hundir— el
+        // promedio de un proveedor con el que nunca trabajo, usando el id de un
+        // servicio propio ya completado.
         $validated = $request->validate([
             'servicio_id'     => 'required|exists:servicios,id',
-            'destinatario_id' => 'required|exists:users,id',
             'puntuacion'      => 'required|integer|between:1,5',
             'comentario'      => 'nullable|string|max:500',
         ]);
@@ -101,8 +106,19 @@ class CalificacionController extends Controller
             return response()->json(['message' => 'Ya calificaste este servicio'], 422);
         }
 
-        $validated['autor_id']     = $userId;
-        $validated['es_verificada'] = true;
+        // El destinatario es siempre la contraparte del servicio, derivada aqui
+        // igual que ya lo hacia `calificarServicio`.
+        $destinatarioId = $servicio->cliente_id === $userId
+            ? $servicio->proveedor?->user_id
+            : $servicio->cliente_id;
+
+        if (!$destinatarioId) {
+            return response()->json(['message' => 'El servicio no tiene una contraparte valida'], 422);
+        }
+
+        $validated['destinatario_id'] = $destinatarioId;
+        $validated['autor_id']        = $userId;
+        $validated['es_verificada']   = true;
 
         $calificacion = Calificacion::create($validated);
 

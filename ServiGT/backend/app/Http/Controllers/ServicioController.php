@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Notificacion;
 use App\Models\Proveedor;
+use App\Models\PublicacionServicio;
 use App\Models\Servicio;
 use App\Http\Resources\ServicioResource;
 use App\Traits\ApiResponse;
@@ -16,8 +17,23 @@ class ServicioController extends Controller
 
     public function store(Request $request): JsonResponse
     {
+        // Cuando la solicitud nace de una publicacion, todo lo que define el
+        // trato sale de la fila y no del cuerpo. Los campos que el cliente
+        // pudiera mandar se descartan ANTES de validar: si se validaran para
+        // luego pisarlos, un `proveedor_id` inexistente devolveria un 422
+        // confuso sobre un campo que la peticion ni siquiera usa.
+        if ($request->filled('publicacion_id')) {
+            $request->request->remove('proveedor_id');
+            $request->request->remove('categoria_id');
+            $request->request->remove('monto_acordado');
+        }
+
         $validated = $request->validate([
-            'proveedor_id'   => 'required|exists:proveedores,id',
+            // `proveedor_id` deja de ser obligatorio cuando la solicitud nace
+            // de una publicacion: en ese caso se deriva de la publicacion, que
+            // es dato del servidor, y no de lo que mande el cliente.
+            'proveedor_id'   => 'required_without:publicacion_id|exists:proveedores,id',
+            'publicacion_id' => 'sometimes|integer|exists:publicaciones_servicio,id',
             'categoria_id'   => 'nullable|exists:categorias,id',
             'descripcion'    => 'required|string|max:1000',
             'fecha_agendada' => 'nullable|date|after:now',
@@ -26,6 +42,37 @@ class ServicioController extends Controller
         ]);
 
         $user = $request->user();
+
+        // Contratacion desde una publicacion (task 5.6).
+        //
+        // Proveedor, categoria, titulo y precio de referencia se leen de la
+        // fila: si se confiara en el cliente, cualquiera podria mandar el
+        // `proveedor_id` de un proveedor y el `publicacion_id` de otro, o
+        // inventar un precio que luego apareceria en el historial como si lo
+        // hubiera publicado el proveedor.
+        //
+        // Tampoco se acepta `monto_acordado` por esta via: el precio de
+        // referencia no es el monto final, se negocia aparte, y aceptarlo aqui
+        // dejaria cerrado un precio que el proveedor nunca acepto.
+        //
+        // El snapshot (`publicacion_titulo`, `publicacion_precio_referencial`)
+        // se copia a proposito: editar o borrar la publicacion despues no debe
+        // reescribir lo que se contrato, y la FK es ON DELETE SET NULL.
+        $publicacion = null;
+        if (isset($validated['publicacion_id'])) {
+            $publicacion = PublicacionServicio::with('proveedor')
+                ->where('estado', 'activa')
+                ->find($validated['publicacion_id']);
+
+            if (!$publicacion) {
+                return $this->error('La publicacion no esta disponible.', 404);
+            }
+
+            $validated['proveedor_id'] = $publicacion->proveedor_id;
+            $validated['categoria_id'] = $publicacion->categoria_id;
+            $validated['publicacion_titulo'] = $publicacion->titulo;
+            $validated['publicacion_precio_referencial'] = $publicacion->precio_referencial;
+        }
 
         // Solo un cliente contrata. Antes bastaba con estar autenticado, asi
         // que un proveedor podia crear servicios y aparecer en ambos lados.

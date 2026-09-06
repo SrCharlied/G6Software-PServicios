@@ -5,7 +5,21 @@ export const validateEmail = (v) => EMAIL_RE.test((v || '').trim());
 
 export const validatePhone = (v) => PHONE_RE.test((v || '').trim());
 
-export const validatePassword = (v) => (v || '').length >= 6;
+// Espejo de las reglas del backend (task 3.1): minimo 10 caracteres con
+// letras y numeros, tope de 72 bytes porque bcrypt trunca ahi. Esto es solo
+// para dar retroalimentacion inmediata en el formulario; la validacion que
+// manda es la del backend, que corre igual si alguien llama al API directo.
+const PASSWORD_MIN = 10;
+const PASSWORD_MAX = 72;
+
+export const validatePassword = (v) => {
+  const valor = v || '';
+  if (valor.length < PASSWORD_MIN || valor.length > PASSWORD_MAX) return false;
+  return /\p{L}/u.test(valor) && /\d/.test(valor);
+};
+
+export const passwordRequisitos =
+  `Minimo ${PASSWORD_MIN} caracteres (maximo ${PASSWORD_MAX}), con letras y numeros.`;
 
 export const validateRequired = (v) => (v || '').toString().trim().length > 0;
 

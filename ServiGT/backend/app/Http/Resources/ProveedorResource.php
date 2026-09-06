@@ -75,11 +75,17 @@ class ProveedorResource extends JsonResource
             return $data;
         }
 
+        // Personalizacion de marca (task 2.4). En el detalle publico solo viaja
+        // si el Premium esta activo: al vencer, el perfil vuelve al degradado y
+        // al color de marca sin que se borre nada en disco, asi que renovar
+        // restaura la portada anterior tal cual estaba.
+        $marcaActiva = $this->premiumEstado() === 'activo';
+
         $data += [
             'nivel'                => $this->nivel,
             'total_calificaciones' => (int) ($this->total_calificaciones ?? 0),
-            'portada'              => $this->portada,
-            'color_acento'         => $this->color_acento,
+            'portada'              => $marcaActiva ? $this->portada : null,
+            'color_acento'         => $marcaActiva ? $this->color_acento : null,
             'categorias'           => $this->categoriasResumidas(),
             'disponibilidad'       => $this->whenLoaded('disponibilidad'),
         ];
@@ -89,7 +95,15 @@ class ProveedorResource extends JsonResource
         }
 
         // Vista propia: solo la ve el duenno del perfil o un administrador.
-        return $data + [
+        // Aqui si se devuelven la portada y el color guardados aunque el
+        // Premium este vencido, para que el proveedor vea que su
+        // personalizacion sigue ahi y que renovar la reactiva. Se usa
+        // array_merge y no `+` porque `+` conserva la clave de la izquierda:
+        // con `+` la portada seguiria llegando en null.
+        return array_merge($data, [
+            'portada'                => $this->portada,
+            'color_acento'           => $this->color_acento,
+            'marca_activa'           => $marcaActiva,
             'user_id'                => $this->user_id,
             'email'                  => $this->email,
             'premium_inicio_at'      => $this->premium_inicio_at?->toIso8601String(),
@@ -98,7 +112,7 @@ class ProveedorResource extends JsonResource
             'premium_renovaciones'   => (int) ($this->premium_renovaciones ?? 0),
             'created_at'             => $this->created_at?->toIso8601String(),
             'updated_at'             => $this->updated_at?->toIso8601String(),
-        ];
+        ]);
     }
 
     private function categoriaResumida(): ?array

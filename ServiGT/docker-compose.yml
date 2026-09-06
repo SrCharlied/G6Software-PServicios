@@ -5,9 +5,14 @@ services:
     container_name: servigt_db
     restart: unless-stopped
     environment:
-      POSTGRES_DB: pservicios
-      POSTGRES_USER: pservicios_user
-      POSTGRES_PASSWORD: pservicios_secret
+      POSTGRES_DB: ${DB_DATABASE:-pservicios}
+      POSTGRES_USER: ${DB_USERNAME:-pservicios_user}
+      # Sin valor por defecto a proposito (task 4.1). Se deja vacio en vez de
+      # usar `:?` porque Compose interpola el archivo completo aunque solo se
+      # invoque el perfil `test`, y un `:?` aqui tumbaria la suite del CI, que
+      # no usa este servicio. Postgres rechaza arrancar con contrasena vacia,
+      # asi que el fallo sigue siendo inmediato y explicito.
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-}
     # Sin binding al host — solo accesible desde la red interna de Docker
     # ports:
     #   - "127.0.0.1:5432:5432"
@@ -17,7 +22,7 @@ services:
       # con el volumen vacio y hacia que una BD ya existente nunca recibiera
       # las tablas nuevas. Lo aplica el backend en cada arranque.
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U pservicios_user -d pservicios"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-pservicios_user} -d ${DB_DATABASE:-pservicios}"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -35,17 +40,31 @@ services:
       - "8085:8000"
     environment:
       APP_NAME: ServiGT
-      APP_ENV: local
-      APP_KEY: base64:xR3TbPNBfz4mGU5MhKtp3HKDO+jMnaSj6UEahGkAjQo=
-      APP_DEBUG: "true"
+      APP_ENV: ${APP_ENV:-local}
+      # APP_KEY, DB_PASSWORD y ADMIN_PASSWORD no traen valor (task 4.1): salen
+      # del archivo ServiGT/.env, que no esta en el repositorio. El entrypoint
+      # aborta el arranque si alguna llega vacia, asi que no existe un secreto
+      # comiteado que sirva en la maquina de cualquiera. Ver ServiGT/.env.example.
+      APP_KEY: ${APP_KEY:-}
+      # Debug apagado salvo que el ambiente lo pida: con debug encendido una
+      # excepcion no controlada entrega stack trace, SQL y rutas del servidor.
+      APP_DEBUG: ${APP_DEBUG:-false}
       # Debe coincidir con el puerto publico para que Sanctum y los enlaces de storage funcionen
       APP_URL: ${APP_URL:-http://localhost:8085}
+      # Origenes permitidos por CORS. Vacio = sin cross-origin fuera de local.
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-}
       DB_CONNECTION: pgsql
       DB_HOST: db
       DB_PORT: 5432
-      DB_DATABASE: pservicios
-      DB_USERNAME: pservicios_user
-      DB_PASSWORD: pservicios_secret
+      DB_DATABASE: ${DB_DATABASE:-pservicios}
+      DB_USERNAME: ${DB_USERNAME:-pservicios_user}
+      DB_PASSWORD: ${DB_PASSWORD:-}
+      # Cuenta de administrador. Obligatoria y nunca impresa por el entrypoint.
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@servigt.gt}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+      # Datos demo: activos solo si el ambiente lo pide explicitamente.
+      SEED_DEMO_DATA: ${SEED_DEMO_DATA:-false}
+      PROVIDER_SEED_PASSWORD: ${PROVIDER_SEED_PASSWORD:-}
     volumes:
       # Persistir fotos publicas entre rebuilds
       - backend_storage:/app/storage/app/public
@@ -70,11 +89,12 @@ services:
     networks:
       - servigt_net
 
-  # Frontend Expo Web
+  # Frontend Expo Web — desarrollo (Metro con hot reload)
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      target: dev
       args:
         # URL publica del backend que se inyecta al bundle web en build-time.
         # Sobreescribir en el server con un archivo .env junto a este docker-compose.yml
@@ -90,14 +110,42 @@ services:
     networks:
       - servigt_net
 
+  # Frontend productivo — export estatico servido por Nginx (task 4.2).
+  #
+  # Vive en el perfil `prod` para no reemplazar el hot reload de desarrollo:
+  # `docker compose up` sigue levantando Metro; este target solo arranca con
+  # `docker compose --profile prod up frontend_prod`.
+  #
+  # No recibe `EXPO_PUBLIC_API_URL` a proposito: el Dockerfile usa `/api`, que
+  # es relativo, y Nginx hace proxy del API en el mismo origen. Asi el uso
+  # normal de la app no depende de CORS.
+  frontend_prod:
+    profiles: ["prod"]
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: prod
+    container_name: servigt_frontend_prod
+    restart: unless-stopped
+    ports:
+      - "8087:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - servigt_net
+
   # PostgreSQL temporal y aislado para las pruebas automatizadas del backend.
   db_test:
     profiles: ["test"]
     image: postgres:16-alpine
     environment:
+      # Credenciales literales a proposito: esta base vive en tmpfs, no expone
+      # puertos, se destruye al terminar la suite y nunca contiene datos reales.
+      # No comparte contrasena con `db` para que filtrarla no sirva de nada.
       POSTGRES_DB: pservicios_test
       POSTGRES_USER: pservicios_test_user
-      POSTGRES_PASSWORD: pservicios_test_secret
+      POSTGRES_PASSWORD: solo-para-la-suite-efimera
     tmpfs:
       - /var/lib/postgresql/data
     volumes:
@@ -120,14 +168,18 @@ services:
     entrypoint: ["php", "artisan", "test"]
     environment:
       APP_ENV: testing
-      APP_KEY: base64:xR3TbPNBfz4mGU5MhKtp3HKDO+jMnaSj6UEahGkAjQo=
-      APP_DEBUG: "true"
+      # Clave efimera exclusiva de la suite, distinta de la de `backend`: no
+      # descifra nada fuera de esta base en tmpfs.
+      APP_KEY: base64:5vYQ1nT0kZP3sB8xW2eR7uK4mJ6hG9dC1aN5fL0iO8s=
+      # Debug apagado tambien aqui, para que las pruebas de la task 4.3 midan el
+      # mismo manejo de errores que corre en el ambiente real.
+      APP_DEBUG: "false"
       DB_CONNECTION: pgsql
       DB_HOST: db_test
       DB_PORT: 5432
       DB_DATABASE: pservicios_test
       DB_USERNAME: pservicios_test_user
-      DB_PASSWORD: pservicios_test_secret
+      DB_PASSWORD: solo-para-la-suite-efimera
       CACHE_STORE: array
       SESSION_DRIVER: array
     volumes:

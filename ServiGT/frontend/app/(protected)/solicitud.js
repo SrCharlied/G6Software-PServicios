@@ -5,7 +5,7 @@ import { useSession } from '../../src/context/SessionContext';
 
 export default function SolicitudRoute() {
   const router = useRouter();
-  const { user, selectedProvider } = useSession();
+  const { user, selectedProvider, selectedPublicacion } = useSession();
 
   if (user?.role === 'proveedor') return <Redirect href="/dashboard" />;
 
@@ -26,6 +26,7 @@ export default function SolicitudRoute() {
         navigation={navigation}
         user={user}
         selectedProvider={selectedProvider}
+        publicacion={selectedPublicacion}
       />
     </InternalLayout>
   );

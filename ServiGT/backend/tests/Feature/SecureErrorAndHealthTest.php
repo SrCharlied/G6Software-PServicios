@@ -58,4 +58,33 @@ class SecureErrorAndHealthTest extends TestCase
         $this->assertStringNotContainsString('password', $payload);
         $this->assertStringNotContainsString('host=db', $payload);
     }
+
+    /**
+     * Una peticion no autenticada devuelve 401 aunque no pida JSON.
+     *
+     * Este es el camino que se escapaba: `getJson()` manda
+     * `Accept: application/json`, y la app tambien, asi que toda la suite
+     * ejercitaba la rama buena. Desde el navegador o con `curl` a pelo, en
+     * cambio, el middleware `Authenticate` intentaba redirigir a la ruta
+     * `login` —que no existe en una API sin vistas— y el
+     * RouteNotFoundException salia como 500.
+     */
+    public function test_una_peticion_no_autenticada_sin_accept_json_devuelve_401(): void
+    {
+        foreach (['/api/publicaciones/mias', '/api/providers/me', '/api/mi-credito'] as $ruta) {
+            $respuesta = $this->get($ruta, ['Accept' => 'text/html']);
+
+            $respuesta->assertStatus(401);
+            $this->assertStringNotContainsString('login', $respuesta->getContent());
+        }
+    }
+
+    public function test_una_peticion_no_autenticada_a_un_post_sin_accept_json_devuelve_401(): void
+    {
+        $respuesta = $this->post('/api/servicios', [
+            'descripcion' => 'Solicitud sin autenticar desde un cliente que no pide JSON.',
+        ], ['Accept' => 'text/html']);
+
+        $respuesta->assertStatus(401);
+    }
 }

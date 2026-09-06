@@ -26,6 +26,16 @@ class ServicioResource extends JsonResource
             'direccion' => $this->direccion,
             'monto_acordado' => $this->monto_acordado,
             'motivo_cancelacion' => $this->motivo_cancelacion,
+            // Snapshot de la publicacion que origino la solicitud (task 5.6).
+            // Son copias, no una lectura de la publicacion: si el proveedor la
+            // edita o la borra, lo contratado sigue diciendo lo que decia el
+            // dia que se contrato. `publicacion_id` puede quedar en null por la
+            // FK ON DELETE SET NULL, y el snapshot sobrevive igual.
+            'publicacion_id' => $this->publicacion_id,
+            'publicacion_titulo' => $this->publicacion_titulo,
+            'publicacion_precio_referencial' => $this->publicacion_precio_referencial !== null
+                ? (float) $this->publicacion_precio_referencial
+                : null,
             'created_at' => $this->created_at?->toIso8601String(),
             'updated_at' => $this->updated_at?->toIso8601String(),
             'cliente' => $this->whenLoaded('cliente', fn () => [

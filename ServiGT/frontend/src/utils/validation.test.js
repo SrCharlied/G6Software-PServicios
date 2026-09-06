@@ -40,15 +40,31 @@ describe('validatePhone', () => {
 });
 
 describe('validatePassword', () => {
-  it('exige al menos 6 caracteres', () => {
-    expect(validatePassword('123456')).toBe(true);
-    expect(validatePassword('segura123')).toBe(true);
+  // Espejo de las reglas del backend (task 3.1). Antes bastaba con 6
+  // caracteres, asi que '123456' pasaba el formulario y luego el backend la
+  // rechazaba: el usuario veia un error generico despues de enviar.
+  it('acepta contrasenas de 10 o mas con letras y numeros', () => {
+    expect(validatePassword('ClaveSegura2026')).toBe(true);
+    expect(validatePassword('segura1234')).toBe(true);
+    expect(validatePassword('caballo correcto bateria grapa 7')).toBe(true);
   });
 
   it('rechaza contrasenas cortas o vacias', () => {
+    expect(validatePassword('123456')).toBe(false);
+    expect(validatePassword('segura123')).toBe(false);
     expect(validatePassword('123')).toBe(false);
     expect(validatePassword('')).toBe(false);
     expect(validatePassword(null)).toBe(false);
+  });
+
+  it('exige letras y numeros a la vez', () => {
+    expect(validatePassword('solamenteletras')).toBe(false);
+    expect(validatePassword('1234567890123')).toBe(false);
+  });
+
+  it('rechaza lo que bcrypt truncaria en 72 bytes', () => {
+    expect(validatePassword('a1'.repeat(36))).toBe(true);
+    expect(validatePassword('a1'.repeat(40))).toBe(false);
   });
 });
 

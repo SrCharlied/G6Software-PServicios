@@ -117,6 +117,12 @@ class PublicacionServicioController extends Controller
         return $this->success('OK', [
             'publicaciones' => PublicacionServicioResource::collection($publicaciones),
             'total' => $publicaciones->count(),
+            // El contador de cupos sale del backend a proposito (task 5.5): si
+            // el frontend calculara "1 gratis / 3 Premium" por su cuenta,
+            // habria dos fuentes de verdad para la misma regla y la de la UI
+            // se podria editar desde el navegador. Aqui la UI solo pinta lo
+            // que el backend ya decidio.
+            'cupos' => $this->cuposDe($proveedor, $publicaciones),
         ]);
     }
 
@@ -265,6 +271,30 @@ class PublicacionServicioController extends Controller
                 'publicacion' => new PublicacionServicioResource($publicacion),
             ]);
         });
+    }
+
+    /**
+     * Resumen de cupos que consume la pantalla de gestion (task 5.5).
+     *
+     * `disponibles` nunca es negativo: un proveedor cuyo Premium acaba de
+     * vencer puede tener 3 activas contra un limite de 1 hasta que la siguiente
+     * escritura normalice los excedentes bajo lock.
+     *
+     * @param  \Illuminate\Support\Collection<int, PublicacionServicio>  $publicaciones
+     * @return array<string, mixed>
+     */
+    private function cuposDe(Proveedor $proveedor, $publicaciones): array
+    {
+        $limite = $this->limiteEfectivo($proveedor);
+        $activas = $publicaciones->where('estado', 'activa')->count();
+
+        return [
+            'limite' => $limite,
+            'activas' => $activas,
+            'disponibles' => max(0, $limite - $activas),
+            'premium_estado' => $proveedor->premiumEstado(),
+            'limite_premium' => self::LIMITE_PREMIUM,
+        ];
     }
 
     /**

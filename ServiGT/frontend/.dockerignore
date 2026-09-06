@@ -1,0 +1,9 @@
+# El build instala dependencias con `npm ci` dentro de la imagen; copiar el
+# node_modules del host lo pisaria con un arbol resuelto para otra plataforma
+# y ademas hace el contexto de build cientos de MB mas grande.
+node_modules
+dist
+.expo
+.git
+npm-debug.log
+*.log

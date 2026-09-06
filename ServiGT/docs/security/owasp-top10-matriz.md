@@ -43,6 +43,7 @@ Cada fila indica un **tipo**:
 | A08 | Compras de créditos, cotizaciones, publicaciones | Integridad de saldo, adjudicación y cupos | Ya existían `idempotency_key`, `DB::transaction()` + `lockForUpdate()` e índice único; el límite de publicaciones se aplica bajo el mismo patrón | 5.3 | `PublicacionServicioLimiteTest`, `PublicacionServicioContratoTest` | **Sin hallazgo nuevo** |
 | A09 | Logging | Sin logging de eventos de seguridad (login fallido, 403, ráfagas de 429) | Sin cambios; no hay fuga de credenciales en logs, pero tampoco capacidad de detección | — | — | **Riesgo residual aceptado**, ver §3 |
 | A10 | Manejo de errores y health | Excepciones no controladas podían filtrar SQL, rutas y credenciales | Render centralizado con mensajes genéricos y correlation ID; cabeceras de seguridad en todas las respuestas | 4.3, 6.3 | `SecureErrorAndHealthTest`, `ConfiguracionSeguraTest` | **Corregida** |
+| A10 / API2 | Peticiones no autenticadas sin `Accept: application/json` | Devolvían **500** en vez de 401: `Authenticate` intentaba redirigir a la ruta `login`, que no existe en una API sin vistas, y el `RouteNotFoundException` caía en el handler genérico. Solo se veía desde el navegador o con `curl` a pelo | `redirectGuestsTo(fn () => null)`: el middleware lanza la excepción en vez de redirigir y llega al render que ya devolvía 401 | 6.3 | `SecureErrorAndHealthTest::test_una_peticion_no_autenticada_sin_accept_json_devuelve_401` | **Corregida** |
 
 ---
 
@@ -85,7 +86,7 @@ Fecha de revisión sugerida: **2026-12-08** (90 días desde el cierre) o antes d
 
 ```
 docker compose --profile test run --rm backend_test
-Tests:  276 passed (1009 assertions)
+Tests:  279 passed (1018 assertions)
 ```
 
 Imagen: `servigt-backend_test:latest`, PHP 8.3 sobre `php:8.3-cli`, Laravel Framework 13.30.1, PostgreSQL 16 (`db_test`) con `database/init.sql`.
@@ -145,6 +146,16 @@ Un preflight desde `Origin: https://atacante.example` recibe `Access-Control-All
 
 `curl -I http://localhost:8087/` devuelve CSP (`script-src 'self'`), `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy`, `Permissions-Policy` y las tres cabeceras de aislamiento de origen. Se verificó que también salen en respuestas 404 y sobre el bundle con hash.
 
+### Prueba de integracion end-to-end
+
+Contra el stack levantado con volúmenes limpios, atravesando Nginx en el puerto 8087 (la topología productiva), no la API directa. Cubre autenticación, serialización, Premium, publicaciones, contratación desde publicación, Flow A completo, Flow B con créditos, mensajería, cabeceras, rate limiting y persistencia tras un rebuild del backend:
+
+```
+Resultado: 77 OK, 0 fallas
+```
+
+De aquí salió el hallazgo del 401: la suite de PHPUnit usa `getJson`/`postJson`, que siempre mandan `Accept: application/json`, así que el camino sin ese header no lo ejercitaba nadie.
+
 ### ZAP Baseline local (task 6.3)
 
 Escaneos contra el stack local con datos sintéticos, sin tocar ningún entorno remoto. Reportes en `docs/security/evidencia/`.
@@ -181,7 +192,7 @@ Las 2 restantes se aceptan:
 
 De los hallazgos levantados el 2026-08-28:
 
-- **17 corregidas con prueba que falla antes y pasa después**, incluidas las cuatro de severidad Alta (los dos BOLA sobre documentos, el mass assignment de `user_id` y la exposición de documentos de identidad por storage público).
+- **18 corregidas con prueba que falla antes y pasa después**, incluidas las cuatro de severidad Alta (los dos BOLA sobre documentos, el mass assignment de `user_id` y la exposición de documentos de identidad por storage público).
 - **2 categorías sin hallazgo** tras revisión (A05 Injection, API5 BFLA), más el invariante de créditos y cotizaciones de A08, que ya estaba correctamente implementado.
 - **2 categorías no aplicables** (API7 SSRF, API10 Unsafe Consumption): el backend no realiza requests HTTP salientes.
 - **6 riesgos residuales aceptados** con fecha de revisión y disparador explícito (§3).

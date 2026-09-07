@@ -1,9 +1,10 @@
 const buildStorage = () => {
   const values = {};
   return {
-    getItem: jest.fn((key) => values[key] ?? null),
-    setItem: jest.fn((key, value) => { values[key] = value; }),
-    removeItem: jest.fn((key) => { delete values[key]; }),
+    getItem: jest.fn(async (key) => values[key] ?? null),
+    setItem: jest.fn(async (key, value) => { values[key] = value; }),
+    removeItem: jest.fn(async (key) => { delete values[key]; }),
+    getAllKeys: jest.fn(async () => Object.keys(values)),
     values,
   };
 };
@@ -26,20 +27,39 @@ const buildApiModule = () => {
   jest.doMock('axios', () => ({ __esModule: true, default: axiosMock }));
 
   const storage = buildStorage();
-  Object.defineProperty(global, 'window', {
-    value: { localStorage: storage },
-    configurable: true,
-  });
+  jest.doMock('./sessionStorage', () => ({
+    STORAGE_KEYS: { token: 'servigt_token', user: 'servigt_user' },
+    sessionStorage: storage,
+    migrateLegacySession: jest.fn(async () => false),
+    clearPrivateSessionStorage: jest.fn(async () => {
+      delete storage.values.servigt_token;
+      delete storage.values.servigt_user;
+      Object.keys(storage.values)
+        .filter((key) => key.startsWith('chat_'))
+        .forEach((key) => { delete storage.values[key]; });
+    }),
+  }));
 
   const apiModule = require('./api');
+  const requestHandler = client.interceptors.request.use.mock.calls[0][0];
   const responseErrorHandler = client.interceptors.response.use.mock.calls[0][1];
 
-  return { apiModule, client, responseErrorHandler, storage };
+  return { apiModule, client, requestHandler, responseErrorHandler, storage };
 };
 
 describe('api error handling', () => {
   afterEach(() => {
     jest.dontMock('axios');
+    jest.dontMock('./sessionStorage');
+  });
+
+  it('inyecta Authorization con el token del adapter', async () => {
+    const { requestHandler, storage } = buildApiModule();
+    storage.values.servigt_token = 'token-real';
+
+    await expect(requestHandler({ headers: {} })).resolves.toMatchObject({
+      headers: { Authorization: 'Bearer token-real' },
+    });
   });
 
   it('preserva status 401 en funciones exportadas', async () => {
@@ -104,10 +124,24 @@ describe('api error handling', () => {
     expect(onUnauthorized).toHaveBeenCalledTimes(1);
   });
 
-  it('restaura una sesion con solo token para obligar revalidacion por /me', () => {
+  it('restaura una sesion con solo token para obligar revalidacion por /me', async () => {
     const { apiModule, storage } = buildApiModule();
     storage.values.servigt_token = 'token-real';
 
-    expect(apiModule.loadStoredSession()).toEqual({ token: 'token-real', user: null });
+    await expect(apiModule.loadStoredSession()).resolves.toEqual({ token: 'token-real', user: null });
+  });
+
+  it('limpia datos locales aunque falle el logout remoto', async () => {
+    const { apiModule, client, storage } = buildApiModule();
+    storage.values.servigt_token = 'token-real';
+    storage.values.servigt_user = '{"id":1}';
+    storage.values.chat_1_2 = '[{"id":1}]';
+    client.post.mockRejectedValueOnce(new Error('Network'));
+
+    await apiModule.logout();
+
+    expect(storage.values.servigt_token).toBeUndefined();
+    expect(storage.values.servigt_user).toBeUndefined();
+    expect(storage.values.chat_1_2).toBeUndefined();
   });
 });

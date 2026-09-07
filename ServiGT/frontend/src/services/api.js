@@ -1,38 +1,16 @@
 import axios from 'axios';
+import {
+  clearPrivateSessionStorage,
+  migrateLegacySession,
+  sessionStorage,
+  STORAGE_KEYS,
+} from './sessionStorage';
 
 const DEFAULT_API_URL = 'http://localhost:8080/api';
 const BASE_URL = process.env.EXPO_PUBLIC_API_URL || DEFAULT_API_URL;
 
-const TOKEN_KEY = 'servigt_token';
-const USER_KEY  = 'servigt_user';
-
-// ── Persistencia en localStorage (solo web) ───────────────────────────────
-
-const storage = {
-  get: (key) => {
-    try {
-      return typeof window !== 'undefined'
-        ? window.localStorage.getItem(key)
-        : null;
-    } catch {
-      return null;
-    }
-  },
-  set: (key, value) => {
-    try {
-      if (typeof window !== 'undefined') {
-        window.localStorage.setItem(key, value);
-      }
-    } catch { /* ignorar */ }
-  },
-  remove: (key) => {
-    try {
-      if (typeof window !== 'undefined') {
-        window.localStorage.removeItem(key);
-      }
-    } catch { /* ignorar */ }
-  },
-};
+const TOKEN_KEY = STORAGE_KEYS.token;
+const USER_KEY  = STORAGE_KEYS.user;
 
 // ── Instancia Axios ───────────────────────────────────────────────────────
 
@@ -43,8 +21,8 @@ const api = axios.create({
 });
 
 // Interceptor de request: inyectar token Bearer si existe
-api.interceptors.request.use((config) => {
-  const token = storage.get(TOKEN_KEY);
+api.interceptors.request.use(async (config) => {
+  const token = await sessionStorage.getItem(TOKEN_KEY);
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
@@ -128,19 +106,19 @@ api.interceptors.response.use(
 
 // ── Token helpers (exportados para App.js) ────────────────────────────────
 
-export const saveSession = (token, user) => {
-  storage.set(TOKEN_KEY, token);
-  storage.set(USER_KEY, JSON.stringify(user));
+export const saveSession = async (token, user) => {
+  await sessionStorage.setItem(TOKEN_KEY, token);
+  await sessionStorage.setItem(USER_KEY, JSON.stringify(user));
 };
 
-export const clearSession = () => {
-  storage.remove(TOKEN_KEY);
-  storage.remove(USER_KEY);
+export const clearSession = async () => {
+  await clearPrivateSessionStorage();
 };
 
-export const loadStoredSession = () => {
-  const token = storage.get(TOKEN_KEY);
-  const raw   = storage.get(USER_KEY);
+export const loadStoredSession = async () => {
+  await migrateLegacySession();
+  const token = await sessionStorage.getItem(TOKEN_KEY);
+  const raw   = await sessionStorage.getItem(USER_KEY);
   if (!token) return null;
   if (!raw) return { token, user: null };
   try {
@@ -164,7 +142,7 @@ export const login = async (email, password) => {
   try {
     const response = await api.post('/login', { email, password });
     const { user, token } = response.data;
-    saveSession(token, user);
+    await saveSession(token, user);
     return response.data;
   } catch (error) {
     throwApiError(error, 'No se pudo iniciar sesion.');
@@ -175,7 +153,7 @@ export const register = async (name, email, password, role) => {
   try {
     const response = await api.post('/register', { name, email, password, role });
     const { user, token } = response.data;
-    saveSession(token, user);
+    await saveSession(token, user);
     return response.data;
   } catch (error) {
     throwApiError(error, 'No se pudo registrar el usuario.');
@@ -187,7 +165,7 @@ export const logout = async () => {
     await api.post('/logout');
   } catch { /* ignorar errores de red en logout */ }
   finally {
-    clearSession();
+    await clearSession();
   }
 };
 

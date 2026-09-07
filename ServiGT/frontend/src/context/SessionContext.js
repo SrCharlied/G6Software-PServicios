@@ -18,8 +18,8 @@ export function SessionProvider({ children }) {
   const [selectedProvider, setSelectedProvider] = useState(null);
   const [chatParams, setChatParams] = useState({ userId: null, name: '' });
 
-  const clearLocalSession = useCallback(() => {
-    clearSession();
+  const clearLocalSession = useCallback(async () => {
+    await clearSession();
     setUser(null);
     setProviderProfile(null);
     setSelectedProvider(null);
@@ -30,7 +30,7 @@ export function SessionProvider({ children }) {
   useEffect(() => { restore(); }, []);
 
   const restore = async () => {
-    const stored = loadStoredSession();
+    const stored = await loadStoredSession();
     if (!stored?.token) { setSessionLoading(false); return; }
     try {
       const meData = await getMe({ skipUnauthorizedHandler: true });
@@ -44,9 +44,9 @@ export function SessionProvider({ children }) {
       }
 
       setUser(currentUser);
-      saveSession(stored.token, currentUser);
+      await saveSession(stored.token, currentUser);
     } catch {
-      clearLocalSession();
+      await clearLocalSession();
     }
     setSessionLoading(false);
   };

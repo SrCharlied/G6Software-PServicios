@@ -6,7 +6,9 @@ import {
   STORAGE_KEYS,
 } from './sessionStorage';
 
-const DEFAULT_API_URL = 'http://localhost:8080/api';
+const DEFAULT_API_URL = process.env.NODE_ENV === 'production'
+  ? '/api'
+  : 'http://localhost:8080/api';
 const BASE_URL = process.env.EXPO_PUBLIC_API_URL || DEFAULT_API_URL;
 
 const TOKEN_KEY = STORAGE_KEYS.token;

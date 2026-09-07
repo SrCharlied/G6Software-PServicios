@@ -73,4 +73,4 @@ La mayoría de estas categorías ya quedaron cubiertas arriba junto con su equiv
 
 **Vulnerabilidades confirmadas de mayor severidad, sin follow-up ticketado todavía** (recomendado priorizar antes que las demás): las tres filas de BOLA/mass assignment sobre `ProviderController` (`uploadDocumento`, `getDocumentos`, `store`) y la exposición combinada de documentos de identidad vía storage público.
 
-Ningún hallazgo de esta matriz fue corregido en código; este documento es puramente un registro de auditoría, sin cambios de código asociados.
+Esto no fue corregido en el código ya que el documento es solamente un registro de auditoría, sin cambios de código asociados.

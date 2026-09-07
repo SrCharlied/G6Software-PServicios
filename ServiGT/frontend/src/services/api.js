@@ -1,38 +1,16 @@
 import axios from 'axios';
+import {
+  clearPrivateSessionStorage,
+  migrateLegacySession,
+  sessionStorage,
+  STORAGE_KEYS,
+} from './sessionStorage';
 
 const DEFAULT_API_URL = 'http://localhost:8080/api';
 const BASE_URL = process.env.EXPO_PUBLIC_API_URL || DEFAULT_API_URL;
 
-const TOKEN_KEY = 'servigt_token';
-const USER_KEY  = 'servigt_user';
-
-// ── Persistencia en localStorage (solo web) ───────────────────────────────
-
-const storage = {
-  get: (key) => {
-    try {
-      return typeof window !== 'undefined'
-        ? window.localStorage.getItem(key)
-        : null;
-    } catch {
-      return null;
-    }
-  },
-  set: (key, value) => {
-    try {
-      if (typeof window !== 'undefined') {
-        window.localStorage.setItem(key, value);
-      }
-    } catch { /* ignorar */ }
-  },
-  remove: (key) => {
-    try {
-      if (typeof window !== 'undefined') {
-        window.localStorage.removeItem(key);
-      }
-    } catch { /* ignorar */ }
-  },
-};
+const TOKEN_KEY = STORAGE_KEYS.token;
+const USER_KEY  = STORAGE_KEYS.user;
 
 // ── Instancia Axios ───────────────────────────────────────────────────────
 
@@ -43,8 +21,8 @@ const api = axios.create({
 });
 
 // Interceptor de request: inyectar token Bearer si existe
-api.interceptors.request.use((config) => {
-  const token = storage.get(TOKEN_KEY);
+api.interceptors.request.use(async (config) => {
+  const token = await sessionStorage.getItem(TOKEN_KEY);
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
@@ -53,43 +31,100 @@ api.interceptors.request.use((config) => {
 
 // ── Manejo centralizado de errores ────────────────────────────────────────
 
-const getErrorMessage = (error, fallbackMessage) => {
-  if (error.response?.data?.errors) {
-    const first = Object.values(error.response.data.errors)[0];
-    return Array.isArray(first) ? first[0] : first;
+export class ApiError extends Error {
+  constructor(message, { status = null, data = null, retryAfter = null, cause = null } = {}) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+    this.data = data;
+    this.retryAfter = retryAfter;
+    this.cause = cause;
+    this.isApiError = true;
   }
-  if (error.response?.data?.message) {
-    return error.response.data.message;
-  }
-  if (error.code === 'ECONNABORTED') {
-    return 'La solicitud tomo demasiado tiempo. Verifica tu conexion.';
-  }
-  if (error.request) {
-    return 'No se pudo conectar con el servidor. Verifica que el backend este corriendo.';
-  }
-  return fallbackMessage;
+}
+
+let unauthorizedHandler = null;
+let handlingUnauthorized = false;
+
+export const setUnauthorizedHandler = (handler) => {
+  unauthorizedHandler = typeof handler === 'function' ? handler : null;
+  return () => {
+    if (unauthorizedHandler === handler) unauthorizedHandler = null;
+  };
 };
+
+const getRetryAfter = (responseData, headers = {}) =>
+  headers['retry-after'] ?? headers['Retry-After'] ?? responseData?.retry_after ?? responseData?.retryAfter ?? null;
+
+export const normalizeApiError = (error, fallbackMessage = 'Ocurrio un error inesperado.') => {
+  if (error?.isApiError) return error;
+
+  const response = error?.response;
+  const data = response?.data ?? null;
+  const status = response?.status ?? null;
+  let message = fallbackMessage;
+
+  if (error?.response?.data?.errors) {
+    const first = Object.values(error.response.data.errors)[0];
+    message = Array.isArray(first) ? first[0] : first;
+  } else if (error?.response?.data?.message) {
+    message = error.response.data.message;
+  } else if (error?.code === 'ECONNABORTED') {
+    message = 'La solicitud tomo demasiado tiempo. Verifica tu conexion.';
+  } else if (error?.request) {
+    message = 'No se pudo conectar con el servidor. Verifica que el backend este corriendo.';
+  }
+
+  return new ApiError(message, {
+    status,
+    data,
+    retryAfter: getRetryAfter(data, response?.headers),
+    cause: error,
+  });
+};
+
+const throwApiError = (error, fallbackMessage) => {
+  throw normalizeApiError(error, fallbackMessage);
+};
+
+api.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    const apiError = normalizeApiError(error);
+    const skipUnauthorizedHandler = error?.config?.skipUnauthorizedHandler === true;
+    if (apiError.status === 401 && !skipUnauthorizedHandler && unauthorizedHandler && !handlingUnauthorized) {
+      handlingUnauthorized = true;
+      try {
+        await unauthorizedHandler(apiError);
+      } finally {
+        handlingUnauthorized = false;
+      }
+    }
+    return Promise.reject(apiError);
+  }
+);
 
 // ── Token helpers (exportados para App.js) ────────────────────────────────
 
-export const saveSession = (token, user) => {
-  storage.set(TOKEN_KEY, token);
-  storage.set(USER_KEY, JSON.stringify(user));
+export const saveSession = async (token, user) => {
+  await sessionStorage.setItem(TOKEN_KEY, token);
+  await sessionStorage.setItem(USER_KEY, JSON.stringify(user));
 };
 
-export const clearSession = () => {
-  storage.remove(TOKEN_KEY);
-  storage.remove(USER_KEY);
+export const clearSession = async () => {
+  await clearPrivateSessionStorage();
 };
 
-export const loadStoredSession = () => {
-  const token = storage.get(TOKEN_KEY);
-  const raw   = storage.get(USER_KEY);
-  if (!token || !raw) return null;
+export const loadStoredSession = async () => {
+  await migrateLegacySession();
+  const token = await sessionStorage.getItem(TOKEN_KEY);
+  const raw   = await sessionStorage.getItem(USER_KEY);
+  if (!token) return null;
+  if (!raw) return { token, user: null };
   try {
     return { token, user: JSON.parse(raw) };
   } catch {
-    return null;
+    return { token, user: null };
   }
 };
 
@@ -107,10 +142,10 @@ export const login = async (email, password) => {
   try {
     const response = await api.post('/login', { email, password });
     const { user, token } = response.data;
-    saveSession(token, user);
+    await saveSession(token, user);
     return response.data;
   } catch (error) {
-    throw new Error(getErrorMessage(error, 'No se pudo iniciar sesion.'));
+    throwApiError(error, 'No se pudo iniciar sesion.');
   }
 };
 
@@ -118,10 +153,10 @@ export const register = async (name, email, password, role) => {
   try {
     const response = await api.post('/register', { name, email, password, role });
     const { user, token } = response.data;
-    saveSession(token, user);
+    await saveSession(token, user);
     return response.data;
   } catch (error) {
-    throw new Error(getErrorMessage(error, 'No se pudo registrar el usuario.'));
+    throwApiError(error, 'No se pudo registrar el usuario.');
   }
 };
 
@@ -130,16 +165,16 @@ export const logout = async () => {
     await api.post('/logout');
   } catch { /* ignorar errores de red en logout */ }
   finally {
-    clearSession();
+    await clearSession();
   }
 };
 
-export const getMe = async () => {
+export const getMe = async (config = {}) => {
   try {
-    const response = await api.get('/me');
+    const response = await api.get('/me', config);
     return response.data;
   } catch (error) {
-    throw new Error(getErrorMessage(error, 'No se pudo obtener el usuario.'));
+    throwApiError(error, 'No se pudo obtener el usuario.');
   }
 };
 
@@ -150,7 +185,7 @@ export const getCategorias = async () => {
     const response = await api.get('/categorias');
     return response.data;
   } catch (error) {
-    throw new Error(getErrorMessage(error, 'No se pudieron cargar las categorias.'));
+    throwApiError(error, 'No se pudieron cargar las categorias.');
   }
 };
 
@@ -161,7 +196,7 @@ export const getProviders = async () => {
     const response = await api.get('/providers');
     return response.data;
   } catch (error) {
-    throw new Error(getErrorMessage(error, 'No se pudo cargar la lista de proveedores.'));
+    throwApiError(error, 'No se pudo cargar la lista de proveedores.');
   }
 };
 
@@ -170,7 +205,7 @@ export const getProvider = async (id) => {
     const response = await api.get(`/providers/${id}`);
     return response.data;
   } catch (error) {
-    throw new Error(getErrorMessage(error, 'No se pudo cargar el proveedor.'));
+    throwApiError(error, 'No se pudo cargar el proveedor.');
   }
 };
 
@@ -181,7 +216,7 @@ export const getMiProveedor = async () => {
     const response = await api.get('/providers/me');
     return response.data;
   } catch (error) {
-    throw new Error(getErrorMessage(error, 'No se encontro tu perfil de proveedor.'));
+    throwApiError(error, 'No se encontro tu perfil de proveedor.');
   }
 };
 
@@ -190,7 +225,7 @@ export const getProviderByUser = async (userId) => {
     const response = await api.get(`/providers/user/${userId}`);
     return response.data;
   } catch (error) {
-    throw new Error(getErrorMessage(error, 'No se encontro el perfil de proveedor.'));
+    throwApiError(error, 'No se encontro el perfil de proveedor.');
   }
 };
 
@@ -199,7 +234,7 @@ export const createProvider = async (data) => {
     const response = await api.post('/providers', data);
     return response.data;
   } catch (error) {
-    throw new Error(getErrorMessage(error, 'No se pudo crear el perfil de proveedor.'));
+    throwApiError(error, 'No se pudo crear el perfil de proveedor.');
   }
 };
 
@@ -208,7 +243,7 @@ export const updateProvider = async (id, data) => {
     const response = await api.put(`/providers/${id}`, data);
     return response.data;
   } catch (error) {
-    throw new Error(getErrorMessage(error, 'No se pudo actualizar el perfil.'));
+    throwApiError(error, 'No se pudo actualizar el perfil.');
   }
 };
 
@@ -219,7 +254,7 @@ export const getDocumentos = async (proveedorId) => {
     const response = await api.get(`/providers/${proveedorId}/documentos`);
     return response.data;
   } catch (error) {
-    throw new Error(getErrorMessage(error, 'No se pudieron cargar los documentos.'));
+    throwApiError(error, 'No se pudieron cargar los documentos.');
   }
 };
 
@@ -234,7 +269,7 @@ export const descargarDocumento = async (proveedorId, documentoId) => {
     );
     return response.data;
   } catch (error) {
-    throw new Error(getErrorMessage(error, 'No se pudo descargar el documento.'));
+    throwApiError(error, 'No se pudo descargar el documento.');
   }
 };
 
@@ -247,7 +282,7 @@ export const uploadFotoPerfil = async (proveedorId, file) => {
     });
     return response.data;
   } catch (error) {
-    throw new Error(getErrorMessage(error, 'No se pudo subir la foto de perfil.'));
+    throwApiError(error, 'No se pudo subir la foto de perfil.');
   }
 };
 
@@ -260,7 +295,7 @@ export const uploadPortada = async (proveedorId, file) => {
     });
     return response.data;
   } catch (error) {
-    throw new Error(getErrorMessage(error, 'No se pudo subir la portada.'));
+    throwApiError(error, 'No se pudo subir la portada.');
   }
 };
 
@@ -269,7 +304,7 @@ export const deletePortada = async (proveedorId) => {
     const response = await api.delete(`/providers/${proveedorId}/portada`);
     return response.data;
   } catch (error) {
-    throw new Error(getErrorMessage(error, 'No se pudo quitar la portada.'));
+    throwApiError(error, 'No se pudo quitar la portada.');
   }
 };
 
@@ -284,7 +319,7 @@ export const uploadDocumento = async (proveedorId, file, tipoDocumento) => {
     });
     return response.data;
   } catch (error) {
-    throw new Error(getErrorMessage(error, 'No se pudo subir el documento.'));
+    throwApiError(error, 'No se pudo subir el documento.');
   }
 };
 
@@ -295,7 +330,7 @@ export const createServicio = async (data) => {
     const response = await api.post('/servicios', data);
     return response.data;
   } catch (error) {
-    throw new Error(getErrorMessage(error, 'No se pudo enviar la solicitud.'));
+    throwApiError(error, 'No se pudo enviar la solicitud.');
   }
 };
 
@@ -304,7 +339,7 @@ export const getServicio = async (id) => {
     const response = await api.get(`/servicios/${id}`);
     return response.data;
   } catch (error) {
-    throw new Error(getErrorMessage(error, 'No se pudo cargar el servicio.'));
+    throwApiError(error, 'No se pudo cargar el servicio.');
   }
 };
 
@@ -314,7 +349,7 @@ export const getSolicitudesProveedor = async (estado = null) => {
     const response = await api.get('/servicios/proveedor', { params });
     return response.data;
   } catch (error) {
-    throw new Error(getErrorMessage(error, 'No se pudieron cargar las solicitudes.'));
+    throwApiError(error, 'No se pudieron cargar las solicitudes.');
   }
 };
 
@@ -324,7 +359,7 @@ export const getSolicitudesCliente = async (estado = null) => {
     const response = await api.get('/servicios/cliente', { params });
     return response.data;
   } catch (error) {
-    throw new Error(getErrorMessage(error, 'No se pudieron cargar tus solicitudes.'));
+    throwApiError(error, 'No se pudieron cargar tus solicitudes.');
   }
 };
 
@@ -333,7 +368,7 @@ export const aceptarServicio = async (id) => {
     const response = await api.post(`/servicios/${id}/aceptar`);
     return response.data;
   } catch (error) {
-    throw new Error(getErrorMessage(error, 'No se pudo aceptar la solicitud.'));
+    throwApiError(error, 'No se pudo aceptar la solicitud.');
   }
 };
 
@@ -342,7 +377,7 @@ export const iniciarServicio = async (id, codigo) => {
     const response = await api.post(`/servicios/${id}/iniciar`, { codigo });
     return response.data;
   } catch (error) {
-    throw new Error(getErrorMessage(error, 'No se pudo iniciar el servicio.'));
+    throwApiError(error, 'No se pudo iniciar el servicio.');
   }
 };
 
@@ -351,7 +386,7 @@ export const finalizarServicio = async (id) => {
     const response = await api.post(`/servicios/${id}/finalizar`);
     return response.data;
   } catch (error) {
-    throw new Error(getErrorMessage(error, 'No se pudo finalizar el servicio.'));
+    throwApiError(error, 'No se pudo finalizar el servicio.');
   }
 };
 
@@ -360,7 +395,7 @@ export const confirmarFinServicio = async (id, codigo) => {
     const response = await api.post(`/servicios/${id}/confirmar-fin`, { codigo });
     return response.data;
   } catch (error) {
-    throw new Error(getErrorMessage(error, 'No se pudo confirmar la finalizacion.'));
+    throwApiError(error, 'No se pudo confirmar la finalizacion.');
   }
 };
 
@@ -369,7 +404,7 @@ export const rechazarServicio = async (id, motivo = '') => {
     const response = await api.post(`/servicios/${id}/rechazar`, { motivo });
     return response.data;
   } catch (error) {
-    throw new Error(getErrorMessage(error, 'No se pudo rechazar la solicitud.'));
+    throwApiError(error, 'No se pudo rechazar la solicitud.');
   }
 };
 
@@ -378,7 +413,7 @@ export const actualizarEstadoServicio = async (id, estado) => {
     const response = await api.put(`/servicios/${id}/estado`, { estado });
     return response.data;
   } catch (error) {
-    throw new Error(getErrorMessage(error, 'No se pudo actualizar el estado.'));
+    throwApiError(error, 'No se pudo actualizar el estado.');
   }
 };
 
@@ -389,7 +424,7 @@ export const getDisponibilidadProveedor = async (proveedorId) => {
     const response = await api.get(`/providers/${proveedorId}/disponibilidad`);
     return response.data;
   } catch (error) {
-    throw new Error(getErrorMessage(error, 'No se pudo cargar la disponibilidad.'));
+    throwApiError(error, 'No se pudo cargar la disponibilidad.');
   }
 };
 
@@ -398,7 +433,7 @@ export const getMiDisponibilidad = async () => {
     const response = await api.get('/disponibilidad/mia');
     return response.data;
   } catch (error) {
-    throw new Error(getErrorMessage(error, 'No se pudo cargar tu disponibilidad.'));
+    throwApiError(error, 'No se pudo cargar tu disponibilidad.');
   }
 };
 
@@ -407,7 +442,7 @@ export const saveDisponibilidad = async (disponibilidad) => {
     const response = await api.post('/disponibilidad', { disponibilidad });
     return response.data;
   } catch (error) {
-    throw new Error(getErrorMessage(error, 'No se pudo guardar la disponibilidad.'));
+    throwApiError(error, 'No se pudo guardar la disponibilidad.');
   }
 };
 
@@ -418,7 +453,7 @@ export const createCalificacion = async (data) => {
     const response = await api.post('/calificaciones', data);
     return response.data;
   } catch (error) {
-    throw new Error(getErrorMessage(error, 'No se pudo enviar la calificacion.'));
+    throwApiError(error, 'No se pudo enviar la calificacion.');
   }
 };
 
@@ -427,7 +462,7 @@ export const calificarServicio = async (servicioId, data) => {
     const response = await api.post(`/servicios/${servicioId}/calificar`, data);
     return response.data;
   } catch (error) {
-    throw new Error(getErrorMessage(error, 'No se pudo enviar la calificacion.'));
+    throwApiError(error, 'No se pudo enviar la calificacion.');
   }
 };
 
@@ -436,7 +471,7 @@ export const getCalificacionesProveedor = async (proveedorId) => {
     const response = await api.get(`/providers/${proveedorId}/calificaciones`);
     return response.data;
   } catch (error) {
-    throw new Error(getErrorMessage(error, 'No se pudieron cargar las calificaciones.'));
+    throwApiError(error, 'No se pudieron cargar las calificaciones.');
   }
 };
 
@@ -449,7 +484,7 @@ export const sendMensaje = async (receptorId, contenido, servicioId = null) => {
     const response = await api.post('/mensajes', payload);
     return response.data;
   } catch (error) {
-    throw new Error(getErrorMessage(error, 'No se pudo enviar el mensaje.'));
+    throwApiError(error, 'No se pudo enviar el mensaje.');
   }
 };
 
@@ -459,7 +494,7 @@ export const getConversacion = async (otroUsuarioId, lastId = null) => {
     const response = await api.get(`/mensajes/conversacion/${otroUsuarioId}`, { params });
     return response.data;
   } catch (error) {
-    throw new Error(getErrorMessage(error, 'No se pudo cargar la conversacion.'));
+    throwApiError(error, 'No se pudo cargar la conversacion.');
   }
 };
 
@@ -468,7 +503,7 @@ export const getMisConversaciones = async () => {
     const response = await api.get('/mensajes/conversaciones');
     return response.data;
   } catch (error) {
-    throw new Error(getErrorMessage(error, 'No se pudieron cargar las conversaciones.'));
+    throwApiError(error, 'No se pudieron cargar las conversaciones.');
   }
 };
 
@@ -479,7 +514,7 @@ export const getNotificaciones = async () => {
     const response = await api.get('/notificaciones');
     return response.data;
   } catch (error) {
-    throw new Error(getErrorMessage(error, 'No se pudieron cargar las notificaciones.'));
+    throwApiError(error, 'No se pudieron cargar las notificaciones.');
   }
 };
 
@@ -488,7 +523,7 @@ export const getUnreadNotificationsCount = async () => {
     const response = await api.get('/notificaciones');
     return response.data.no_leidas || 0;
   } catch (error) {
-    throw new Error(getErrorMessage(error, 'No se pudo cargar el conteo de notificaciones.'));
+    throwApiError(error, 'No se pudo cargar el conteo de notificaciones.');
   }
 };
 
@@ -497,7 +532,7 @@ export const marcarNotificacionLeida = async (id) => {
     const response = await api.put(`/notificaciones/${id}/leer`);
     return response.data;
   } catch (error) {
-    throw new Error(getErrorMessage(error, 'No se pudo marcar como leida.'));
+    throwApiError(error, 'No se pudo marcar como leida.');
   }
 };
 
@@ -506,7 +541,7 @@ export const marcarTodasLeidas = async () => {
     const response = await api.put('/notificaciones/leer-todas');
     return response.data;
   } catch (error) {
-    throw new Error(getErrorMessage(error, 'No se pudo actualizar las notificaciones.'));
+    throwApiError(error, 'No se pudo actualizar las notificaciones.');
   }
 };
 
@@ -517,7 +552,7 @@ export const crearPedido = async (data) => {
     const response = await api.post('/pedidos', data);
     return response.data;
   } catch (error) {
-    throw new Error(getErrorMessage(error, 'No se pudo publicar el pedido.'));
+    throwApiError(error, 'No se pudo publicar el pedido.');
   }
 };
 
@@ -528,7 +563,7 @@ export const getPedidosAbiertos = async ({ categoriaId = null, page = 1 } = {}) 
     const response = await api.get('/pedidos/abiertos', { params });
     return response.data;
   } catch (error) {
-    throw new Error(getErrorMessage(error, 'No se pudieron cargar los pedidos.'));
+    throwApiError(error, 'No se pudieron cargar los pedidos.');
   }
 };
 
@@ -537,7 +572,7 @@ export const getMiCredito = async () => {
     const response = await api.get('/mi-credito');
     return response.data;
   } catch (error) {
-    throw new Error(getErrorMessage(error, 'No se pudo obtener el saldo.'));
+    throwApiError(error, 'No se pudo obtener el saldo.');
   }
 };
 
@@ -546,7 +581,7 @@ export const getCreditosPaquetes = async () => {
     const response = await api.get('/creditos/paquetes');
     return response.data;
   } catch (error) {
-    throw new Error(getErrorMessage(error, 'No se pudieron cargar los paquetes de creditos.'));
+    throwApiError(error, 'No se pudieron cargar los paquetes de creditos.');
   }
 };
 
@@ -558,7 +593,7 @@ export const comprarCreditos = async ({ paqueteId, idempotencyKey }) => {
     });
     return response.data;
   } catch (error) {
-    throw new Error(getErrorMessage(error, 'No se pudo completar la compra simulada.'));
+    throwApiError(error, 'No se pudo completar la compra simulada.');
   }
 };
 
@@ -569,7 +604,7 @@ export const getCreditosTransacciones = async ({ page = 1, perPage = 15 } = {}) 
     });
     return response.data;
   } catch (error) {
-    throw new Error(getErrorMessage(error, 'No se pudo cargar el historial de creditos.'));
+    throwApiError(error, 'No se pudo cargar el historial de creditos.');
   }
 };
 
@@ -578,7 +613,7 @@ export const getPremiumMiEstado = async () => {
     const response = await api.get('/premium/mi-estado');
     return response.data;
   } catch (error) {
-    throw new Error(getErrorMessage(error, 'No se pudo cargar el estado Premium.'));
+    throwApiError(error, 'No se pudo cargar el estado Premium.');
   }
 };
 
@@ -587,7 +622,7 @@ export const activarPremium = async () => {
     const response = await api.post('/premium/activar');
     return response.data;
   } catch (error) {
-    throw new Error(getErrorMessage(error, 'No se pudo activar Premium.'));
+    throwApiError(error, 'No se pudo activar Premium.');
   }
 };
 
@@ -596,7 +631,7 @@ export const getPedidoDetalle = async (id) => {
     const response = await api.get(`/pedidos/${id}`);
     return response.data;
   } catch (error) {
-    throw new Error(getErrorMessage(error, 'No se pudo cargar el pedido.'));
+    throwApiError(error, 'No se pudo cargar el pedido.');
   }
 };
 
@@ -605,7 +640,7 @@ export const enviarCotizacion = async (pedidoId, { monto, mensaje }) => {
     const response = await api.post(`/pedidos/${pedidoId}/cotizaciones`, { monto, mensaje });
     return response.data;
   } catch (error) {
-    throw new Error(getErrorMessage(error, 'No se pudo enviar la cotización.'));
+    throwApiError(error, 'No se pudo enviar la cotización.');
   }
 };
 
@@ -614,7 +649,7 @@ export const editarCotizacion = async (pedidoId, cotizacionId, { monto, mensaje 
     const response = await api.put(`/pedidos/${pedidoId}/cotizaciones/${cotizacionId}`, { monto, mensaje });
     return response.data;
   } catch (error) {
-    throw new Error(getErrorMessage(error, 'No se pudo actualizar la cotización.'));
+    throwApiError(error, 'No se pudo actualizar la cotización.');
   }
 };
 
@@ -623,7 +658,7 @@ export const aceptarCotizacion = async (pedidoId, cotizacionId) => {
     const response = await api.post(`/pedidos/${pedidoId}/cotizaciones/${cotizacionId}/aceptar`);
     return response.data;
   } catch (error) {
-    throw new Error(getErrorMessage(error, 'No se pudo aceptar la cotización.'));
+    throwApiError(error, 'No se pudo aceptar la cotización.');
   }
 };
 
@@ -632,7 +667,7 @@ export const getMisPedidos = async ({ page = 1 } = {}) => {
     const response = await api.get('/pedidos/mios', { params: { page } });
     return response.data;
   } catch (error) {
-    throw new Error(getErrorMessage(error, 'No se pudieron cargar tus pedidos.'));
+    throwApiError(error, 'No se pudieron cargar tus pedidos.');
   }
 };
 
@@ -643,7 +678,7 @@ export const getAdminStats = async () => {
     const response = await api.get('/admin/stats');
     return response.data;
   } catch (error) {
-    throw new Error(getErrorMessage(error, 'No se pudieron cargar las metricas.'));
+    throwApiError(error, 'No se pudieron cargar las metricas.');
   }
 };
 
@@ -653,7 +688,7 @@ export const getAdminUsuarios = async (role = null) => {
     const response = await api.get('/admin/usuarios', { params });
     return response.data;
   } catch (error) {
-    throw new Error(getErrorMessage(error, 'No se pudieron cargar los usuarios.'));
+    throwApiError(error, 'No se pudieron cargar los usuarios.');
   }
 };
 
@@ -662,7 +697,7 @@ export const getAdminProveedores = async () => {
     const response = await api.get('/admin/proveedores');
     return response.data;
   } catch (error) {
-    throw new Error(getErrorMessage(error, 'No se pudieron cargar los proveedores.'));
+    throwApiError(error, 'No se pudieron cargar los proveedores.');
   }
 };
 
@@ -671,7 +706,7 @@ export const recargarCreditosProveedor = async (proveedorId, { monto, motivo }) 
     const response = await api.post(`/admin/proveedores/${proveedorId}/creditos`, { monto, motivo });
     return response.data;
   } catch (error) {
-    throw new Error(getErrorMessage(error, 'No se pudo agregar creditos al proveedor.'));
+    throwApiError(error, 'No se pudo agregar creditos al proveedor.');
   }
 };
 
@@ -681,7 +716,7 @@ export const getAdminCreditosPremium = async ({ estado = null } = {}) => {
     const response = await api.get('/admin/creditos-premium', { params });
     return response.data;
   } catch (error) {
-    throw new Error(getErrorMessage(error, 'No se pudieron cargar creditos y Premium.'));
+    throwApiError(error, 'No se pudieron cargar creditos y Premium.');
   }
 };
 

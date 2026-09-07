@@ -10,8 +10,8 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getConversacion, sendMensaje } from '../services/api';
+import { sessionStorage } from '../services/sessionStorage';
 import { useToast } from '../context/ToastContext';
 import { T } from '../theme';
 
@@ -58,14 +58,14 @@ export default function ChatScreen({
   const loadMensajes = async () => {
     let locales = [];
     try {
-      const localData = await AsyncStorage.getItem(getStorageKey());
+      const localData = await sessionStorage.getItem(getStorageKey());
       if (localData) {
         locales = JSON.parse(localData);
         setMensajes(locales);
         setLoading(false);
       }
     } catch (e) {
-      console.log('Error AsyncStorage', e);
+      console.log('Error sessionStorage', e);
     }
 
     if (locales.length === 0) setLoading(true);
@@ -82,7 +82,7 @@ export default function ChatScreen({
         const filtrados = locales.filter((m) => !String(m.id).startsWith('temp-'));
         const finales = [...filtrados, ...data.mensajes];
         setMensajes(finales);
-        AsyncStorage.setItem(getStorageKey(), JSON.stringify(finales));
+        sessionStorage.setItem(getStorageKey(), JSON.stringify(finales));
       }
     } catch (error) {
       if (locales.length === 0) toast(error.message, 'error');
@@ -104,7 +104,7 @@ export default function ChatScreen({
         const filtrados = actuales.filter((m) => !String(m.id).startsWith('temp-'));
         const nuevos = [...filtrados, ...data.mensajes];
         setMensajes(nuevos);
-        AsyncStorage.setItem(getStorageKey(), JSON.stringify(nuevos));
+        sessionStorage.setItem(getStorageKey(), JSON.stringify(nuevos));
       }
     } catch {
       // Evita ruido visual durante polling.
@@ -133,7 +133,7 @@ export default function ChatScreen({
       const data = await sendMensaje(chatWithUserId, contenido);
       setMensajes((prev) => {
         const nuevos = prev.map((m) => (m.id === tempMsg.id ? data.mensaje : m));
-        AsyncStorage.setItem(getStorageKey(), JSON.stringify(nuevos));
+        sessionStorage.setItem(getStorageKey(), JSON.stringify(nuevos));
         return nuevos;
       });
     } catch (error) {

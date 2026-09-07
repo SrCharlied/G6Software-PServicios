@@ -75,6 +75,7 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      target: frontend_dev
       args:
         # URL publica del backend que se inyecta al bundle web en build-time.
         # Sobreescribir en el server con un archivo .env junto a este docker-compose.yml
@@ -84,6 +85,25 @@ services:
     restart: unless-stopped
     ports:
       - "8086:8081"
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - servigt_net
+
+  # Frontend productivo: export web estatico servido por Nginx.
+  frontend_prod:
+    profiles: ["prod"]
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: frontend_prod
+      args:
+        EXPO_PUBLIC_API_URL: /api
+    container_name: servigt_frontend_prod
+    restart: unless-stopped
+    ports:
+      - "8087:80"
     depends_on:
       backend:
         condition: service_healthy

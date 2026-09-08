@@ -673,6 +673,90 @@ export const getMisPedidos = async ({ page = 1 } = {}) => {
   }
 };
 
+// ── Publicaciones de servicios ───────────────────────────────────────────
+
+export const getMisPublicaciones = async () => {
+  try {
+    const response = await api.get('/publicaciones/mias');
+    return response.data;
+  } catch (error) {
+    throwApiError(error, 'No se pudieron cargar tus publicaciones.');
+  }
+};
+
+const buildPublicacionFormData = ({
+  titulo, descripcion, categoriaId, precioReferencial, estado, imagen, eliminarImagen,
+}) => {
+  const formData = new FormData();
+  if (titulo !== undefined) formData.append('titulo', titulo);
+  if (descripcion !== undefined) formData.append('descripcion', descripcion);
+  if (categoriaId !== undefined && categoriaId !== null && categoriaId !== '') {
+    formData.append('categoria_id', categoriaId);
+  }
+  if (precioReferencial !== undefined && precioReferencial !== null && precioReferencial !== '') {
+    formData.append('precio_referencial', precioReferencial);
+  }
+  if (estado !== undefined) formData.append('estado', estado);
+  if (imagen) formData.append('imagen', imagen);
+  if (eliminarImagen) formData.append('eliminar_imagen', '1');
+  return formData;
+};
+
+export const crearPublicacion = async (datos) => {
+  try {
+    const formData = buildPublicacionFormData(datos);
+    const response = await api.post('/publicaciones', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response.data;
+  } catch (error) {
+    throwApiError(error, 'No se pudo crear la publicacion.');
+  }
+};
+
+// PUT con archivo no llega bien a PHP en la mayoria de clientes HTTP, asi que
+// se envia como POST con _method=PUT (spoofing que Laravel soporta nativo)
+// para que multipart/form-data funcione igual que en crearPublicacion.
+export const actualizarPublicacion = async (id, datos) => {
+  try {
+    const formData = buildPublicacionFormData(datos);
+    formData.append('_method', 'PUT');
+    const response = await api.post(`/publicaciones/${id}`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response.data;
+  } catch (error) {
+    throwApiError(error, 'No se pudo actualizar la publicacion.');
+  }
+};
+
+export const activarPublicacion = async (id) => {
+  try {
+    const response = await api.post(`/publicaciones/${id}/activar`);
+    return response.data;
+  } catch (error) {
+    throwApiError(error, 'No se pudo activar la publicacion.');
+  }
+};
+
+export const desactivarPublicacion = async (id) => {
+  try {
+    const response = await api.post(`/publicaciones/${id}/desactivar`);
+    return response.data;
+  } catch (error) {
+    throwApiError(error, 'No se pudo desactivar la publicacion.');
+  }
+};
+
+export const eliminarPublicacion = async (id) => {
+  try {
+    const response = await api.delete(`/publicaciones/${id}`);
+    return response.data;
+  } catch (error) {
+    throwApiError(error, 'No se pudo eliminar la publicacion.');
+  }
+};
+
 // ── Admin ─────────────────────────────────────────────────────────────────
 
 export const getAdminStats = async () => {

@@ -114,9 +114,19 @@ class PublicacionServicioController extends Controller
             ->orderByDesc('created_at')
             ->get();
 
+        $limite = $this->limiteEfectivo($proveedor);
+        $activas = $publicaciones->where('estado', 'activa')->count();
+
         return $this->success('OK', [
             'publicaciones' => PublicacionServicioResource::collection($publicaciones),
             'total' => $publicaciones->count(),
+            // Cupos: el frontend solo pinta este bloque, la regla 1 gratis / 3
+            // Premium vive unicamente aqui (ver limiteEfectivo/verificarLimite).
+            'cupos' => [
+                'activas' => $activas,
+                'limite' => $limite,
+                'disponibles' => max(0, $limite - $activas),
+            ],
         ]);
     }
 

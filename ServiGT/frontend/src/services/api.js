@@ -684,6 +684,18 @@ export const getMisPublicaciones = async () => {
   }
 };
 
+export const getPublicaciones = async ({ proveedorId = null, categoriaId = null, page = 1, perPage = 15 } = {}) => {
+  try {
+    const params = { page, per_page: perPage };
+    if (proveedorId) params.proveedor_id = proveedorId;
+    if (categoriaId) params.categoria_id = categoriaId;
+    const response = await api.get('/publicaciones', { params });
+    return response.data;
+  } catch (error) {
+    throwApiError(error, 'No se pudieron cargar las publicaciones.');
+  }
+};
+
 const buildPublicacionFormData = ({
   titulo, descripcion, categoriaId, precioReferencial, estado, imagen, eliminarImagen,
 }) => {

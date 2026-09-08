@@ -4,11 +4,13 @@ namespace App\Http\Controllers;
 
 use App\Models\Notificacion;
 use App\Models\Proveedor;
+use App\Models\PublicacionServicio;
 use App\Models\Servicio;
 use App\Http\Resources\ServicioResource;
 use App\Traits\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class ServicioController extends Controller
 {
@@ -17,8 +19,9 @@ class ServicioController extends Controller
     public function store(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'proveedor_id'   => 'required|exists:proveedores,id',
-            'categoria_id'   => 'nullable|exists:categorias,id',
+            'proveedor_id'   => 'required_without:publicacion_id|integer|exists:proveedores,id',
+            'publicacion_id' => 'sometimes|nullable|integer',
+            'categoria_id'   => 'sometimes|nullable|integer|exists:categorias,id',
             'descripcion'    => 'required|string|max:1000',
             'fecha_agendada' => 'nullable|date|after:now',
             'direccion'      => 'nullable|string|max:500',
@@ -33,9 +36,27 @@ class ServicioController extends Controller
             return $this->error('Solo un cliente puede solicitar un servicio.', 403);
         }
 
-        // Y nadie se contrata a si mismo: era la primera pieza de la cadena
-        // que permitia inflar la calificacion propia sin que interviniera
-        // ningun tercero.
+        if (!empty($validated['publicacion_id'])) {
+            $publicacion = $this->publicacionContratable((int) $validated['publicacion_id']);
+
+            if (!$publicacion) {
+                return $this->error('Publicacion no encontrada.', 404);
+            }
+
+            if (!$this->publicacionEstaVisible($publicacion)) {
+                return $this->error('La publicacion no esta disponible para contratacion.', 422);
+            }
+
+            $validated['proveedor_id'] = $publicacion->proveedor_id;
+            $validated['categoria_id'] = $publicacion->categoria_id;
+            $validated['publicacion_titulo'] = $publicacion->titulo;
+            $validated['publicacion_precio_referencial'] = $publicacion->precio_referencial;
+            $validated['monto_acordado'] = $publicacion->precio_referencial;
+        } else {
+            unset($validated['publicacion_id']);
+            $validated['categoria_id'] = $validated['categoria_id'] ?? null;
+        }
+
         $proveedorSolicitado = Proveedor::find($validated['proveedor_id']);
         if ($proveedorSolicitado && $proveedorSolicitado->user_id === $user->id) {
             return $this->error('No puedes solicitarte un servicio a ti mismo.', 403);
@@ -45,19 +66,23 @@ class ServicioController extends Controller
         $validated['estado']        = 'pendiente';
         $validated['codigo_inicio'] = str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
 
-        $servicio = Servicio::create($validated);
-        $servicio->load(['cliente', 'proveedor', 'categoria']);
+        $servicio = DB::transaction(function () use ($request, $validated) {
+            $servicio = Servicio::create($validated);
+            $servicio->load(['cliente', 'proveedor', 'categoria', 'publicacion']);
 
-        $proveedor = $servicio->proveedor;
-        if ($proveedor?->user_id) {
-            Notificacion::create([
-                'destinatario_id' => $proveedor->user_id,
-                'tipo'            => 'nueva_solicitud',
-                'titulo'          => 'Nueva solicitud de servicio',
-                'mensaje'         => "{$request->user()->name} solicito tu servicio: {$validated['descripcion']}",
-                'datos'           => ['servicio_id' => $servicio->id],
-            ]);
-        }
+            $proveedor = $servicio->proveedor;
+            if ($proveedor?->user_id) {
+                Notificacion::create([
+                    'destinatario_id' => $proveedor->user_id,
+                    'tipo'            => 'nueva_solicitud',
+                    'titulo'          => 'Nueva solicitud de servicio',
+                    'mensaje'         => "{$request->user()->name} solicito tu servicio: {$validated['descripcion']}",
+                    'datos'           => ['servicio_id' => $servicio->id],
+                ]);
+            }
+
+            return $servicio;
+        });
 
         return $this->success('Solicitud enviada exitosamente', [
             'servicio' => new ServicioResource($servicio),
@@ -348,5 +373,26 @@ class ServicioController extends Controller
             'mensaje'         => 'El servicio fue completado. Ya puedes calificar a ' . ($servicio->proveedor?->nombre ?? 'tu proveedor') . '.',
             'datos'           => ['servicio_id' => $servicio->id],
         ]);
+    }
+
+    private function publicacionContratable(int $id): ?PublicacionServicio
+    {
+        return PublicacionServicio::with(['proveedor', 'categoria'])->find($id);
+    }
+
+    private function publicacionEstaVisible(PublicacionServicio $publicacion): bool
+    {
+        if ($publicacion->estado !== 'activa' || !$publicacion->proveedor) {
+            return false;
+        }
+
+        $limite = $publicacion->proveedor->premiumEstado() === 'activo' ? 3 : 1;
+
+        return PublicacionServicio::where('proveedor_id', $publicacion->proveedor_id)
+            ->where('estado', 'activa')
+            ->orderBy('created_at')
+            ->limit($limite)
+            ->pluck('id')
+            ->contains($publicacion->id);
     }
 }

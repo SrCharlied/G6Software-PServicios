@@ -17,6 +17,7 @@ const ESTADO_LABEL = { activa: 'Activa', inactiva: 'Inactiva' };
 export default function PublicacionCard({
   publicacion,
   mode = 'catalogo',
+  actionLabel = 'Cotizar',
   onPress,
   onCotizar,
   footer,
@@ -85,7 +86,7 @@ export default function PublicacionCard({
 
         {mode === 'cotizar' ? (
           <Button kind="primary" size="sm" onPress={onCotizar} style={s.cotizarBtn}>
-            Cotizar
+            {actionLabel}
           </Button>
         ) : null}
 

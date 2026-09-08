@@ -16,7 +16,8 @@ export default function ProviderDetailRoute() {
         if (params.provider || params.selectedProvider) {
           setSelectedProvider(params.provider || params.selectedProvider);
         }
-        router.push('/solicitud');
+        const publicacionParam = params.publicacionId ? `?publicacionId=${encodeURIComponent(params.publicacionId)}` : '';
+        router.push(`/solicitud${publicacionParam}`);
         return;
       }
       if (key === 'chat') {

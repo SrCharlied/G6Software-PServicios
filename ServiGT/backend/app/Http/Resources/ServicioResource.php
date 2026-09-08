@@ -19,6 +19,11 @@ class ServicioResource extends JsonResource
             'id' => $this->id,
             'cliente_id' => $this->cliente_id,
             'proveedor_id' => $this->proveedor_id,
+            'publicacion_id' => $this->publicacion_id,
+            'publicacion_titulo' => $this->publicacion_titulo,
+            'publicacion_precio_referencial' => $this->publicacion_precio_referencial !== null
+                ? (float) $this->publicacion_precio_referencial
+                : null,
             'categoria_id' => $this->categoria_id,
             'descripcion' => $this->descripcion,
             'estado' => $this->estado,

@@ -262,7 +262,7 @@ export default function MisPublicacionesScreen({ navigation }) {
             <Text style={s.selectArrow}>{showCategorias ? '^' : 'v'}</Text>
           </TouchableOpacity>
           {showCategorias && (
-            <View style={s.dropdownList}>
+            <ScrollView style={s.dropdownList} nestedScrollEnabled showsVerticalScrollIndicator>
               {categorias.map((cat) => (
                 <TouchableOpacity
                   key={cat.id}
@@ -272,7 +272,7 @@ export default function MisPublicacionesScreen({ navigation }) {
                   <Text style={s.dropdownOptionText}>{cat.nombre}</Text>
                 </TouchableOpacity>
               ))}
-            </View>
+            </ScrollView>
           )}
 
           <Text style={s.label}>Precio referencial (Q)</Text>

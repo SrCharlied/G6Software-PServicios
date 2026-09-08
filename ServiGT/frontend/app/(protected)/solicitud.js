@@ -1,10 +1,11 @@
-import { Redirect, useRouter } from 'expo-router';
+import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
 import SolicitudFormScreen from '../../src/screens/SolicitudFormScreen';
 import InternalLayout from '../../src/components/InternalLayout';
 import { useSession } from '../../src/context/SessionContext';
 
 export default function SolicitudRoute() {
   const router = useRouter();
+  const { publicacionId } = useLocalSearchParams();
   const { user, selectedProvider } = useSession();
 
   if (user?.role === 'proveedor') return <Redirect href="/dashboard" />;
@@ -26,6 +27,7 @@ export default function SolicitudRoute() {
         navigation={navigation}
         user={user}
         selectedProvider={selectedProvider}
+        publicacionId={publicacionId}
       />
     </InternalLayout>
   );

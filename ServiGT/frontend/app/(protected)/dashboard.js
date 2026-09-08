@@ -24,6 +24,7 @@ export default function DashboardRoute() {
         home: '/home',
         providereditprofile: '/profile/edit',
         creditos: '/creditos',
+        publicaciones: '/publicaciones',
         login: '/login',
       };
       router.push(map[key] ?? '/home');

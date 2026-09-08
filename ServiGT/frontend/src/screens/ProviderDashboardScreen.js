@@ -480,6 +480,10 @@ export default function ProviderDashboardScreen({
 
       <View style={styles.card}>{renderTab()}</View>
 
+      <TouchableOpacity style={styles.secondaryHomeBtn} onPress={() => navigation.navigate('Publicaciones')}>
+        <Text style={styles.secondaryHomeBtnText}>Administrar mis publicaciones</Text>
+      </TouchableOpacity>
+
       <TouchableOpacity style={styles.secondaryHomeBtn} onPress={() => navigation.navigate('Home')}>
         <Text style={styles.secondaryHomeBtnText}>Ver listado de proveedores</Text>
       </TouchableOpacity>

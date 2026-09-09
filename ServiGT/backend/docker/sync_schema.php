@@ -83,9 +83,28 @@ foreach ($requiredSchemaChecks as $checkSql) {
     }
 }
 
-$adminEmail    = getenv('ADMIN_EMAIL')    ?: 'admin@gmail.com';
-$adminPassword = getenv('ADMIN_PASSWORD') ?: 'admin';
+// ── Seed admin (task 4.1) ──────────────────────────────────────────────────
+// Antes esto creaba `admin@gmail.com` con la contrasena literal `admin` en
+// cualquier base vacia: cualquiera que levantara el compose tal cual quedaba
+// con una cuenta de administrador de credencial conocida. Ahora ADMIN_PASSWORD
+// es obligatoria y el arranque falla si no viene; la contrasena nunca se
+// imprime ni se registra, solo el correo.
+$adminEmail    = getenv('ADMIN_EMAIL')    ?: 'admin@servigt.gt';
+$adminPassword = getenv('ADMIN_PASSWORD') ?: '';
 $adminName     = getenv('ADMIN_NAME')     ?: 'Administrador ServiGT';
+
+if ($adminPassword === '') {
+    fwrite(STDERR, "[!] ADMIN_PASSWORD no esta definida.\n");
+    fwrite(STDERR, "    Es obligatoria: sin ella el backend crearia (o dejaria sin crear)\n");
+    fwrite(STDERR, "    la cuenta de administrador de forma impredecible.\n");
+    fwrite(STDERR, "    Definela en el archivo .env junto a docker-compose.yml.\n");
+    exit(1);
+}
+
+if (strlen($adminPassword) < 12) {
+    fwrite(STDERR, "[!] ADMIN_PASSWORD es demasiado corta (minimo 12 caracteres).\n");
+    exit(1);
+}
 
 $check = $pdo->prepare('SELECT id FROM users WHERE email = :email LIMIT 1');
 $check->execute(['email' => $adminEmail]);
@@ -117,7 +136,28 @@ $sampleProviders = [
     ['Elena Flores',    'Enseñanza',    'Alta Verapaz',   'Coban',              '5555-0110', 55.00, 4.9, 'experto',     'Tutoria academica de matematicas y ciencias.'],
 ];
 
-$providerPassword = getenv('PROVIDER_SEED_PASSWORD') ?: 'Proveedor123!';
+// ── Seed de datos demo (task 4.1) ──────────────────────────────────────────
+// Los diez proveedores de ejemplo existen para poder demostrar el catalogo, no
+// para correr en un ambiente real: son cuentas con contrasena compartida y
+// telefono ficticio. Se siembran solo cuando el ambiente lo pide de forma
+// explicita (`SEED_DEMO_DATA=true`), con default activo unicamente en local.
+$ambiente     = getenv('APP_ENV') ?: 'production';
+$demoPorEnv   = in_array($ambiente, ['local', 'testing'], true) ? 'true' : 'false';
+$sembrarDemo  = filter_var(getenv('SEED_DEMO_DATA') ?: $demoPorEnv, FILTER_VALIDATE_BOOLEAN);
+
+if (!$sembrarDemo) {
+    echo "[*] Datos demo omitidos (SEED_DEMO_DATA=false, APP_ENV={$ambiente}).\n";
+    echo "[*] Esquema PostgreSQL sincronizado.\n";
+    exit(0);
+}
+
+$providerPassword = getenv('PROVIDER_SEED_PASSWORD') ?: '';
+if ($providerPassword === '') {
+    fwrite(STDERR, "[!] SEED_DEMO_DATA esta activo pero PROVIDER_SEED_PASSWORD no esta definida.\n");
+    fwrite(STDERR, "    Definela en el .env del ambiente o desactiva los datos demo.\n");
+    exit(1);
+}
+
 $providerHash = password_hash($providerPassword, PASSWORD_BCRYPT);
 $createdProviders = 0;
 

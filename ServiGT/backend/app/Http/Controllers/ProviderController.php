@@ -174,6 +174,18 @@ class ProviderController extends Controller
             'color_acento'      => 'nullable|regex:/^#[0-9a-fA-F]{6}$/',
         ]);
 
+        // Personalizacion de marca reservada a Premium activo (task 2.4). Se
+        // valida aqui y no en el request para poder distinguir "no mando color"
+        // de "mando color sin Premium": lo primero es una edicion normal de
+        // perfil, lo segundo es un intento de usar una prestacion que no tiene.
+        if (array_key_exists('color_acento', $validated)
+            && !$request->user()->can('personalizarMarca', $proveedor)) {
+            return $this->error(
+                'El color de acento es una prestacion de Premium activo.',
+                403
+            );
+        }
+
         $categoriaIds = $validated['categoria_ids'] ?? null;
         unset($validated['categoria_ids']);
 
@@ -245,7 +257,9 @@ class ProviderController extends Controller
             return $this->error('Proveedor no encontrado', 404);
         }
 
-        $this->authorize('manage', $proveedor);
+        // Portada = personalizacion de marca: exige Premium activo (task 2.4),
+        // no solo ser dueno del perfil.
+        $this->authorize('personalizarMarca', $proveedor);
 
         // La portada se muestra a lo ancho, asi que admite mas peso que el
         // avatar: 6 MB contra los 3 MB de la foto de perfil.
@@ -277,7 +291,7 @@ class ProviderController extends Controller
             return $this->error('Proveedor no encontrado', 404);
         }
 
-        $this->authorize('manage', $proveedor);
+        $this->authorize('personalizarMarca', $proveedor);
 
         $proveedor->update(['portada' => null]);
 

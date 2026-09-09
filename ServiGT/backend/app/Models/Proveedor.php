@@ -28,6 +28,8 @@ class Proveedor extends Model
         'premium_vence_at',
         'premium_ciclo_key',
         'premium_renovaciones',
+        'portada',
+        'color_acento',
     ];
 
     protected $casts = [
@@ -72,6 +74,11 @@ class Proveedor extends Model
     public function servicios()
     {
         return $this->hasMany(Servicio::class);
+    }
+
+    public function publicaciones()
+    {
+        return $this->hasMany(PublicacionServicio::class, 'proveedor_id');
     }
 
     public function credito()

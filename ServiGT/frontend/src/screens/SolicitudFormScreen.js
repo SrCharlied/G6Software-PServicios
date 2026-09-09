@@ -11,6 +11,7 @@ export default function SolicitudFormScreen({
   navigation,
   user,
   selectedProvider,
+  publicacionId = null,
 }) {
   const toast = useToast();
   const { width } = useWindowDimensions();
@@ -53,14 +54,20 @@ export default function SolicitudFormScreen({
 
     setSubmitting(true);
     try {
-      await createServicio({
+      const payload = {
         proveedor_id: selectedProvider.id,
         categoria_id: selectedProvider.categoria_id || null,
         descripcion: descripcion.trim(),
         direccion: direccion.trim() || null,
         fecha_agendada: fecha.trim() || null,
         monto_acordado: monto ? parseFloat(monto) : null,
-      });
+      };
+
+      if (publicacionId) {
+        payload.publicacion_id = Number(publicacionId);
+      }
+
+      await createServicio(payload);
 
       toast(`Solicitud enviada a ${selectedProvider.nombre}. Te notificaremos cuando responda.`, 'success');
       navigation.navigate('Home');
@@ -109,6 +116,9 @@ export default function SolicitudFormScreen({
           <Text style={styles.summaryMeta}>
             {selectedProvider.categoria?.nombre || 'Servicio'} - {[selectedProvider.municipio, selectedProvider.departamento].filter(Boolean).join(', ') || 'Guatemala'}
           </Text>
+          {publicacionId ? (
+            <Text style={styles.summaryPublication}>Desde publicacion #{publicacionId}</Text>
+          ) : null}
           {selectedProvider.telefono ? <Text style={styles.summaryPhone}>{selectedProvider.telefono}</Text> : null}
         </Card>
 
@@ -222,6 +232,7 @@ const styles = StyleSheet.create({
   summaryKicker: { color: T.faint, fontSize: 11, fontWeight: '900', textTransform: 'uppercase', marginTop: 14 },
   summaryName: { color: T.ink, fontSize: 19, fontWeight: '900', marginTop: 4 },
   summaryMeta: { color: T.muted, fontSize: 13, lineHeight: 19, marginTop: 6 },
+  summaryPublication: { color: T.blue, fontSize: 12, fontWeight: '800', marginTop: 10 },
   summaryPhone: { color: T.deep, fontSize: 13, fontWeight: '800', marginTop: 10 },
 
   card: { flex: 1, minWidth: 0 },

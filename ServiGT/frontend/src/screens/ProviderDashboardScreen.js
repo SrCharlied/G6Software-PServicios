@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Platform,
   ScrollView,
   Text,
   TouchableOpacity,
@@ -8,14 +9,16 @@ import {
 } from 'react-native';
 import {
   aceptarServicio,
+  descargarDocumento,
   finalizarServicio,
   getCalificacionesProveedor,
   getCategorias,
   getDocumentos,
+  getMiCredito,
   getMiDisponibilidad,
+  getMiProveedor,
   getPedidosAbiertos,
   getPremiumMiEstado,
-  getProviderByUser,
   getSolicitudesProveedor,
   iniciarServicio,
   rechazarServicio,
@@ -56,6 +59,7 @@ export default function ProviderDashboardScreen({
   const [calificaciones, setCalificaciones] = useState([]);
   const [disponibilidad, setDisponibilidad] = useState(buildDisponibilidad());
   const [premiumInfo, setPremiumInfo] = useState(null);
+  const [saldo, setSaldo] = useState(null);
   const [oportunidades, setOportunidades] = useState([]);
   const [categorias, setCategorias] = useState([]);
 
@@ -128,7 +132,7 @@ export default function ProviderDashboardScreen({
   const loadProfile = async () => {
     setLoadingProfile(true);
     try {
-      const data = await getProviderByUser(user.id);
+      const data = await getMiProveedor();
       setProfile(data.proveedor);
       setProviderProfile(data.proveedor);
     } catch { setProfile(null); }
@@ -162,6 +166,16 @@ export default function ProviderDashboardScreen({
       setPremiumInfo(premiumData);
     } catch {
       setPremiumInfo(null);
+    }
+
+    // El saldo tambien va aparte y por la misma razon: es informativo en esta
+    // pantalla, no bloqueante. Si el endpoint falla se queda en null y la
+    // cabecera simplemente no pinta el chip, en vez de mostrar un "0" falso.
+    try {
+      const creditoData = await getMiCredito();
+      setSaldo(Number(creditoData.saldo ?? 0));
+    } catch {
+      setSaldo(null);
     }
   };
 
@@ -205,6 +219,29 @@ export default function ProviderDashboardScreen({
       toast(`"${file.name}" subido correctamente.`, 'success');
     } catch (error) { toast(error.message, 'error'); }
     finally { setUploading(false); }
+  };
+
+  const handleDescargar = async (doc) => {
+    if (!profile) return;
+
+    if (Platform.OS !== 'web') {
+      toast('La descarga de documentos esta disponible en la version web.', 'error');
+      return;
+    }
+
+    try {
+      const blob = await descargarDocumento(profile.id, doc.id);
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = doc.nombre_archivo;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      toast(error.message, 'error');
+    }
   };
 
   const handleAccept = async (id) => {
@@ -391,8 +428,10 @@ export default function ProviderDashboardScreen({
       <ProviderHeader
         profile={profile}
         premiumInfo={premiumInfo}
+        saldo={saldo}
         disponibilidad={disponibilidad}
         onEditarPerfil={() => navigation.navigate('ProviderEditProfile')}
+        onVerCreditos={() => navigation.navigate('Creditos')}
         onLogout={onLogout}
       />
 
@@ -422,6 +461,7 @@ export default function ProviderDashboardScreen({
         loading={loadingDocs}
         subiendo={uploading}
         onUpload={handleUpload}
+        onDescargar={handleDescargar}
       />
 
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabsRow}>
@@ -439,6 +479,10 @@ export default function ProviderDashboardScreen({
       </ScrollView>
 
       <View style={styles.card}>{renderTab()}</View>
+
+      <TouchableOpacity style={styles.secondaryHomeBtn} onPress={() => navigation.navigate('Publicaciones')}>
+        <Text style={styles.secondaryHomeBtnText}>Administrar mis publicaciones</Text>
+      </TouchableOpacity>
 
       <TouchableOpacity style={styles.secondaryHomeBtn} onPress={() => navigation.navigate('Home')}>
         <Text style={styles.secondaryHomeBtnText}>Ver listado de proveedores</Text>

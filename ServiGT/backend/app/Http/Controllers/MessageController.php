@@ -3,11 +3,15 @@
 namespace App\Http\Controllers;
 
 use App\Models\Mensaje;
+use App\Models\Servicio;
+use App\Traits\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class MessageController extends Controller
 {
+    use ApiResponse;
+
     // Enviar mensaje
     public function store(Request $request): JsonResponse
     {
@@ -23,6 +27,18 @@ class MessageController extends Controller
             return response()->json(['message' => 'No puedes enviarte mensajes a ti mismo'], 422);
         }
 
+        // Regla de producto ratificada: el canal solo se abre a traves de un
+        // servicio, originado por una solicitud directa o por la publicacion
+        // de un proveedor. Una cotizacion a un pedido todavia no adjudicado no
+        // habilita el chat, porque en esa fase el pedido oculta a proposito la
+        // identidad del proveedor.
+        if (!$this->compartenServicio($validated['emisor_id'], (int) $validated['receptor_id'])) {
+            return $this->error(
+                'Solo puedes escribir a alguien con quien tengas un servicio en curso o pasado.',
+                403
+            );
+        }
+
         $mensaje = Mensaje::create($validated);
         $mensaje->load(['emisor:id,name,role,foto_perfil', 'receptor:id,name,role,foto_perfil']);
 
@@ -30,6 +46,23 @@ class MessageController extends Controller
             'message' => 'Mensaje enviado',
             'mensaje' => $mensaje,
         ], 201);
+    }
+
+    /**
+     * Existe un servicio que vincule a los dos usuarios, en cualquiera de los
+     * dos sentidos: uno como cliente y el otro como duenno del perfil
+     * proveedor. No filtra por estado a proposito, para no cortar la
+     * conversacion cuando el trabajo termina.
+     */
+    private function compartenServicio(int $unUsuario, int $otroUsuario): bool
+    {
+        return Servicio::where(function ($query) use ($unUsuario, $otroUsuario) {
+            $query->where('cliente_id', $unUsuario)
+                ->whereHas('proveedor', fn ($p) => $p->where('user_id', $otroUsuario));
+        })->orWhere(function ($query) use ($unUsuario, $otroUsuario) {
+            $query->where('cliente_id', $otroUsuario)
+                ->whereHas('proveedor', fn ($p) => $p->where('user_id', $unUsuario));
+        })->exists();
     }
 
     // Obtener conversacion entre dos usuarios

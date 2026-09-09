@@ -9,10 +9,17 @@ import {
   View,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { getProvider, getCalificacionesProveedor, getDisponibilidadProveedor, storageUrl } from '../services/api';
+import {
+  getProvider,
+  getCalificacionesProveedor,
+  getDisponibilidadProveedor,
+  getPublicaciones,
+  storageUrl,
+} from '../services/api';
 import { useToast } from '../context/ToastContext';
 import { T } from '../theme';
-import { Avatar, Button, Card, PremiumBadge, StatusChip, Stars } from '../components/ui';
+import PublicacionCard from '../components/PublicacionCard';
+import { Avatar, Button, Card, PremiumBadge, ProfileCover, StatusChip, Stars } from '../components/ui';
 
 const DIAS = ['Dom', 'Lun', 'Mar', 'Mie', 'Jue', 'Vie', 'Sab'];
 
@@ -31,6 +38,9 @@ export default function ProviderDetailScreen({
   const [proveedor, setProveedor] = useState(selectedProvider || null);
   const [calificaciones, setCalificaciones] = useState([]);
   const [disponibilidad, setDisponibilidad] = useState([]);
+  const [publicaciones, setPublicaciones] = useState([]);
+  const [publicacionesLoading, setPublicacionesLoading] = useState(false);
+  const [publicacionesError, setPublicacionesError] = useState(null);
   const [loading, setLoading] = useState(!selectedProvider);
 
   const esCliente = user && user.role !== 'proveedor';
@@ -39,11 +49,16 @@ export default function ProviderDetailScreen({
   useEffect(() => {
     if (selectedProvider) {
       setProveedor(selectedProvider);
+      loadPublicaciones(selectedProvider.id);
       loadExtras(selectedProvider.id);
     } else if (providerId) {
       // Carga por ID cuando se accede directamente por URL
       getProvider(providerId)
-        .then((data) => { setProveedor(data.proveedor); loadExtras(data.proveedor.id); })
+        .then((data) => {
+          setProveedor(data.proveedor);
+          loadPublicaciones(data.proveedor.id);
+          loadExtras(data.proveedor.id);
+        })
         .catch(() => setLoading(false))
         .finally(() => setLoading(false));
     }
@@ -64,6 +79,20 @@ export default function ProviderDetailScreen({
       toast(error.message, 'error');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadPublicaciones = async (id) => {
+    setPublicacionesLoading(true);
+    setPublicacionesError(null);
+    try {
+      const data = await getPublicaciones({ proveedorId: id, perPage: 50 });
+      setPublicaciones(data.publicaciones || []);
+    } catch (error) {
+      setPublicaciones([]);
+      setPublicacionesError(error.message);
+    } finally {
+      setPublicacionesLoading(false);
     }
   };
 
@@ -111,9 +140,19 @@ export default function ProviderDetailScreen({
   const ProfileColumn = (
     <View style={twoColumns ? styles.colLeft : undefined}>
       <Card style={styles.profileCard}>
+        <ProfileCover
+          portadaUri={storageUrl(proveedor.portada)}
+          colorAcento={proveedor.color_acento}
+          height={110}
+          radius={14}
+          style={styles.cover}
+        />
         <Avatar uri={storageUrl(proveedor.foto_perfil)} name={proveedor.nombre} size={72} />
         <Text style={styles.provName}>{proveedor.nombre}</Text>
-        <PremiumBadge proveedor={proveedor} showDetails style={styles.premiumBlock} />
+        {/* Indicador derivado minimo: el perfil publico ya no recibe la fecha
+            de vencimiento ni el conteo de renovaciones, que son datos
+            operativos del proveedor. */}
+        <PremiumBadge proveedor={proveedor} style={styles.premiumBlock} />
 
         <View style={styles.chipsWrap}>
           {categorias.map((cat) => (
@@ -160,36 +199,27 @@ export default function ProviderDetailScreen({
         </Card>
       ) : null}
 
-      {user && !esMiPerfil ? (
+      {user && esCliente && !esMiPerfil ? (
         <Card style={[styles.card, { gap: 10 }]}>
-          {esCliente && (
-            <Button
-              kind="primary"
-              full
-              icon="send"
-              onPress={() => navigation.navigate('SolicitudForm', { provider: proveedor })}
-            >
-              Solicitar servicio
-            </Button>
-          )}
           <Button
-            kind="secondary"
+            kind="primary"
             full
-            icon="message-circle"
-            onPress={() =>
-              navigation.navigate('Chat', {
-                chatWithUserId: proveedor.user_id,
-                chatWithName: proveedor.nombre,
-              })
-            }
+            icon="send"
+            onPress={() => navigation.navigate('SolicitudForm', { provider: proveedor })}
           >
-            Enviar mensaje
+            Solicitar servicio
           </Button>
+          {/* El chat se abre desde el servicio, no desde el perfil publico: la
+              regla ratificada exige una relacion previa y el backend responde
+              403 sin ella. Dejar el boton aqui ofrecia una accion imposible. */}
+          <Text style={styles.contactHint}>
+            Podras escribirle cuando la solicitud este en curso.
+          </Text>
         </Card>
       ) : !user ? (
         <Card style={[styles.card, { alignItems: 'center', gap: 10 }]}>
           <Text style={styles.loginPrompt}>
-            Inicia sesion para solicitar servicios o chatear con este proveedor.
+            Inicia sesion para solicitar servicios a este proveedor.
           </Text>
           <Button kind="primary" full onPress={() => navigation.navigate('Login')}>
             Iniciar sesion
@@ -220,6 +250,40 @@ export default function ProviderDetailScreen({
           </View>
         </Card>
       ) : null}
+
+      <View style={styles.publicacionesSection}>
+        <Text style={styles.cardTitle}>Publicaciones</Text>
+        {publicacionesLoading ? (
+          <View style={styles.publicacionesState}>
+            <ActivityIndicator size="small" color={T.blue} />
+            <Text style={styles.emptyText}>Cargando publicaciones...</Text>
+          </View>
+        ) : publicacionesError ? (
+          <View style={styles.publicacionesState}>
+            <Text style={styles.errorText}>{publicacionesError}</Text>
+          </View>
+        ) : publicaciones.length === 0 ? (
+          <View style={styles.publicacionesState}>
+            <Text style={styles.emptyText}>Este proveedor aun no tiene publicaciones visibles.</Text>
+          </View>
+        ) : (
+          <View style={styles.publicacionesGrid}>
+            {publicaciones.map((publicacion) => (
+              <PublicacionCard
+                key={publicacion.id}
+                publicacion={publicacion}
+                mode={user && esCliente && !esMiPerfil ? 'cotizar' : 'catalogo'}
+                actionLabel="Solicitar servicio"
+                onCotizar={() => navigation.navigate('SolicitudForm', {
+                  provider: proveedor,
+                  publicacionId: publicacion.id,
+                })}
+                style={twoColumns ? styles.publicacionCardWide : undefined}
+              />
+            ))}
+          </View>
+        )}
+      </View>
 
       {disponibilidad.length > 0 ? (
         <Card style={styles.card}>
@@ -299,8 +363,10 @@ const styles = StyleSheet.create({
   colRight: { flex: 1, gap: 14 },
 
   profileCard: { alignItems: 'center', marginBottom: 14 },
+  cover: { width: 'auto', alignSelf: 'stretch', marginTop: -16, marginHorizontal: -16, marginBottom: 14 },
   provName: { fontSize: 22, fontWeight: '800', color: T.ink, marginTop: 12, marginBottom: 8 },
   premiumBlock: { alignSelf: 'stretch', marginBottom: 12 },
+  contactHint: { color: T.muted, fontSize: 12, textAlign: 'center' },
   chipsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, justifyContent: 'center', marginBottom: 4 },
   ratingRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8, marginBottom: 4 },
   ratingText: { fontSize: 13, color: T.muted },
@@ -346,4 +412,19 @@ const styles = StyleSheet.create({
   resenaDate: { fontSize: 11, color: T.faint, marginTop: 2 },
   resenaComentario: { fontSize: 13, color: T.muted, lineHeight: 19, marginTop: 4 },
   emptyText: { fontSize: 14, color: T.faint, textAlign: 'center', paddingVertical: 12 },
+  errorText: { fontSize: 14, color: T.danger, textAlign: 'center', paddingVertical: 12 },
+  publicacionesSection: { marginBottom: 14 },
+  publicacionesState: {
+    minHeight: 96,
+    borderWidth: 1,
+    borderColor: T.border,
+    borderRadius: T.rLg,
+    backgroundColor: T.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 16,
+    gap: 8,
+  },
+  publicacionesGrid: { gap: 12 },
+  publicacionCardWide: { maxWidth: 360 },
 });

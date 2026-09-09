@@ -19,6 +19,7 @@ import { getPedidoDetalle, enviarCotizacion, editarCotizacion, aceptarCotizacion
 import { useSession } from '../context/SessionContext';
 import { useToast } from '../context/ToastContext';
 import { T } from '../theme';
+import { ScreenHeader } from '../components/ui';
 
 const URGENCIA_CONFIG = {
   alta:  { label: 'URGENTE', bg: '#fee2e2', text: '#991b1b', border: '#fca5a5' },
@@ -379,10 +380,7 @@ export default function PedidoDetailScreen({ pedidoId, navigation }) {
     <SafeAreaView style={s.container}>
       <ScrollView contentContainerStyle={s.content} showsVerticalScrollIndicator={false}>
 
-        {/* Volver */}
-        <TouchableOpacity style={s.backRow} onPress={() => navigation.goBack()}>
-          <Text style={s.backText}>← Volver</Text>
-        </TouchableOpacity>
+        <ScreenHeader style={s.backRow} onBack={() => navigation.goBack()} variant="inline" />
 
         {/* Urgencia · Categoría · Tiempo */}
         <View style={s.pageHeader}>
@@ -694,7 +692,6 @@ const s = StyleSheet.create({
   content:   { padding: 24, paddingBottom: 56, width: '100%', maxWidth: 980, alignSelf: 'center' },
 
   backRow:  { marginBottom: 18 },
-  backText: { color: T.blue, fontWeight: '600', fontSize: 15 },
 
   pageHeader:   { marginBottom: 18 },
   pageHeaderTop:{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 5, flexWrap: 'wrap' },

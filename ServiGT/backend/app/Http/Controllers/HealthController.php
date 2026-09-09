@@ -2,8 +2,10 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Middleware\CorrelationId;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class HealthController extends Controller
 {
@@ -13,7 +15,11 @@ class HealthController extends Controller
             DB::connection()->getPdo();
             $dbStatus = 'connected';
         } catch (\Exception $e) {
-            $dbStatus = 'error: ' . $e->getMessage();
+            $dbStatus = 'unavailable';
+            Log::warning('health.database_unavailable', [
+                'correlation_id' => request()->attributes->get(CorrelationId::ATTRIBUTE),
+                'exception' => $e::class,
+            ]);
         }
 
         return response()->json([
@@ -24,6 +30,7 @@ class HealthController extends Controller
                 'driver' => config('database.default'),
                 'status' => $dbStatus,
             ],
+            'correlation_id' => request()->attributes->get(CorrelationId::ATTRIBUTE),
             'timestamp' => now()->toIso8601String(),
         ]);
     }

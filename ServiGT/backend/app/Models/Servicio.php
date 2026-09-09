@@ -14,6 +14,9 @@ class Servicio extends Model
     protected $fillable = [
         'cliente_id',
         'proveedor_id',
+        'publicacion_id',
+        'publicacion_titulo',
+        'publicacion_precio_referencial',
         'categoria_id',
         'descripcion',
         'estado',
@@ -27,6 +30,7 @@ class Servicio extends Model
 
     protected $casts = [
         'fecha_agendada' => 'datetime',
+        'publicacion_precio_referencial' => 'decimal:2',
     ];
 
     public function cliente()
@@ -42,6 +46,11 @@ class Servicio extends Model
     public function categoria()
     {
         return $this->belongsTo(Categoria::class);
+    }
+
+    public function publicacion()
+    {
+        return $this->belongsTo(PublicacionServicio::class, 'publicacion_id');
     }
 
     public function calificaciones()

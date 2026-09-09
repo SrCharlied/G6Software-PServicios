@@ -8,6 +8,7 @@ export default function MisPedidosRoute() {
     navigate: (name, params = {}) => {
       if (name === 'PublicarPedido') { router.push('/pedidos/publicar'); return; }
       if (name === 'PedidoDetail') { router.push(`/pedidos/${params.pedidoId}`); return; }
+      if (name === 'Solicitudes') { router.push('/solicitudes'); return; }
       router.push('/home');
     },
     goBack: () => router.back(),

@@ -115,6 +115,15 @@ export const styles = StyleSheet.create({
   headerStatusDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#22d3a8' },
   headerStatusDotOff: { backgroundColor: '#fda4af' },
   headerStatusText: { fontSize: 12, fontWeight: '600', color: '#fff' },
+  headerMeta: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
+  headerSaldo: {
+    flexDirection: 'row', alignItems: 'center', gap: 7,
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    paddingHorizontal: 13, paddingVertical: 7,
+    borderRadius: 999, borderWidth: 1, borderColor: 'rgba(255,255,255,0.20)',
+  },
+  headerSaldoLabel: { fontSize: 12, fontWeight: '600', color: 'rgba(255,255,255,0.82)' },
+  headerSaldoValue: { fontSize: 13, fontWeight: '800', color: '#fff' },
   headerActions: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
   headerGhostBtn: {
     backgroundColor: 'rgba(255,255,255,0.18)',
@@ -143,6 +152,7 @@ export const styles = StyleSheet.create({
   linkText: { color: T.blue, fontWeight: '700', fontSize: 13 },
 
   // Profile
+  profileCover: { width: 'auto', alignSelf: 'stretch', marginTop: -T.s4, marginHorizontal: -T.s4, marginBottom: 12 },
   profileName: { fontSize: 18, fontWeight: '700', color: T.ink, marginBottom: 8 },
   profilePremium: { marginBottom: 12 },
   profileDescription: { fontSize: 14, color: T.text, lineHeight: 20, opacity: 0.78 },
@@ -167,6 +177,7 @@ export const styles = StyleSheet.create({
   documentInfo: { flex: 1 },
   documentType: { fontSize: 12, fontWeight: '700', color: T.ink, marginBottom: 3 },
   documentName: { fontSize: 13, color: T.muted },
+  documentDownloadText: { fontSize: 13, fontWeight: '600', color: T.blue },
   emptyInlineText: { fontSize: 14, color: T.faint, textAlign: 'center', paddingVertical: 12 },
 
   // Tabs

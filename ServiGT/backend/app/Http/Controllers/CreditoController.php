@@ -8,6 +8,7 @@ use App\Models\PaqueteCredito;
 use App\Models\Proveedor;
 use App\Models\TransaccionCredito;
 use App\Traits\ApiResponse;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -104,6 +105,10 @@ class CreditoController extends Controller
      * Request: { paquete_id: int, idempotency_key: string }
      * Idempotencia: repetir la misma idempotency_key para el proveedor
      * autenticado devuelve la compra ya registrada sin acreditar de nuevo.
+     * Vale tanto para el reintento secuencial como para dos peticiones
+     * simultaneas: la clave es UNIQUE por proveedor en BD, asi que la
+     * perdedora de la carrera revierte y responde con la compra ganadora en
+     * vez de con un 500. Dos proveedores distintos pueden usar la misma clave.
      */
     public function comprar(Request $request): JsonResponse
     {
@@ -122,14 +127,14 @@ class CreditoController extends Controller
             return $this->error('Datos de compra invalidos.', 422, $e->errors());
         }
 
-        $existente = CompraCredito::where('proveedor_id', $proveedor->id)
-            ->where('idempotency_key', $validated['idempotency_key'])
-            ->first();
+        $clave = $validated['idempotency_key'];
+
+        // Camino rapido: el reintento secuencial normal ni siquiera abre
+        // transaccion. La carrera se resuelve mas abajo, contra la BD.
+        $existente = $this->buscarCompraPorClave($proveedor->id, $clave);
 
         if ($existente) {
-            return $this->success('Compra ya registrada previamente.', [
-                'compra' => $this->formatearCompra($existente->load('paquete')),
-            ]);
+            return $this->respuestaIdempotente($proveedor->id, $existente);
         }
 
         $paquete = PaqueteCredito::activos()->find($validated['paquete_id']);
@@ -137,57 +142,129 @@ class CreditoController extends Controller
             return $this->error('El paquete solicitado no existe o no esta disponible.', 404);
         }
 
-        $resultado = DB::transaction(function () use ($proveedor, $paquete, $validated) {
-            $proveedorLock = Proveedor::query()->lockForUpdate()->findOrFail($proveedor->id);
+        $intentos = 0;
 
-            $credito = CreditoProveedor::query()
-                ->where('proveedor_id', $proveedorLock->id)
-                ->lockForUpdate()
-                ->first();
+        while (true) {
+            try {
+                $resultado = DB::transaction(function () use ($proveedor, $paquete, $clave) {
+                    return $this->registrarCompra($proveedor, $paquete, $clave);
+                });
 
-            if (!$credito) {
-                $credito = CreditoProveedor::create([
-                    'proveedor_id' => $proveedorLock->id,
-                    'saldo'        => 0,
-                    'updated_at'   => now(),
-                ]);
+                return $this->success('Compra completada correctamente.', [
+                    'compra' => $this->formatearCompra($resultado['compra']),
+                    'saldo'  => $resultado['saldo'],
+                ], 201);
+            } catch (QueryException $e) {
+                if (!$this->esViolacionDeUnicidad($e)) {
+                    throw $e;
+                }
+
+                // El arbitro de la idempotencia es el UNIQUE de la tabla, no la
+                // consulta previa: entre ese SELECT y este INSERT cabe otra
+                // peticion con la misma clave. Si gano la carrera, su compra es
+                // la valida y esta transaccion ya se revirtio entera, asi que no
+                // se acredito nada dos veces. Devolvemos la ganadora como exito.
+                $ganadora = $this->buscarCompraPorClave($proveedor->id, $clave);
+
+                if ($ganadora) {
+                    return $this->respuestaIdempotente($proveedor->id, $ganadora);
+                }
+
+                // No fue la clave: dos compras sortearon la misma referencia.
+                // Nada quedo escrito, se reintenta con otro numero.
+                if (++$intentos >= 3) {
+                    return $this->error(
+                        'No se pudo generar una referencia unica para la compra. Intenta de nuevo.',
+                        503
+                    );
+                }
             }
+        }
+    }
 
-            $totalCreditos = $paquete->creditos_base + $paquete->creditos_bonus;
+    /**
+     * Cuerpo transaccional de la compra. Corre siempre dentro de
+     * DB::transaction: si algo revienta, no queda ni la fila ni el saldo.
+     */
+    private function registrarCompra(Proveedor $proveedor, PaqueteCredito $paquete, string $clave): array
+    {
+        $proveedorLock = Proveedor::query()->lockForUpdate()->findOrFail($proveedor->id);
 
-            $compra = CompraCredito::create([
-                'proveedor_id'       => $proveedorLock->id,
-                'paquete_id'         => $paquete->id,
-                'monto_gtq'          => $paquete->precio_gtq,
-                'creditos_otorgados' => $totalCreditos,
-                'estado'             => 'completada',
-                'referencia'         => $this->generarReferenciaUnica(),
-                'idempotency_key'    => $validated['idempotency_key'],
-                'completada_at'      => now(),
+        $credito = CreditoProveedor::query()
+            ->where('proveedor_id', $proveedorLock->id)
+            ->lockForUpdate()
+            ->first();
+
+        if (!$credito) {
+            $credito = CreditoProveedor::create([
+                'proveedor_id' => $proveedorLock->id,
+                'saldo'        => 0,
+                'updated_at'   => now(),
             ]);
+        }
 
-            $credito->saldo += $totalCreditos;
-            $credito->updated_at = now();
-            $credito->save();
+        $totalCreditos = $paquete->creditos_base + $paquete->creditos_bonus;
 
-            TransaccionCredito::create([
-                'proveedor_id'  => $proveedorLock->id,
-                'tipo'          => 'compra',
-                'monto'         => $totalCreditos,
-                'motivo'        => "Compra de creditos: {$paquete->nombre}",
-                'referencia_id' => $compra->id,
-            ]);
+        $compra = CompraCredito::create([
+            'proveedor_id'       => $proveedorLock->id,
+            'paquete_id'         => $paquete->id,
+            'monto_gtq'          => $paquete->precio_gtq,
+            'creditos_otorgados' => $totalCreditos,
+            'estado'             => 'completada',
+            'referencia'         => $this->generarReferenciaUnica(),
+            'idempotency_key'    => $clave,
+            'completada_at'      => now(),
+        ]);
 
-            return [
-                'compra' => $compra->fresh()->load('paquete'),
-                'saldo'  => $credito->saldo,
-            ];
-        });
+        $credito->saldo += $totalCreditos;
+        $credito->updated_at = now();
+        $credito->save();
 
-        return $this->success('Compra completada correctamente.', [
-            'compra' => $this->formatearCompra($resultado['compra']),
-            'saldo'  => $resultado['saldo'],
-        ], 201);
+        TransaccionCredito::create([
+            'proveedor_id'  => $proveedorLock->id,
+            'tipo'          => 'compra',
+            'monto'         => $totalCreditos,
+            'motivo'        => "Compra de creditos: {$paquete->nombre}",
+            'referencia_id' => $compra->id,
+        ]);
+
+        return [
+            'compra' => $compra->fresh()->load('paquete'),
+            'saldo'  => $credito->saldo,
+        ];
+    }
+
+    /**
+     * La clave es unica por proveedor, no globalmente: dos proveedores
+     * distintos pueden mandar "compra-1" sin pisarse.
+     */
+    private function buscarCompraPorClave(int $proveedorId, string $clave): ?CompraCredito
+    {
+        return CompraCredito::where('proveedor_id', $proveedorId)
+            ->where('idempotency_key', $clave)
+            ->first();
+    }
+
+    /**
+     * Respuesta de una compra que ya existia. Devuelve 200, no 201, y el saldo
+     * vigente: quien reintenta necesita el saldo de ahora, no el del momento
+     * en que se acredito.
+     */
+    private function respuestaIdempotente(int $proveedorId, CompraCredito $compra): JsonResponse
+    {
+        return $this->success('Compra ya registrada previamente.', [
+            'compra' => $this->formatearCompra($compra->load('paquete')),
+            'saldo'  => (int) (CreditoProveedor::where('proveedor_id', $proveedorId)->value('saldo') ?? 0),
+        ]);
+    }
+
+    /**
+     * 23505 es el SQLSTATE de unique_violation en PostgreSQL. Es estandar SQL,
+     * asi que no depende del driver.
+     */
+    private function esViolacionDeUnicidad(QueryException $e): bool
+    {
+        return (string) $e->getCode() === '23505';
     }
 
     /**
@@ -233,13 +310,18 @@ class CreditoController extends Controller
     }
 
     /**
-     * Genera una referencia unica formato SGT-XXXXX. La columna es UNIQUE en
-     * BD; el reintento cubre la colision improbable de dos numeros iguales.
+     * Genera una referencia unica formato SGT-XXXXXXXXXX.
+     *
+     * El espacio anterior era de 100,000 numeros: a 50 mil compras la mitad de
+     * los sorteos ya chocaba y el bucle se degradaba. Diez digitos lo llevan a
+     * 10,000 millones. El sondeo evita el reintento en la practica totalidad de
+     * los casos, pero la unicidad real la garantiza el UNIQUE de la columna:
+     * quien llame a este metodo debe manejar la violacion igual.
      */
     private function generarReferenciaUnica(): string
     {
         do {
-            $referencia = 'SGT-' . str_pad((string) random_int(0, 99999), 5, '0', STR_PAD_LEFT);
+            $referencia = 'SGT-' . str_pad((string) random_int(0, 9999999999), 10, '0', STR_PAD_LEFT);
         } while (CompraCredito::where('referencia', $referencia)->exists());
 
         return $referencia;

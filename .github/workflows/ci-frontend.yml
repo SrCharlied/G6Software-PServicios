@@ -1,0 +1,173 @@
+# Task 1.5 — CI frontend, audits y normalizacion de Git.
+#
+# Corre en el runner directamente (sin Docker): el job de backend en
+# ci-backend.yml necesita PostgreSQL real via Compose, pero el frontend no
+# depende de infraestructura, asi que Node + npm ci alcanza y es mas rapido.
+#
+# POR QUE NO HAY FILTRO `paths`
+# -----------------------------
+# Mismo razonamiento que ci-backend.yml: si este job se vuelve required check
+# de `dev`, un filtro paths/paths-ignore dejaria PRs que no tocan frontend
+# atascados en "Expected — Waiting for status" para siempre.
+#
+# QUE BLOQUEA EL MERGE Y QUE NO
+# ------------------------------
+# Jest, el build web y `git diff --check` hacen fallar el job (sin
+# continue-on-error). `npm audit` es informativo por ahora: el lockfile del
+# frontend recien se congelo en la task 1.2, asi que un advisory nuevo en una
+# dependencia transitiva no deberia tumbar un PR sin relacion. Volverlo
+# bloqueante es una decision de producto para una task aparte.
+#
+# Para que "bloquee el merge" tenga efecto real hace falta ademas marcar este
+# workflow como required status check de `dev` en la configuracion del
+# repositorio (Settings → Branches) — eso no se puede declarar desde este
+# archivo.
+
+name: CI frontend
+
+on:
+  pull_request:
+    branches: [dev]
+  push:
+    branches: [dev]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-frontend-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  frontend:
+    name: Jest, build web y checks de Git
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # Historial completo: git diff --check y la deteccion de secretos
+          # comparan contra la base del PR, no solo contra el ultimo commit.
+          fetch-depth: 0
+
+      - name: Configurar Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+          cache: npm
+          cache-dependency-path: ServiGT/frontend/package-lock.json
+
+      - name: Instalar dependencias (npm ci)
+        working-directory: ServiGT/frontend
+        run: npm ci
+
+      - name: Ejecutar Jest
+        working-directory: ServiGT/frontend
+        run: npm test -- --ci --runInBand
+
+      - name: Build web (expo export)
+        working-directory: ServiGT/frontend
+        run: npm run build:web
+
+      # Informativo: ver nota de cabecera. No usa continue-on-error para que
+      # el resumen refleje el codigo de salida real, pero el paso siguiente
+      # (publicar evidencia) corre con `if: always()` sin depender de este.
+      - name: Auditar dependencias (npm audit, informativo)
+        id: audit
+        working-directory: ServiGT/frontend
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          npm audit --audit-level=moderate 2>&1 | tee ../../audit.log
+
+      - name: Resolver rango de commits del PR
+        id: rango
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE="${{ github.event.pull_request.base.sha }}"
+          else
+            BASE="$(git rev-parse HEAD~1 2>/dev/null || git hash-object -t tree /dev/null)"
+          fi
+          echo "base=${BASE}" >> "$GITHUB_OUTPUT"
+
+      # `git diff --check` (whitespace en fin de linea / conflictos) sobre lo
+      # que el PR introduce, no sobre todo el historial del repo.
+      - name: git diff --check
+        run: git diff --check "${{ steps.rango.outputs.base }}"...HEAD
+
+      # Deteccion basica de secretos por patrones comunes, acotada a los
+      # archivos que el PR modifica (no a todo el repo: docker-compose.yml ya
+      # tiene credenciales de desarrollo local aceptadas y documentadas en
+      # ServiGT/docs/security/owasp-top10-matriz.md — no es objetivo de esta
+      # task volver a abrir ese hallazgo). Solo se imprime archivo:linea, el
+      # valor detectado nunca se vuelca al log.
+      - name: Deteccion basica de secretos
+        run: |
+          CAMBIADOS="$(git diff --name-only --diff-filter=ACM "${{ steps.rango.outputs.base }}"...HEAD)"
+          if [ -z "$CAMBIADOS" ]; then
+            echo "Sin archivos nuevos/modificados que escanear."
+            exit 0
+          fi
+
+          PATRONES=(
+            'AKIA[0-9A-Z]{16}'
+            '-----BEGIN (RSA |EC |DSA |OPENSSH )?PRIVATE KEY-----'
+            'xox[baprs]-[0-9A-Za-z-]+'
+            "(api[_-]?key|apikey|secret|password|token)[\"']?[[:space:]]*[:=][[:space:]]*[\"'][A-Za-z0-9/+_=-]{16,}[\"']"
+          )
+
+          HALLAZGOS=""
+          while IFS= read -r archivo; do
+            [ -f "$archivo" ] || continue
+            for patron in "${PATRONES[@]}"; do
+              MATCH="$(grep -nE -e "$patron" "$archivo" 2>/dev/null | cut -d: -f1)"
+              if [ -n "$MATCH" ]; then
+                while IFS= read -r linea; do
+                  HALLAZGOS="${HALLAZGOS}${archivo}:${linea}"$'\n'
+                done <<< "$MATCH"
+              fi
+            done
+          done <<< "$CAMBIADOS"
+
+          if [ -n "$HALLAZGOS" ]; then
+            echo "Posibles secretos detectados (valor oculto, solo se reporta archivo:linea):"
+            echo "$HALLAZGOS" | sort -u
+            exit 1
+          fi
+
+          echo "Sin coincidencias de patrones de secretos conocidos."
+
+      - name: Publicar evidencia en el resumen del run
+        if: always()
+        run: |
+          {
+            echo "## Evidencia de ejecucion — CI frontend"
+            echo
+            echo "| Campo | Valor |"
+            echo "|---|---|"
+            echo "| Comandos | \`npm ci\` -> \`npm test -- --ci --runInBand\` -> \`npm run build:web\` |"
+            echo "| Base comparada (diff --check / secretos) | \`${{ steps.rango.outputs.base }}\` |"
+            echo "| Commit | \`${{ github.sha }}\` |"
+            echo "| npm audit | ${{ steps.audit.outcome }} (informativo, ver AGENTS.md §11 y nota de cabecera) |"
+            echo
+            echo "<details><summary>Salida de npm audit</summary>"
+            echo
+            echo '```'
+            cat audit.log 2>/dev/null || echo "sin salida"
+            echo '```'
+            echo
+            echo "</details>"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Adjuntar logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-ci-${{ github.run_id }}
+          path: |
+            audit.log
+          retention-days: 14
+          if-no-files-found: warn

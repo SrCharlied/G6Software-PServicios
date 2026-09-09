@@ -16,4 +16,9 @@ class Categoria extends Model
     {
         return $this->hasMany(Proveedor::class);
     }
+
+    public function publicaciones(): HasMany
+    {
+        return $this->hasMany(PublicacionServicio::class);
+    }
 }

@@ -15,6 +15,7 @@ use App\Http\Controllers\CotizacionController;
 use App\Http\Controllers\CreditoController;
 use App\Http\Controllers\PedidoController;
 use App\Http\Controllers\PremiumController;
+use App\Http\Controllers\PublicacionServicioController;
 
 /*
 |--------------------------------------------------------------------------
@@ -31,8 +32,8 @@ use App\Http\Controllers\PremiumController;
 Route::get('/health', [HealthController::class, 'check']);
 
 // Autenticacion
-Route::post('/register', [AuthController::class, 'register']);
-Route::post('/login',    [AuthController::class, 'login']);
+Route::post('/register', [AuthController::class, 'register'])->middleware('throttle:register');
+Route::post('/login',    [AuthController::class, 'login'])->middleware('throttle:login');
 
 // Consultas publicas
 Route::get('/categorias',              [CategoriaController::class, 'index']);
@@ -40,6 +41,8 @@ Route::get('/pedidos/abiertos',        [PedidoController::class, 'abiertos']);
 Route::get('/pedidos/{id}',            [PedidoController::class, 'show'])->where('id', '[0-9]+');
 Route::get('/providers',      [ProviderController::class, 'index']);
 Route::get('/providers/{id}', [ProviderController::class, 'show'])->where('id', '[0-9]+');
+Route::get('/publicaciones', [PublicacionServicioController::class, 'index']);
+Route::get('/publicaciones/{id}', [PublicacionServicioController::class, 'show'])->where('id', '[0-9]+');
 
 // Calificaciones publicas de un proveedor
 Route::get('/providers/{id}/calificaciones', [CalificacionController::class, 'porProveedor'])->where('id', '[0-9]+');
@@ -56,16 +59,21 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
 
     // Perfil de proveedor
-    Route::get('/providers/user/{userId}', [ProviderController::class, 'showByUser']);
+    Route::get('/providers/me',           [ProviderController::class, 'me']);
+    Route::get('/providers/user/{userId}', [ProviderController::class, 'showByUser'])->where('userId', '[0-9]+');
     Route::post('/providers',              [ProviderController::class, 'store']);
     Route::put('/providers/{id}',          [ProviderController::class, 'update'])->where('id', '[0-9]+');
 
     // Foto de perfil del proveedor
-    Route::post('/providers/{id}/foto', [ProviderController::class, 'uploadFoto'])->where('id', '[0-9]+');
+    Route::post('/providers/{id}/foto', [ProviderController::class, 'uploadFoto'])->where('id', '[0-9]+')->middleware('throttle:uploads');
+    Route::post('/providers/{id}/portada', [ProviderController::class, 'uploadPortada'])->where('id', '[0-9]+')->middleware('throttle:uploads');
+    Route::delete('/providers/{id}/portada', [ProviderController::class, 'deletePortada'])->where('id', '[0-9]+');
 
     // Documentos del proveedor
     Route::get('/providers/{id}/documentos',  [ProviderController::class, 'getDocumentos']);
-    Route::post('/providers/{id}/documentos', [ProviderController::class, 'uploadDocumento']);
+    Route::post('/providers/{id}/documentos', [ProviderController::class, 'uploadDocumento'])->middleware('throttle:uploads');
+    Route::get('/providers/{id}/documentos/{documentoId}/descargar', [ProviderController::class, 'descargarDocumento'])
+        ->where(['id' => '[0-9]+', 'documentoId' => '[0-9]+']);
 
     // ── Servicios ────────────────────────────────────────────────────────────
     // Cliente solicita un servicio
@@ -100,7 +108,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // ── Mensajes / Chat ──────────────────────────────────────────────────────
     // Enviar mensaje
-    Route::post('/mensajes', [MessageController::class, 'store']);
+    Route::post('/mensajes', [MessageController::class, 'store'])->middleware('throttle:messages');
     // Ver conversacion con otro usuario
     Route::get('/mensajes/conversacion/{userId}', [MessageController::class, 'conversacion'])->where('userId', '[0-9]+');
     // Listar todas mis conversaciones
@@ -119,13 +127,21 @@ Route::middleware('auth:sanctum')->group(function () {
     // Catalogo de paquetes comprables
     Route::get('/creditos/paquetes', [CreditoController::class, 'paquetes']);
     // Compra simulada e inmediata de un paquete
-    Route::post('/creditos/comprar', [CreditoController::class, 'comprar']);
+    Route::post('/creditos/comprar', [CreditoController::class, 'comprar'])->middleware('throttle:purchase');
     // Historial paginado de movimientos de creditos
     Route::get('/creditos/transacciones', [CreditoController::class, 'transacciones']);
 
     // ── Premium del proveedor ────────────────────────────────────────────────
-    Route::post('/premium/activar',  [PremiumController::class, 'activar']);
+    Route::post('/premium/activar',  [PremiumController::class, 'activar'])->middleware('throttle:premium');
     Route::get('/premium/mi-estado', [PremiumController::class, 'miEstado']);
+
+    // Publicaciones de servicios ofrecidos
+    Route::get('/publicaciones/mias', [PublicacionServicioController::class, 'mias']);
+    Route::post('/publicaciones', [PublicacionServicioController::class, 'store'])->middleware('throttle:uploads');
+    Route::put('/publicaciones/{id}', [PublicacionServicioController::class, 'update'])->where('id', '[0-9]+')->middleware('throttle:uploads');
+    Route::post('/publicaciones/{id}/activar', [PublicacionServicioController::class, 'activar'])->where('id', '[0-9]+');
+    Route::post('/publicaciones/{id}/desactivar', [PublicacionServicioController::class, 'desactivar'])->where('id', '[0-9]+');
+    Route::delete('/publicaciones/{id}', [PublicacionServicioController::class, 'destroy'])->where('id', '[0-9]+');
 
     // ── Notificaciones ───────────────────────────────────────────────────────
     Route::get('/notificaciones',                [NotificacionController::class, 'index']);

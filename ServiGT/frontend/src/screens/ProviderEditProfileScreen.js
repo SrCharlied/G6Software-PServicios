@@ -10,7 +10,15 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
-import { getCategorias, updateProvider, createProvider, uploadFotoPerfil, storageUrl } from '../services/api';
+import {
+  createProvider,
+  deletePortada,
+  getCategorias,
+  storageUrl,
+  updateProvider,
+  uploadFotoPerfil,
+  uploadPortada,
+} from '../services/api';
 import { useToast } from '../context/ToastContext';
 import { validateRequired, validatePhone, validateNumeric } from '../utils/validation';
 import { T } from '../theme';
@@ -25,6 +33,18 @@ const DEPARTAMENTOS = [
 
 const NIVELES = ['novato', 'intermedio', 'experto'];
 
+// Paleta cerrada de acentos. Se ofrecen opciones curadas en vez de un selector
+// libre para que ningun perfil termine con un color ilegible sobre el texto
+// blanco de la portada.
+const COLORES_ACENTO = [
+  { value: '#1b5499', label: 'Azul ServiGT' },
+  { value: '#0f766e', label: 'Verde jade' },
+  { value: '#7c2d12', label: 'Terracota' },
+  { value: '#4c1d95', label: 'Morado' },
+  { value: '#b45309', label: 'Ambar' },
+  { value: '#0e1424', label: 'Grafito' },
+];
+
 export default function ProviderEditProfileScreen({
   navigation,
   user,
@@ -35,6 +55,7 @@ export default function ProviderEditProfileScreen({
   const { width } = useWindowDimensions();
   const wide = width >= 960;
   const fileInputRef = useRef(null);
+  const portadaInputRef = useRef(null);
   const isEditing = !!providerProfile;
 
   const [nombre, setNombre] = useState(providerProfile?.nombre || user?.name || '');
@@ -56,6 +77,9 @@ export default function ProviderEditProfileScreen({
   });
   const [localPhotoUri, setLocalPhotoUri] = useState(null);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [localPortadaUri, setLocalPortadaUri] = useState(null);
+  const [uploadingPortada, setUploadingPortada] = useState(false);
+  const [colorAcento, setColorAcento] = useState(providerProfile?.color_acento || null);
   const [showDepartamentos, setShowDepartamentos] = useState(false);
   const [showNivelSelector, setShowNivelSelector] = useState(false);
 
@@ -94,6 +118,43 @@ export default function ProviderEditProfileScreen({
     }
   };
 
+  const handlePortadaSelect = async (event) => {
+    const file = event.target?.files?.[0];
+    if (!file || !providerProfile?.id) return;
+
+    const previewUrl = URL.createObjectURL(file);
+    setLocalPortadaUri(previewUrl);
+    setUploadingPortada(true);
+    try {
+      const data = await uploadPortada(providerProfile.id, file);
+      toast('Portada actualizada.', 'success');
+      onProfileUpdated && onProfileUpdated({ ...providerProfile, portada: data.portada });
+    } catch (error) {
+      toast(error.message, 'error');
+      setLocalPortadaUri(null);
+    } finally {
+      setUploadingPortada(false);
+    }
+  };
+
+  const handlePortadaRemove = async () => {
+    if (!providerProfile?.id) return;
+
+    setUploadingPortada(true);
+    try {
+      await deletePortada(providerProfile.id);
+      // Se limpia la vista previa local ademas del perfil: si no, la portada
+      // recien borrada seguiria en pantalla hasta recargar.
+      setLocalPortadaUri(null);
+      toast('Portada eliminada.', 'info');
+      onProfileUpdated && onProfileUpdated({ ...providerProfile, portada: null });
+    } catch (error) {
+      toast(error.message, 'error');
+    } finally {
+      setUploadingPortada(false);
+    }
+  };
+
   const handleSave = async () => {
     const errs = {};
     if (!validateRequired(nombre)) errs.nombre = 'El nombre es requerido.';
@@ -120,6 +181,7 @@ export default function ProviderEditProfileScreen({
         tarifa_hora: tarifaHora ? parseFloat(tarifaHora) : null,
         tarifa_proyecto: tarifaProyecto ? parseFloat(tarifaProyecto) : null,
         nivel,
+        color_acento: colorAcento,
       };
 
       const data = isEditing
@@ -136,6 +198,7 @@ export default function ProviderEditProfileScreen({
   };
 
   const currentPhoto = localPhotoUri || storageUrl(providerProfile?.foto_perfil);
+  const currentPortada = localPortadaUri || storageUrl(providerProfile?.portada);
   const initial = nombre.charAt(0).toUpperCase() || '?';
 
   return (
@@ -347,6 +410,106 @@ export default function ProviderEditProfileScreen({
           <Text style={s.cancelBtnText}>Cancelar</Text>
         </TouchableOpacity>
       </Card>
+
+      {isEditing ? (
+        <Card padding={24} style={[s.card, s.cardSpaced]}>
+          <Text style={s.sectionTitle}>Personalizacion</Text>
+          <Text style={s.sectionHint}>
+            La portada y el color de acento se ven en tu perfil publico. Las dos son
+            opcionales: sin ellas tu perfil usa el degradado de ServiGT.
+          </Text>
+
+          <Text style={s.label}>Portada</Text>
+          <TouchableOpacity
+            style={s.portadaWrap}
+            onPress={() => portadaInputRef.current?.click()}
+            activeOpacity={0.85}
+            disabled={uploadingPortada}
+            accessibilityRole="button"
+            accessibilityLabel="Cambiar portada"
+          >
+            {currentPortada ? (
+              <Image source={{ uri: currentPortada }} style={s.portadaImg} resizeMode="cover" />
+            ) : (
+              <View style={[s.portadaImg, s.portadaEmpty]}>
+                <Text style={s.portadaEmptyText}>
+                  {uploadingPortada ? 'Subiendo...' : 'Toca para subir una portada'}
+                </Text>
+                <Text style={s.portadaEmptyHint}>JPG, PNG o WebP · maximo 6 MB</Text>
+              </View>
+            )}
+            {uploadingPortada && currentPortada ? (
+              <View style={s.portadaOverlay}>
+                <ActivityIndicator size="small" color={T.white} />
+              </View>
+            ) : null}
+          </TouchableOpacity>
+
+          {currentPortada ? (
+            <View style={s.portadaActions}>
+              <Button
+                kind="ghost"
+                size="sm"
+                onPress={() => portadaInputRef.current?.click()}
+                disabled={uploadingPortada}
+              >
+                Cambiar
+              </Button>
+              <Button
+                kind="ghost"
+                size="sm"
+                onPress={handlePortadaRemove}
+                disabled={uploadingPortada}
+              >
+                Quitar
+              </Button>
+            </View>
+          ) : null}
+
+          {Platform.OS === 'web' && (
+            <input
+              ref={portadaInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              style={{ display: 'none' }}
+              onChange={handlePortadaSelect}
+            />
+          )}
+
+          <Text style={[s.label, { marginTop: 18 }]}>Color de acento</Text>
+          <View style={s.colorRow}>
+            {COLORES_ACENTO.map((color) => {
+              const activo = colorAcento === color.value;
+              return (
+                <TouchableOpacity
+                  key={color.value}
+                  onPress={() => setColorAcento(color.value)}
+                  style={[s.colorDot, { backgroundColor: color.value }, activo && s.colorDotActive]}
+                  accessibilityRole="button"
+                  accessibilityLabel={color.label}
+                  accessibilityState={{ selected: activo }}
+                >
+                  {activo ? <Text style={s.colorCheck}>✓</Text> : null}
+                </TouchableOpacity>
+              );
+            })}
+
+            <TouchableOpacity
+              onPress={() => setColorAcento(null)}
+              style={[s.colorReset, !colorAcento && s.colorResetActive]}
+              accessibilityRole="button"
+              accessibilityState={{ selected: !colorAcento }}
+            >
+              <Text style={[s.colorResetText, !colorAcento && s.colorResetTextActive]}>
+                Sin color
+              </Text>
+            </TouchableOpacity>
+          </View>
+          <Text style={s.sectionHint}>
+            El color se guarda al presionar Guardar, junto al resto del perfil.
+          </Text>
+        </Card>
+      ) : null}
     </ScrollView>
   );
 }
@@ -404,6 +567,40 @@ const s = StyleSheet.create({
   card: { maxWidth: 760, width: '100%', alignSelf: 'center' },
   sectionTitle: { fontSize: 22, fontWeight: '900', color: T.ink, marginBottom: 18 },
   label: { fontSize: 13, fontWeight: '800', color: T.ink, marginBottom: 6, marginTop: 4 },
+
+  // Personalizacion
+  cardSpaced:  { marginTop: 16 },
+  sectionHint: { fontSize: 13, color: T.muted, lineHeight: 19, marginBottom: 16, marginTop: -8 },
+  portadaWrap: { borderRadius: 14, overflow: 'hidden', marginTop: 4 },
+  portadaImg:  { width: '100%', height: 150, borderRadius: 14, backgroundColor: T.inputBg },
+  portadaEmpty: {
+    alignItems: 'center', justifyContent: 'center', gap: 4,
+    borderWidth: 1, borderColor: T.inputBorder, borderStyle: 'dashed',
+  },
+  portadaEmptyText: { fontSize: 14, fontWeight: '700', color: T.muted },
+  portadaEmptyHint: { fontSize: 12, color: T.faint },
+  portadaOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center', justifyContent: 'center',
+    backgroundColor: 'rgba(14,20,36,0.45)',
+  },
+  portadaActions: { flexDirection: 'row', gap: 8, marginTop: 10 },
+
+  colorRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, alignItems: 'center', marginTop: 4 },
+  colorDot: {
+    width: 34, height: 34, borderRadius: 17,
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 2, borderColor: 'transparent',
+  },
+  colorDotActive: { borderColor: T.ink },
+  colorCheck: { color: T.white, fontSize: 15, fontWeight: '900' },
+  colorReset: {
+    paddingHorizontal: 12, paddingVertical: 8, borderRadius: 999,
+    borderWidth: 1, borderColor: T.inputBorder, backgroundColor: T.inputBg,
+  },
+  colorResetActive: { borderColor: T.ink, backgroundColor: T.tint },
+  colorResetText: { fontSize: 12, fontWeight: '700', color: T.muted },
+  colorResetTextActive: { color: T.deep },
   field: { marginBottom: 12 },
   inputError: { borderColor: T.danger, backgroundColor: '#fff5f5' },
   fieldError: { fontSize: 12, color: T.danger, marginBottom: 10, marginLeft: 2 },

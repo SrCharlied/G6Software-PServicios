@@ -9,6 +9,7 @@ use App\Models\Pedido;
 use App\Models\Proveedor;
 use App\Models\Servicio;
 use App\Models\TransaccionCredito;
+use App\Http\Resources\ServicioResource;
 use App\Traits\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -241,7 +242,7 @@ class CotizacionController extends Controller
             return [
                 'pedido'     => $pedido->fresh(),
                 'cotizacion' => $cotizacion->fresh()->load('proveedor'),
-                'servicio'   => $servicio->load(['cliente', 'proveedor', 'categoria']),
+                'servicio'   => new ServicioResource($servicio->load(['cliente', 'proveedor.categoria', 'categoria'])),
             ];
         });
 

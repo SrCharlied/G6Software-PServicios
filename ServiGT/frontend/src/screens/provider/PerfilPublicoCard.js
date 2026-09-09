@@ -1,14 +1,26 @@
 import { Text, TouchableOpacity, View } from 'react-native';
-import { PremiumBadge } from '../../components/ui';
+import { PremiumBadge, ProfileCover } from '../../components/ui';
+import { storageUrl } from '../../services/api';
 import styles from './providerStyles';
 import { formatCurrency } from './providerUtils';
 
 /**
  * Resumen del perfil publico del proveedor con su estado Premium detallado.
+ *
+ * Muestra la misma portada que ve el cliente para que el proveedor sepa como
+ * quedo su personalizacion sin tener que salir a mirarse desde fuera.
  */
 export default function PerfilPublicoCard({ profile, premiumInfo, onVerComoCliente }) {
   return (
     <View style={styles.card}>
+      <ProfileCover
+        portadaUri={storageUrl(profile.portada)}
+        colorAcento={profile.color_acento}
+        height={96}
+        radius={12}
+        style={styles.profileCover}
+      />
+
       <View style={styles.cardHeader}>
         <Text style={styles.cardTitle}>Perfil publico</Text>
         <TouchableOpacity onPress={onVerComoCliente}>

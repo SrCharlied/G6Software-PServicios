@@ -32,7 +32,7 @@ export const DIAS = [
 ];
 
 export const TABS = [
-  { key: 'solicitudes',    label: 'Solicitudes' },
+  { key: 'solicitudes',    label: 'Trabajos' },
   { key: 'oportunidades',  label: 'Oportunidades' },
   { key: 'mensajes',       label: 'Mensajes' },
   { key: 'historial',      label: 'Historial' },

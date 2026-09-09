@@ -5,17 +5,28 @@ import styles from './providerStyles';
 import { getAvailabilityText, getGreeting, isAvailableNow } from './providerUtils';
 
 /**
- * Cabecera del panel: saludo, badge Premium, disponibilidad del dia y accesos.
+ * Cabecera del panel: saludo, badge Premium, saldo de creditos, disponibilidad
+ * del dia y accesos.
+ *
+ * El saldo se muestra aqui y no dentro de un panel porque el proveedor gasta
+ * creditos al cotizar desde Oportunidades: tenerlo a la vista al entrar evita
+ * que descubra que no le alcanza a medio flujo.
  */
 export default function ProviderHeader({
   profile,
   premiumInfo,
+  saldo,
   disponibilidad,
   subtitle = null,
   onEditarPerfil,
+  onVerCreditos,
   onLogout,
 }) {
   const availableNow = isAvailableNow(disponibilidad);
+
+  // saldo es null mientras carga y 0 es un saldo legitimo, asi que la guarda
+  // compara contra null en vez de confiar en el valor falsy.
+  const saldoVisible = saldo !== null && saldo !== undefined;
 
   return (
     <LinearGradient
@@ -32,12 +43,28 @@ export default function ProviderHeader({
       ) : null}
 
       <View style={styles.headerRow}>
-        {profile ? (
-          <View style={[styles.headerStatus, !availableNow && styles.headerStatusOff]}>
-            <View style={[styles.headerStatusDot, !availableNow && styles.headerStatusDotOff]} />
-            <Text style={styles.headerStatusText}>{getAvailabilityText(disponibilidad)}</Text>
-          </View>
-        ) : <View />}
+        <View style={styles.headerMeta}>
+          {profile ? (
+            <View style={[styles.headerStatus, !availableNow && styles.headerStatusOff]}>
+              <View style={[styles.headerStatusDot, !availableNow && styles.headerStatusDotOff]} />
+              <Text style={styles.headerStatusText}>{getAvailabilityText(disponibilidad)}</Text>
+            </View>
+          ) : null}
+
+          {saldoVisible ? (
+            <TouchableOpacity
+              style={styles.headerSaldo}
+              onPress={onVerCreditos}
+              accessibilityRole="button"
+              accessibilityLabel={`Saldo de ${saldo} creditos. Ir a Creditos.`}
+            >
+              <Text style={styles.headerSaldoLabel}>Saldo</Text>
+              <Text style={styles.headerSaldoValue}>
+                {saldo} {saldo === 1 ? 'credito' : 'creditos'}
+              </Text>
+            </TouchableOpacity>
+          ) : null}
+        </View>
 
         <View style={styles.headerActions}>
           {profile ? (

@@ -12,3 +12,4 @@ ServiGT/backend/vendor/
 *.swp
 .DS_Store
 _zip_extract/
+.DOCS/

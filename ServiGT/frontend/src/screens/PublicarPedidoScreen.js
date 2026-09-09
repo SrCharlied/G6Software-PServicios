@@ -12,6 +12,7 @@ import {
 import { crearPedido, getCategorias } from '../services/api';
 import { useToast } from '../context/ToastContext';
 import { T } from '../theme';
+import { ScreenHeader } from '../components/ui';
 
 const URGENCIAS = [
   { value: 'baja',  label: 'Baja',  color: T.success },
@@ -91,18 +92,13 @@ export default function PublicarPedidoScreen({ navigation }) {
       contentContainerStyle={[styles.content, compact && styles.contentCompact]}
       keyboardShouldPersistTaps="handled"
     >
-      <TouchableOpacity style={styles.backRow} onPress={() => navigation.goBack()}>
-        <Text style={styles.backText}>Volver</Text>
-      </TouchableOpacity>
-
-      <View style={styles.hero}>
-        <View style={styles.heroCopy}>
-          <Text style={styles.title}>Publicar pedido</Text>
-          <Text style={styles.subtitle}>
-            Describe lo que necesitas y recibe hasta 6 cotizaciones. Tu pedido queda abierto 7 dias.
-          </Text>
-        </View>
-      </View>
+      <ScreenHeader
+        variant="inline"
+        style={styles.hero}
+        title="Publicar pedido"
+        subtitle="Describe lo que necesitas y recibe hasta 6 cotizaciones. Tu pedido queda abierto 7 dias."
+        onBack={() => navigation.goBack()}
+      />
 
       <View style={[styles.stepper, compact && styles.stepperCompact]}>
         {['Que necesitas', 'Donde', 'Publicar'].map((step, index) => (
@@ -213,11 +209,8 @@ const styles = StyleSheet.create({
   content:     { padding: 24, paddingBottom: 56, alignItems: 'center' },
   contentCompact: { paddingHorizontal: 16, paddingTop: 18 },
   hero:        { width: '100%', maxWidth: 760, marginBottom: 18 },
-  heroCopy:    { flex: 1, minWidth: 0 },
   formPanel:   { width: '100%', maxWidth: 760, backgroundColor: T.paper, borderRadius: 14, borderWidth: 1, borderColor: T.border, padding: 24, ...T.sh2 },
   formPanelCompact: { padding: 18 },
-  title:       { fontSize: 26, fontWeight: '800', color: T.ink, marginBottom: 5 },
-  subtitle:    { fontSize: 14, color: T.muted, lineHeight: 20 },
   stepper:     { width: '100%', maxWidth: 760, flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 18 },
   stepperCompact: { gap: 4 },
   stepItem:    { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 7 },
@@ -267,6 +260,4 @@ const styles = StyleSheet.create({
   submitBtnDisabled: { opacity: 0.6 },
   submitText:  { ...T.primaryButtonText, fontSize: 16 },
   hint:        { marginTop: 14, fontSize: 12, color: T.faint, textAlign: 'center' },
-  backRow:     { marginBottom: 16 },
-  backText:    { fontSize: 15, color: T.blue, fontWeight: '600' },
 });

@@ -9,7 +9,7 @@ import { TIPOS_DOCUMENTO } from './providerUtils';
  * Carga y listado de documentos de identidad. La seleccion de archivo solo
  * existe en web; en nativo se explica en vez de mostrar un boton muerto.
  */
-export default function DocumentosPanel({ documentos, loading, subiendo, onUpload }) {
+export default function DocumentosPanel({ documentos, loading, subiendo, onUpload, onDescargar }) {
   const [tipoDocumento, setTipoDocumento] = useState(TIPOS_DOCUMENTO[0]);
   const [showTipoSelector, setShowTipoSelector] = useState(false);
   const fileInputRef = useRef(null);
@@ -86,6 +86,11 @@ export default function DocumentosPanel({ documentos, loading, subiendo, onUploa
               <Text style={styles.documentType}>{doc.tipo_documento}</Text>
               <Text style={styles.documentName}>{doc.nombre_archivo}</Text>
             </View>
+            {onDescargar ? (
+              <TouchableOpacity onPress={() => onDescargar(doc)}>
+                <Text style={styles.documentDownloadText}>Descargar</Text>
+              </TouchableOpacity>
+            ) : null}
             <StatusBadge estado={doc.estado_validacion} />
           </View>
         ))

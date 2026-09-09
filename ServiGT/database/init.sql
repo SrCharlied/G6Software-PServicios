@@ -84,6 +84,8 @@ CREATE TABLE IF NOT EXISTS proveedores (
     premium_vence_at TIMESTAMP WITHOUT TIME ZONE NULL,
     premium_ciclo_key VARCHAR(80),
     premium_renovaciones INT NOT NULL DEFAULT 0 CHECK (premium_renovaciones >= 0),
+    portada VARCHAR(500),
+    color_acento VARCHAR(7),
     created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
@@ -169,18 +171,41 @@ CREATE TABLE IF NOT EXISTS compras_creditos (
     estado VARCHAR(20) NOT NULL DEFAULT 'pendiente'
         CHECK (estado IN ('pendiente','completada','fallida','cancelada')),
     referencia VARCHAR(20) NOT NULL UNIQUE,
-    idempotency_key VARCHAR(100) NOT NULL UNIQUE,
+    idempotency_key VARCHAR(100) NOT NULL,
     completada_at TIMESTAMP WITHOUT TIME ZONE,
+    created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT compras_creditos_proveedor_idem_uk UNIQUE (proveedor_id, idempotency_key)
+);
+CREATE INDEX IF NOT EXISTS idx_compras_creditos_proveedor ON compras_creditos (proveedor_id, created_at DESC);
+
+-- Publicaciones de servicios ofrecidos por proveedores
+CREATE TABLE IF NOT EXISTS publicaciones_servicio (
+    id BIGSERIAL PRIMARY KEY,
+    proveedor_id BIGINT NOT NULL REFERENCES proveedores(id) ON DELETE CASCADE,
+    categoria_id BIGINT REFERENCES categorias(id) ON DELETE SET NULL,
+    titulo VARCHAR(120) NOT NULL,
+    descripcion TEXT NOT NULL,
+    precio_referencial DECIMAL(10,2),
+    imagen VARCHAR(500),
+    estado VARCHAR(20) NOT NULL DEFAULT 'activa'
+        CHECK (estado IN ('activa','inactiva')),
     created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
-CREATE INDEX IF NOT EXISTS idx_compras_creditos_proveedor ON compras_creditos (proveedor_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_publicaciones_servicio_visible
+    ON publicaciones_servicio (estado, categoria_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_publicaciones_servicio_proveedor
+    ON publicaciones_servicio (proveedor_id, estado);
 
 -- Servicios (solicitudes de trabajo)
 CREATE TABLE IF NOT EXISTS servicios (
     id BIGSERIAL PRIMARY KEY,
     cliente_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     proveedor_id BIGINT NOT NULL REFERENCES proveedores(id) ON DELETE CASCADE,
+    publicacion_id BIGINT REFERENCES publicaciones_servicio(id) ON DELETE SET NULL,
+    publicacion_titulo VARCHAR(120),
+    publicacion_precio_referencial DECIMAL(10,2),
     categoria_id BIGINT REFERENCES categorias(id) ON DELETE SET NULL,
     descripcion TEXT NOT NULL,
     estado VARCHAR(20) NOT NULL DEFAULT 'pendiente'
@@ -395,6 +420,53 @@ ALTER TABLE proveedores ADD COLUMN IF NOT EXISTS premium_vence_at TIMESTAMP WITH
 ALTER TABLE proveedores ADD COLUMN IF NOT EXISTS premium_ciclo_key VARCHAR(80);
 ALTER TABLE proveedores ADD COLUMN IF NOT EXISTS premium_renovaciones INT NOT NULL DEFAULT 0;
 
+-- Personalizacion del perfil del proveedor: imagen de portada y color de
+-- acento. Ambas opcionales; un perfil sin ellas se dibuja con el degradado
+-- de marca de siempre.
+ALTER TABLE proveedores ADD COLUMN IF NOT EXISTS portada VARCHAR(500);
+ALTER TABLE proveedores ADD COLUMN IF NOT EXISTS color_acento VARCHAR(7);
+
+-- Publicaciones y trazabilidad nullable desde servicios. El snapshot conserva
+-- datos minimos aunque luego la publicacion se edite o elimine.
+CREATE TABLE IF NOT EXISTS publicaciones_servicio (
+    id BIGSERIAL PRIMARY KEY,
+    proveedor_id BIGINT NOT NULL REFERENCES proveedores(id) ON DELETE CASCADE,
+    categoria_id BIGINT REFERENCES categorias(id) ON DELETE SET NULL,
+    titulo VARCHAR(120) NOT NULL,
+    descripcion TEXT NOT NULL,
+    precio_referencial DECIMAL(10,2),
+    imagen VARCHAR(500),
+    estado VARCHAR(20) NOT NULL DEFAULT 'activa'
+        CHECK (estado IN ('activa','inactiva')),
+    created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_publicaciones_servicio_visible
+    ON publicaciones_servicio (estado, categoria_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_publicaciones_servicio_proveedor
+    ON publicaciones_servicio (proveedor_id, estado);
+
+ALTER TABLE servicios ADD COLUMN IF NOT EXISTS publicacion_id BIGINT REFERENCES publicaciones_servicio(id) ON DELETE SET NULL;
+ALTER TABLE servicios ADD COLUMN IF NOT EXISTS publicacion_titulo VARCHAR(120);
+ALTER TABLE servicios ADD COLUMN IF NOT EXISTS publicacion_precio_referencial DECIMAL(10,2);
+
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint
+        WHERE conrelid = 'servicios'::regclass
+          AND contype = 'f'
+          AND conkey = ARRAY[(
+              SELECT attnum FROM pg_attribute
+              WHERE attrelid = 'servicios'::regclass AND attname = 'publicacion_id'
+          )]::smallint[]
+    ) THEN
+        ALTER TABLE servicios
+            ADD CONSTRAINT servicios_publicacion_id_fkey
+            FOREIGN KEY (publicacion_id) REFERENCES publicaciones_servicio(id) ON DELETE SET NULL;
+    END IF;
+END $$;
+
 DO $$
 BEGIN
     IF NOT EXISTS (
@@ -420,6 +492,24 @@ BEGIN
         ALTER TABLE transacciones_credito DROP CONSTRAINT IF EXISTS transacciones_credito_tipo_check;
         ALTER TABLE transacciones_credito ADD CONSTRAINT transacciones_credito_tipo_check
             CHECK (tipo IN ('bono','gasto','recarga','compra'));
+    END IF;
+END $$;
+
+-- La unicidad de idempotency_key nacio global, pero el controlador siempre la
+-- consulta acotada al proveedor autenticado. Esa asimetria hacia que la clave
+-- de un proveedor bloqueara la de otro: la consulta no veia la fila ajena,
+-- pasaba el chequeo y reventaba contra el UNIQUE con un 500. La clave solo
+-- tiene que ser unica DENTRO de cada proveedor.
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint
+        WHERE conrelid = 'compras_creditos'::regclass
+          AND conname = 'compras_creditos_proveedor_idem_uk'
+    ) THEN
+        ALTER TABLE compras_creditos DROP CONSTRAINT IF EXISTS compras_creditos_idempotency_key_key;
+        ALTER TABLE compras_creditos ADD CONSTRAINT compras_creditos_proveedor_idem_uk
+            UNIQUE (proveedor_id, idempotency_key);
     END IF;
 END $$;
 

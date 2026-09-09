@@ -20,9 +20,10 @@ const NAV_BY_ROLE = {
   ],
   proveedor: [
     { label: 'Mi panel',       path: '/dashboard', icon: 'grid' },
+    { label: 'Publicaciones',  path: '/publicaciones', icon: 'file-text' },
     { label: 'Oportunidades',  path: '/pedidos/abiertos', icon: 'search', match: ['/pedidos/'] },
     { label: 'Creditos',       path: '/creditos', icon: 'credit-card' },
-    { label: 'Solicitudes',    path: '/solicitudes', icon: 'briefcase' },
+    { label: 'Trabajos',       path: '/solicitudes', icon: 'briefcase' },
     { label: 'Mensajes',       path: '/chat', icon: 'message-circle' },
     { label: 'Mi perfil',      path: '/profile/edit', icon: 'user' },
   ],

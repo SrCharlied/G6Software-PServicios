@@ -1,6 +1,8 @@
 ServiGT/frontend/dist/
 ServiGT/frontend/.expo/
 ServiGT/frontend/node_modules/
+ServiGT/frontend/playwright-report/
+ServiGT/frontend/test-results/
 ServiGT/backend/vendor/
 .env
 *.log

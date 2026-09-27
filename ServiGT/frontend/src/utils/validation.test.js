@@ -50,6 +50,16 @@ describe('validatePassword', () => {
     expect(validatePassword('')).toBe(false);
     expect(validatePassword(null)).toBe(false);
   });
+
+  it('rechaza contrasenas que superan el tope de 72 bytes de bcrypt', () => {
+    expect(validatePassword('a'.repeat(72))).toBe(true);   // limite exacto
+    expect(validatePassword('a'.repeat(73))).toBe(false);
+  });
+
+  it('cuenta bytes UTF-8, no caracteres, para contrasenas con acentos o emoji', () => {
+    // 24 emoji de 4 bytes = 96 bytes UTF-8 pero solo 24 code points.
+    expect(validatePassword('😀'.repeat(24))).toBe(false);
+  });
 });
 
 describe('validateRequired', () => {

@@ -122,6 +122,89 @@ if (!$check->fetch()) {
     echo "[*] Admin por defecto creado: {$adminEmail}\n";
 }
 
+// ── Neutraliza el administrador legado ─────────────────────────────────────
+// Dejar de crear `admin@gmail.com` cierra el agujero solo en una base nueva. En
+// cualquier entorno que haya corrido el codigo anterior la cuenta sigue ahi con
+// la contrasena literal `admin`, porque el seed de arriba unicamente inserta
+// cuando el correo no existe: nunca toca una fila existente. Eso incluye la
+// maquina de cada integrante y cualquier instancia ya desplegada.
+//
+// Revocar los tokens es la parte que de verdad corta el acceso. Rotar la
+// contrasena no invalida un token de Sanctum ya emitido: quien tenga uno sigue
+// entrando como administrador aunque la contrasena cambie.
+//
+// Si la cuenta no tiene datos asociados se elimina; si los tiene se conserva la
+// fila y se le pone una contrasena aleatoria que nadie conoce, para no romper
+// referencias. En ambos casos el bloque es idempotente y no imprime secretos.
+$legados = ['admin@gmail.com'];
+
+foreach ($legados as $correoLegado) {
+    if ($correoLegado === $adminEmail) {
+        continue; // es el administrador configurado, no un residuo
+    }
+
+    $buscar = $pdo->prepare('SELECT id FROM users WHERE email = :email LIMIT 1');
+    $buscar->execute(['email' => $correoLegado]);
+    $idLegado = $buscar->fetchColumn();
+
+    if (!$idLegado) {
+        continue;
+    }
+
+    $idLegado = (int) $idLegado;
+
+    $tokens = $pdo->prepare(
+        'DELETE FROM personal_access_tokens WHERE tokenable_type = :tipo AND tokenable_id = :id'
+    );
+    $tokens->execute(['tipo' => 'App\\Models\\User', 'id' => $idLegado]);
+    $tokensRevocados = $tokens->rowCount();
+
+    // Cualquier referencia que impida borrar la fila sin perder informacion.
+    $dependencias = [
+        'proveedores'    => 'user_id',
+        'servicios'      => 'cliente_id',
+        'pedidos'        => 'cliente_id',
+        'notificaciones' => 'destinatario_id',
+    ];
+
+    $tieneDatos = false;
+    foreach ($dependencias as $tablaDep => $columna) {
+        $consulta = $pdo->prepare(
+            "SELECT EXISTS (SELECT 1 FROM {$tablaDep} WHERE {$columna} = :id)"
+        );
+        $consulta->execute(['id' => $idLegado]);
+        if ($consulta->fetchColumn()) {
+            $tieneDatos = true;
+            break;
+        }
+    }
+
+    foreach ([['mensajes', 'emisor_id', 'receptor_id'],
+              ['calificaciones', 'autor_id', 'destinatario_id']] as [$tablaDep, $colA, $colB]) {
+        if ($tieneDatos) {
+            break;
+        }
+        $consulta = $pdo->prepare(
+            "SELECT EXISTS (SELECT 1 FROM {$tablaDep} WHERE {$colA} = :a OR {$colB} = :b)"
+        );
+        $consulta->execute(['a' => $idLegado, 'b' => $idLegado]);
+        $tieneDatos = (bool) $consulta->fetchColumn();
+    }
+
+    if ($tieneDatos) {
+        $inutilizable = password_hash(bin2hex(random_bytes(32)), PASSWORD_BCRYPT);
+        $pdo->prepare('UPDATE users SET password = :password WHERE id = :id')
+            ->execute(['password' => $inutilizable, 'id' => $idLegado]);
+        fwrite(STDERR, "[!] Administrador legado {$correoLegado} neutralizado: {$tokensRevocados} token(s)\n");
+        fwrite(STDERR, "    revocado(s) y contrasena reemplazada por un valor aleatorio.\n");
+        fwrite(STDERR, "    Conserva datos asociados, por eso no se elimino. Revisala y borrala a mano\n");
+        fwrite(STDERR, "    si ya no se usa.\n");
+    } else {
+        $pdo->prepare('DELETE FROM users WHERE id = :id')->execute(['id' => $idLegado]);
+        echo "[*] Administrador legado {$correoLegado} eliminado ({$tokensRevocados} token(s) revocado(s)).\n";
+    }
+}
+
 // ── Seed proveedores de ejemplo ────────────────────────────────────────────
 $sampleProviders = [
     ['Juan Perez',      'Plomería',     'Guatemala',      'Mixco',              '5555-0101', 75.00, 4.8, 'experto',     'Plomero con 15 anos de experiencia en instalaciones residenciales.'],

@@ -59,12 +59,30 @@ use Tests\TestCase;
  * cuando D cierre 1.1. El grupo `concurrencia` permite excluirlos del CI
  * mientras tanto, si el equipo decide no integrarlos junto con 1.1.
  *
+ * ── Contrato de `en_camino` (ratificado) ────────────────────────────────────
+ *
+ * Se resolvio la propuesta del plan (seccion 3.1) conservando el estado con una
+ * salida valida:
+ *
+ *     aceptado ──/estado──> en_camino
+ *        │                      │
+ *        └──/iniciar(codigo)────┴──> en_progreso
+ *
+ * Es decir: `/estado` queda reducido a un unico destino, `en_camino`, y solo
+ * desde `aceptado`; `/iniciar` valida el codigo desde `aceptado` o desde
+ * `en_camino`; `completado` sigue siendo alcanzable unicamente por
+ * `confirmar-fin`. Hoy `en_camino` es un callejon sin salida —lo produce solo
+ * `/estado` y `/iniciar` exige `aceptado`—, asi que las dos pruebas de abajo
+ * tambien nacen en rojo. No hay migracion: el valor ya esta en el CHECK del
+ * esquema y no existe ninguna fila en ese estado.
+ *
+ * Que `/estado` rechace `completado` y `cancelado` es una regla de maquina de
+ * estados, no de atomicidad: vive en las pruebas de 1.1, no aqui.
+ *
  * ── Fuera de alcance en esta entrega ────────────────────────────────────────
  *
  * - `cancelar`: la ruta no existe todavia (task 2.1, D). La carrera
  *   cancelar/iniciar es el escenario central de 1.2 y se agrega al aterrizar.
- * - `en_camino`: su tratamiento tecnico sigue pendiente de ratificacion
- *   (plan Sprint 8, seccion 3.1). No se prueba una regla no acordada.
  */
 #[Group('concurrencia')]
 class ServicioConcurrenciaTest extends TestCase
@@ -196,6 +214,43 @@ class ServicioConcurrenciaTest extends TestCase
         $this->assertTransicionAtomica($traza, 'confirmar-fin');
     }
 
+    // ── Contrato ratificado de `en_camino` ───────────────────────────────────
+
+    /**
+     * Unica transicion que `/estado` conserva tras 1.1. Hoy responde 200 pero
+     * sin proteger la fila, asi que dos peticiones simultaneas pueden moverla
+     * desde origenes distintos.
+     */
+    public function test_marcar_en_camino_protege_la_transicion_contra_una_peticion_simultanea(): void
+    {
+        $servicio = $this->crearServicio('aceptado');
+
+        $traza = $this->trazarTransicion(function () use ($servicio) {
+            Sanctum::actingAs($servicio->proveedor->user);
+            return $this->putJson("/api/servicios/{$servicio->id}/estado", ['estado' => 'en_camino']);
+        });
+
+        $this->assertTransicionAtomica($traza, 'marcar en camino');
+    }
+
+    /**
+     * La salida del estado. Hoy `/iniciar` exige `aceptado`, asi que un
+     * servicio en `en_camino` no puede arrancar y queda atrapado: esta prueba
+     * falla primero en el codigo de respuesta y, una vez abierta la puerta,
+     * seguira exigiendo que la transicion sea atomica.
+     */
+    public function test_iniciar_desde_en_camino_protege_la_transicion_contra_una_peticion_simultanea(): void
+    {
+        $servicio = $this->crearServicio('en_camino');
+
+        $traza = $this->trazarTransicion(function () use ($servicio) {
+            Sanctum::actingAs($servicio->proveedor->user);
+            return $this->postJson("/api/servicios/{$servicio->id}/iniciar", ['codigo' => '123456']);
+        });
+
+        $this->assertTransicionAtomica($traza, 'iniciar desde en_camino');
+    }
+
     // ── Efecto duplicado concreto ────────────────────────────────────────────
 
     /**
@@ -286,7 +341,9 @@ class ServicioConcurrenciaTest extends TestCase
         $this->assertSame(
             200,
             $traza['status'],
-            "El fixture de {$endpoint} no llego a ejecutar la transicion."
+            "{$endpoint} no completo la transicion (HTTP {$traza['status']}), asi que no hay nada "
+            . 'cuya atomicidad medir. Un 422 aqui significa que la ruta todavia no admite este '
+            . 'origen: es parte del contrato que cierra 1.1, no un fixture mal armado.'
         );
 
         $lecturaBajoLock      = false;

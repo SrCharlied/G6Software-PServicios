@@ -145,7 +145,7 @@ export default function RegisterScreen({ navigation, onRegisterSuccess }) {
     if (!validateRequired(name)) errs.name = 'El nombre es requerido.';
     if (!validateRequired(email)) errs.email = 'El correo es requerido.';
     else if (!validateEmail(email)) errs.email = 'El formato del correo no es valido.';
-    if (!validatePassword(password)) errs.password = 'La contrasena debe tener al menos 6 caracteres.';
+    if (!validatePassword(password)) errs.password = 'La contrasena debe tener entre 6 y 72 caracteres.';
     if (Object.keys(errs).length) { setErrors(errs); return; }
     setErrors({});
 

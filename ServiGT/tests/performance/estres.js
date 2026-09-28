@@ -1,4 +1,4 @@
-// Task 5.1/5.2 — prueba de estres escalonada con techo explicito.
+// Task 5.1/5.2 - prueba de estres escalonada con techo explicito.
 //
 // Escala VUs por etapas hasta un techo (STRESS_MAX_VUS, default 100) durante
 // como maximo 10 minutos, seguido de 2 minutos a 0 VUs para observar
@@ -11,13 +11,14 @@
 //   docker run --rm --network <red-del-backend-objetivo> \
 //     -e BASE_URL=http://k6_backend_target:8000/api \
 //     -v "$(pwd)/ServiGT/tests/performance:/scripts" \
-//     grafana/k6:latest run /scripts/estres.js
+//     grafana/k6@sha256:e66db15b860113878fa74670e31f5e274830b7b6e42c8bff28b2f2d86a257603 run /scripts/estres.js
 import http from 'k6/http';
 import { check, sleep } from 'k6';
 import { Rate } from 'k6/metrics';
 
 const BASE_URL = __ENV.BASE_URL || 'http://localhost:18000/api';
 const MAX_VUS = Number(__ENV.STRESS_MAX_VUS || 100);
+const SMOKE = __ENV.SMOKE === 'true' || __ENV.SMOKE === '1';
 
 const errorRate = new Rate('errores_estres');
 
@@ -26,7 +27,10 @@ export const options = {
     escalonado: {
       executor: 'ramping-vus',
       startVUs: 0,
-      stages: [
+      stages: SMOKE ? [
+        { duration: '10s', target: 1 },
+        { duration: '5s', target: 0 },
+      ] : [
         { duration: '90s', target: Math.round(MAX_VUS * 0.1) },
         { duration: '90s', target: Math.round(MAX_VUS * 0.25) },
         { duration: '90s', target: Math.round(MAX_VUS * 0.5) },
@@ -41,6 +45,7 @@ export const options = {
     // No es un objetivo de negocio: es un freno de seguridad para no seguir
     // generando trafico si el entorno ya colapso.
     'http_req_failed': [{ threshold: 'rate<0.5', abortOnFail: true, delayAbortEval: '20s' }],
+    'checks': ['rate>0.99'],
   },
 };
 
@@ -48,7 +53,7 @@ export default function () {
   // Solo lecturas publicas: el objetivo de esta prueba es encontrar el
   // techo de saturacion del servidor, no medir autenticacion (eso ya lo
   // cubre carga.js). Mezclar login aqui encimaria el costo de bcrypt con la
-  // señal de saturacion HTTP general que buscamos.
+  // senal de saturacion HTTP general que buscamos.
   const endpoints = ['/health', '/categorias', '/providers', '/publicaciones'];
   const path = endpoints[Math.floor(Math.random() * endpoints.length)];
 

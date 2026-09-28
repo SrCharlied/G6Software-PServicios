@@ -74,23 +74,39 @@ class CalificacionController extends Controller
     {
         $validated = $request->validate([
             'servicio_id'     => 'required|exists:servicios,id',
-            'destinatario_id' => 'required|exists:users,id',
+            'destinatario_id' => 'nullable|exists:users,id',
             'puntuacion'      => 'required|integer|between:1,5',
             'comentario'      => 'nullable|string|max:500',
         ]);
 
-        $servicio = Servicio::find($validated['servicio_id']);
+        $servicio = Servicio::with('proveedor')->find($validated['servicio_id']);
         $userId   = $request->user()->id;
 
         if ($servicio->estado !== 'completado') {
-            return response()->json(['message' => 'Solo puedes calificar servicios completados'], 422);
+            return $this->error('Solo puedes calificar servicios completados', 422);
         }
 
-        $esParte = $servicio->cliente_id === $userId
-            || $servicio->proveedor?->user_id === $userId;
+        $esCliente = $servicio->cliente_id === $userId;
+        $esProveedor = $servicio->proveedor?->user_id === $userId;
 
-        if (!$esParte) {
-            return response()->json(['message' => 'No participaste en este servicio'], 403);
+        if (!$esCliente && !$esProveedor) {
+            return $this->error('No participaste en este servicio', 403);
+        }
+
+        $destinatarioId = $esCliente
+            ? $servicio->proveedor?->user_id
+            : $servicio->cliente_id;
+
+        if (!$destinatarioId) {
+            return $this->error('El servicio no tiene una contraparte valida para calificar', 422);
+        }
+
+        if ($destinatarioId === $userId) {
+            return $this->error('No puedes calificar tu propio perfil.', 403);
+        }
+
+        if (isset($validated['destinatario_id']) && (int) $validated['destinatario_id'] !== (int) $destinatarioId) {
+            return $this->error('El destinatario no corresponde a la contraparte del servicio', 422);
         }
 
         $yaCalifico = Calificacion::where('servicio_id', $validated['servicio_id'])
@@ -98,28 +114,31 @@ class CalificacionController extends Controller
             ->exists();
 
         if ($yaCalifico) {
-            return response()->json(['message' => 'Ya calificaste este servicio'], 422);
+            return $this->error('Ya calificaste este servicio', 422);
         }
 
-        $validated['autor_id']     = $userId;
-        $validated['es_verificada'] = true;
-
-        $calificacion = Calificacion::create($validated);
+        $calificacion = Calificacion::create([
+            'servicio_id'     => $servicio->id,
+            'autor_id'        => $userId,
+            'destinatario_id' => $destinatarioId,
+            'puntuacion'      => $validated['puntuacion'],
+            'comentario'      => $validated['comentario'] ?? null,
+            'es_verificada'   => true,
+        ]);
 
         // Actualizar promedio del proveedor si se califica a un proveedor
-        $proveedor = Proveedor::where('user_id', $validated['destinatario_id'])->first();
+        $proveedor = Proveedor::where('user_id', $destinatarioId)->first();
         if ($proveedor) {
-            $promedio = Calificacion::where('destinatario_id', $validated['destinatario_id'])
+            $promedio = Calificacion::where('destinatario_id', $destinatarioId)
                 ->avg('puntuacion');
-            $total = Calificacion::where('destinatario_id', $validated['destinatario_id'])->count();
+            $total = Calificacion::where('destinatario_id', $destinatarioId)->count();
             $proveedor->update([
                 'calificacion_promedio' => round($promedio, 2),
                 'total_calificaciones'  => $total,
             ]);
         }
 
-        return response()->json([
-            'message'      => 'Calificacion enviada',
+        return $this->success('Calificacion enviada', [
             'calificacion' => $calificacion->load('autor'),
         ], 201);
     }

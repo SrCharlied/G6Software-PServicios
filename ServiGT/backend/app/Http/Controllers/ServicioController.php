@@ -205,6 +205,52 @@ class ServicioController extends Controller
         });
     }
 
+    public function cancelar(int $id, Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'motivo' => 'nullable|string|max:500',
+        ]);
+
+        return DB::transaction(function () use ($id, $request, $validated) {
+            $servicio = Servicio::query()->lockForUpdate()->find($id);
+
+            if (!$servicio) {
+                return $this->error('Servicio no encontrado', 404);
+            }
+
+            $user = $request->user();
+            if ($user->role !== 'cliente' || $servicio->cliente_id !== $user->id) {
+                return $this->error('No tienes permiso para cancelar este servicio', 403);
+            }
+
+            if (!in_array($servicio->estado, ['pendiente', 'aceptado', 'en_camino'], true)) {
+                return $this->error('Este servicio ya no se puede cancelar', 422);
+            }
+
+            $servicio->update([
+                'estado' => 'cancelado',
+                'motivo_cancelacion' => $validated['motivo'] ?? null,
+            ]);
+
+            $servicio->loadMissing('proveedor');
+            if ($servicio->proveedor?->user_id) {
+                Notificacion::create([
+                    'destinatario_id' => $servicio->proveedor->user_id,
+                    'tipo'            => 'servicio_cancelado',
+                    'titulo'          => 'Servicio cancelado',
+                    'mensaje'         => 'El cliente cancelo el servicio antes de que iniciara.',
+                    'datos'           => ['servicio_id' => $servicio->id],
+                ]);
+            }
+
+            $servicio->loadMissing(['cliente', 'proveedor.categoria', 'categoria']);
+
+            return $this->success('Servicio cancelado', [
+                'servicio' => new ServicioResource($servicio),
+            ]);
+        });
+    }
+
     public function actualizarEstado(int $id, Request $request): JsonResponse
     {
         return DB::transaction(function () use ($id, $request) {

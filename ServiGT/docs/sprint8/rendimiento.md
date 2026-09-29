@@ -103,3 +103,60 @@ docker run --rm --network servigt_servigt_net -e BASE_URL=http://k6_backend_targ
 docker rm -f k6_backend_target
 docker compose --profile test down db_test -v
 ```
+
+## Corrida final sobre el incremento corregido
+
+Esta corrida del 2026-09-29 reemplaza la medición preliminar como evidencia de
+cierre. Se ejecutó sobre `cf703ef`, que incluye las correcciones de las tasks
+1.1, 1.2, 2.1, 2.2, 3.1, 4.1 y 4.2. Se mantuvo el mismo entorno dedicado:
+`servigt-backend_test`, PostgreSQL `db_test` en tmpfs y la imagen k6 con digest
+`sha256:e66db15b860113878fa74670e31f5e274830b7b6e42c8bff28b2f2d86a257603`.
+
+Antes de las campañas se verificó `/api/health`: driver `pgsql`, estado
+`connected`. El smoke de 1 VU durante 10 segundos pasó con 20 requests HTTP,
+0% de errores y todos los thresholds verdes.
+
+### Carga final
+
+Rampa completa 0->5->25->25->0 durante cinco minutos.
+
+| Métrica | Resultado final | Objetivo propuesto | Cumple |
+|---|---:|---:|:--:|
+| p95 lecturas públicas | 15.78 ms | < 800 ms | Sí |
+| p95 autenticado (`/me`) | 17.14 ms | < 1.5 s | Sí |
+| Tasa de error de negocio | 0.00% (0/5127) | < 1% | Sí |
+| `http_req_failed` | 0.00% (0/5137) | < 5% | Sí |
+| Throughput | 5137 requests, 16.95 req/s | - | - |
+| VUs máximos | 25 | 25 | Sí |
+
+Resultado del proceso: exit code 0; 5127/5127 checks exitosos y ninguna
+iteración interrumpida.
+
+### Estrés final
+
+Escalonado completo hasta `STRESS_MAX_VUS=100`, sostenido en el techo y con
+rampa posterior a cero durante diez minutos totales.
+
+| Métrica | Resultado final |
+|---|---:|
+| VUs máximos alcanzados | 100 |
+| `http_req_failed` | 0.00% (0/35102) |
+| Checks | 35102/35102 exitosos |
+| Throughput | 35102 requests, 58.28 req/s |
+| Latencia media | 280.09 ms |
+| Latencia p95 | 665.56 ms |
+| Latencia máxima | 793.27 ms |
+
+Resultado del proceso: exit code 0. El freno `rate<0.5` no se activó y el
+escenario regresó de 100 a 0 VUs sin requests interrumpidos. No se encontró un
+punto de ruptura dentro del techo aprobado de la prueba.
+
+### Interpretación final
+
+- Los cuatro thresholds propuestos de carga se cumplen en esta máquina.
+- Hasta 100 VUs no hubo respuestas fallidas ni errores de servidor.
+- La latencia p95 aumentó de 16.39 ms en carga mixta a 665.56 ms en estrés,
+  señal esperable de presión, pero sin pérdida de disponibilidad observada.
+- Estos valores describen `php artisan serve` y Docker Desktop en una máquina
+  local compartida. No son una promesa de capacidad de producción ni reemplazan
+  una prueba sobre la infraestructura de despliegue real.

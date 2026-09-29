@@ -1,6 +1,6 @@
 // Pruebas del mapa de destinos de notificaciones (src/utils/notificationRoutes.js).
 //
-// Funcion pura: sin React, sin red. Cubre los 9 tipos que emite el backend mas
+// Funcion pura: sin React, sin red. Cubre los 10 tipos que emite el backend mas
 // los casos degradados (tipo desconocido, datos ausentes, payload incompleto).
 
 import { destinoNotificacion, TIPOS_CON_DESTINO } from './notificationRoutes';
@@ -8,7 +8,7 @@ import { destinoNotificacion, TIPOS_CON_DESTINO } from './notificationRoutes';
 // Contrato con el backend. Fuente exacta:
 //   ServicioController.php  -> nueva_solicitud, solicitud_aceptada,
 //     solicitud_rechazada, servicio_iniciado, servicio_por_confirmar,
-//     servicio_completado, servicio_calificable
+//     servicio_completado, servicio_cancelado, servicio_calificable
 //   CotizacionController.php -> cotizacion_aceptada, cotizacion_rechazada
 const TIPOS_BACKEND = [
   'nueva_solicitud',
@@ -17,13 +17,14 @@ const TIPOS_BACKEND = [
   'servicio_iniciado',
   'servicio_por_confirmar',
   'servicio_completado',
+  'servicio_cancelado',
   'servicio_calificable',
   'cotizacion_aceptada',
   'cotizacion_rechazada',
 ];
 
 describe('cobertura de tipos', () => {
-  it('mapea exactamente los 9 tipos del backend, sin faltantes ni sobrantes', () => {
+  it('mapea exactamente los 10 tipos del backend, sin faltantes ni sobrantes', () => {
     expect(TIPOS_CON_DESTINO.sort()).toEqual([...TIPOS_BACKEND].sort());
   });
 
@@ -40,7 +41,7 @@ describe('cobertura de tipos', () => {
 });
 
 describe('Flujo A: servicios', () => {
-  it('los seis tipos de ciclo de servicio van al listado de solicitudes', () => {
+  it('los siete tipos de ciclo de servicio van al listado de solicitudes', () => {
     const tipos = [
       'nueva_solicitud',
       'solicitud_aceptada',
@@ -48,11 +49,17 @@ describe('Flujo A: servicios', () => {
       'servicio_iniciado',
       'servicio_por_confirmar',
       'servicio_completado',
+      'servicio_cancelado',
     ];
 
     tipos.forEach((tipo) => {
       expect(destinoNotificacion({ tipo, datos: { servicio_id: 41 } })).toBe('/solicitudes');
     });
+  });
+
+  it('servicio_cancelado navega al listado incluso sin servicio_id', () => {
+    expect(destinoNotificacion({ tipo: 'servicio_cancelado', datos: {} }))
+      .toBe('/solicitudes');
   });
 
   it('servicio_calificable abre la pantalla de calificacion del servicio', () => {

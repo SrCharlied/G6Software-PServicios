@@ -206,3 +206,50 @@ alternativa, sin consumidores conocidos en el frontend.
   tres de esta página convivían con 271 pruebas en verde.
 - No se ejecutó escaneo ZAP nuevo en esta captura. El del 07/09/2026 sigue
   siendo la referencia y su diff es trabajo de la fase "después".
+
+## 6. Evidencia después de las correcciones
+
+Esta sección reemplaza el estado pendiente de la captura histórica anterior.
+Se ejecutó el 2026-09-29 sobre `360ba3e` y una base PostgreSQL efímera
+`db_test`; no se usaron cuentas ni datos de desarrollo.
+
+### Matriz negativa consolidada
+
+```bash
+docker compose --profile test run --rm backend_test --filter \
+  "MatrizAutorizacionTest|ProviderAuthorizationTest|ProviderDocumentPrivacyTest|AutocontratacionYMensajeriaTest|ServicioResourceActorAwareTest|PublicacionServicioContratoTest|AuthSecurityTest|SecureErrorAndHealthTest|ConfiguracionSeguraTest|ServicioCancelacionTest|CalificacionDestinatarioTest|ServicioConcurrenciaTest"
+
+# Tests: 155 passed (376 assertions) - 4.19 s
+
+docker compose --profile test run --rm backend_test tests/Feature/RateLimitingTest.php
+
+# Tests: 5 passed (71 assertions) - 0.48 s
+```
+
+La matriz incluye las regresiones nuevas de cancelación, transiciones
+concurrentes y destinatario de calificaciones, además de las pruebas previas
+de autenticación, autorización, privacidad, errores seguros y contratos.
+
+### Smoke HTTP de H1, H2 y H3
+
+```bash
+python docs/sprint8/evidencia/despues-h1-h2-h3.py
+```
+
+Resultado real: `PASS`; las 14 comprobaciones pasaron. El script usa por
+defecto `http://localhost:18000/api`, permite cambiarlo con `BASE_URL`, crea
+solo datos `smoke_after_` y termina con código distinto de cero ante cualquier
+regresión. La salida completa está en
+`evidencia/despues-h1-h2-h3.txt`.
+
+| Riesgo | Resultado después |
+|---|---|
+| H1: completar o cancelar mediante `PUT /estado` | No reproducido. Ambos destinos retornan 422 y el servicio conserva `aceptado`. |
+| H2: cancelación ausente o posterior al inicio | No reproducido. El cliente cancela antes de iniciar; iniciar un cancelado y cancelar `en_progreso` retornan 422. |
+| H3: destinatario arbitrario o autocalificación | No reproducido. La ruta histórica deriva el proveedor real; el tercero conserva 0 calificaciones y la autocalificación retorna 403. |
+
+### Alcance restante
+
+No se ejecutó un escaneo ZAP nuevo. El cierre se apoya en la matriz negativa,
+el throttle aislado y el smoke HTTP reproducible; por ello no se afirma que
+exista un diff ZAP posterior ni ausencia total de vulnerabilidades.

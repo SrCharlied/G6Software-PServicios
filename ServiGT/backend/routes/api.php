@@ -87,6 +87,8 @@ Route::middleware('auth:sanctum')->group(function () {
     // Proveedor acepta/rechaza
     Route::post('/servicios/{id}/aceptar',  [ServicioController::class, 'aceptar'])->where('id', '[0-9]+');
     Route::post('/servicios/{id}/rechazar', [ServicioController::class, 'rechazar'])->where('id', '[0-9]+');
+    // Cliente propietario cancela antes de que el trabajo haya iniciado
+    Route::post('/servicios/{id}/cancelar', [ServicioController::class, 'cancelar'])->where('id', '[0-9]+');
     // Proveedor inicia el servicio validando el codigo de inicio del cliente
     Route::post('/servicios/{id}/iniciar',  [ServicioController::class, 'iniciar'])->where('id', '[0-9]+');
     // Proveedor finaliza el servicio: genera codigo_fin y estado pasa a por_confirmar

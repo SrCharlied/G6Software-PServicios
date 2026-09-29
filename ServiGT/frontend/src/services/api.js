@@ -410,6 +410,15 @@ export const rechazarServicio = async (id, motivo = '') => {
   }
 };
 
+export const cancelarServicio = async (id) => {
+  try {
+    const response = await api.post(`/servicios/${id}/cancelar`);
+    return response.data;
+  } catch (error) {
+    throwApiError(error, 'No se pudo cancelar el servicio.');
+  }
+};
+
 export const actualizarEstadoServicio = async (id, estado) => {
   try {
     const response = await api.put(`/servicios/${id}/estado`, { estado });

@@ -144,4 +144,16 @@ describe('api error handling', () => {
     expect(storage.values.servigt_user).toBeUndefined();
     expect(storage.values.chat_1_2).toBeUndefined();
   });
+
+  it('cancela un servicio mediante el endpoint autenticado', async () => {
+    const { apiModule, client } = buildApiModule();
+    client.post.mockResolvedValueOnce({
+      data: { message: 'Servicio cancelado', servicio: { id: 17, estado: 'cancelado' } },
+    });
+
+    await expect(apiModule.cancelarServicio(17)).resolves.toMatchObject({
+      servicio: { id: 17, estado: 'cancelado' },
+    });
+    expect(client.post).toHaveBeenCalledWith('/servicios/17/cancelar');
+  });
 });

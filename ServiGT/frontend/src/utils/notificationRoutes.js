@@ -22,6 +22,7 @@ const DESTINOS = {
   servicio_iniciado:      () => '/solicitudes',
   servicio_por_confirmar: () => '/solicitudes',
   servicio_completado:    () => '/solicitudes',
+  servicio_cancelado:     () => '/solicitudes',
 
   // Unico tipo del Flujo A con pantalla dedicada.
   servicio_calificable: (datos) =>

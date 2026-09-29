@@ -1,7 +1,9 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
+  Modal,
+  Pressable,
   StyleSheet,
   Text,
   TextInput,
@@ -10,6 +12,7 @@ import {
   View,
 } from 'react-native';
 import {
+  cancelarServicio,
   confirmarFinServicio,
   getSolicitudesCliente,
   getSolicitudesProveedor,
@@ -24,12 +27,14 @@ const tabs = [
 ];
 
 const ESTADOS_CON_CODIGO = new Set(['pendiente', 'aceptado']);
+const ESTADOS_CANCELABLES = new Set(['pendiente', 'aceptado', 'en_camino']);
 
 function StatusChip({ estado }) {
   const normalized = estado || 'pendiente';
   const cfg = {
     pendiente: { bg: '#fff7ed', fg: '#92400e', dot: '#f59e0b' },
     aceptado: { bg: '#eef4ff', fg: '#1b5499', dot: T.blue },
+    en_camino: { bg: '#eef4ff', fg: '#1b5499', dot: T.blue },
     en_progreso: { bg: '#eef4ff', fg: '#1b5499', dot: T.blue },
     por_confirmar: { bg: '#fef9c3', fg: '#713f12', dot: T.amber },
     completado: { bg: '#dcfce7', fg: '#166534', dot: T.success },
@@ -56,6 +61,10 @@ export default function SolicitudesScreen({ navigation, user }) {
   const [codigoFinInputs, setCodigoFinInputs] = useState({});
   const [codigoFinErrors, setCodigoFinErrors] = useState({});
   const [confirmandoId, setConfirmandoId] = useState(null);
+  const [cancelTarget, setCancelTarget] = useState(null);
+  const [cancelandoId, setCancelandoId] = useState(null);
+  const [cancelError, setCancelError] = useState('');
+  const cancelandoRef = useRef(false);
 
   const canSeeRecibidas = user?.role === 'proveedor';
 
@@ -107,6 +116,37 @@ export default function SolicitudesScreen({ navigation, user }) {
     }
   };
 
+  const abrirConfirmacionCancelacion = (servicio) => {
+    setCancelError('');
+    setCancelTarget(servicio);
+  };
+
+  const cerrarConfirmacionCancelacion = () => {
+    if (cancelandoId !== null) return;
+    setCancelError('');
+    setCancelTarget(null);
+  };
+
+  const handleCancelar = async () => {
+    if (!cancelTarget || cancelandoRef.current) return;
+
+    const servicioId = cancelTarget.id;
+    cancelandoRef.current = true;
+    setCancelandoId(servicioId);
+    setCancelError('');
+    try {
+      await cancelarServicio(servicioId);
+      await fetchSolicitudes();
+      setCancelTarget(null);
+      toast('Servicio cancelado.', 'success');
+    } catch (error) {
+      setCancelError(error.message || 'No se pudo cancelar el servicio.');
+    } finally {
+      cancelandoRef.current = false;
+      setCancelandoId(null);
+    }
+  };
+
   const formatDate = (value) => {
     if (!value) return '';
     try {
@@ -140,6 +180,9 @@ export default function SolicitudesScreen({ navigation, user }) {
     const puedeCalificar = activeTab === 'enviadas'
       && item.estado === 'completado'
       && !yaCalifico;
+    const puedeCancelar = user?.role === 'cliente'
+      && activeTab === 'enviadas'
+      && ESTADOS_CANCELABLES.has(item.estado);
 
     return (
       <View style={[styles.card, wide && styles.cardWide]}>
@@ -226,6 +269,15 @@ export default function SolicitudesScreen({ navigation, user }) {
         {activeTab === 'enviadas' && item.estado === 'completado' && yaCalifico ? (
           <Text style={styles.ratedText}>Ya calificaste este servicio.</Text>
         ) : null}
+
+        {puedeCancelar ? (
+          <TouchableOpacity
+            style={styles.cancelAction}
+            onPress={() => abrirConfirmacionCancelacion(item)}
+          >
+            <Text style={styles.cancelActionText}>Cancelar servicio</Text>
+          </TouchableOpacity>
+        ) : null}
       </View>
     );
   };
@@ -296,6 +348,44 @@ export default function SolicitudesScreen({ navigation, user }) {
         />
       )}
       </View>
+
+      <Modal
+        transparent
+        visible={Boolean(cancelTarget)}
+        animationType="fade"
+        onRequestClose={cerrarConfirmacionCancelacion}
+      >
+        <View style={styles.modalOverlay}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={cerrarConfirmacionCancelacion} />
+          <View style={styles.cancelModal} accessibilityViewIsModal>
+            <Text style={styles.cancelModalTitle}>Cancelar este servicio</Text>
+            <Text style={styles.cancelModalText}>
+              Esta accion no se puede deshacer. El proveedor recibira una notificacion.
+            </Text>
+            {cancelError ? <Text style={styles.cancelError}>{cancelError}</Text> : null}
+            <View style={styles.cancelModalActions}>
+              <TouchableOpacity
+                style={styles.cancelSecondaryBtn}
+                onPress={cerrarConfirmacionCancelacion}
+                disabled={cancelandoId !== null}
+              >
+                <Text style={styles.cancelSecondaryText}>Volver</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.cancelConfirmBtn, cancelandoId !== null && styles.cancelConfirmBtnDisabled]}
+                onPress={handleCancelar}
+                disabled={cancelandoId !== null}
+              >
+                {cancelandoId !== null ? (
+                  <ActivityIndicator color={T.white} />
+                ) : (
+                  <Text style={styles.cancelConfirmText}>Confirmar cancelacion</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -406,6 +496,50 @@ const styles = StyleSheet.create({
   confirmFinBtnDisabled: { opacity: 0.6 },
   confirmFinBtnText: { color: T.white, fontSize: 14, fontWeight: '800' },
   ratedText: { marginTop: 12, color: T.success, fontSize: 13, fontWeight: '700' },
+  cancelAction: {
+    marginTop: 10,
+    borderWidth: 1,
+    borderColor: T.danger,
+    borderRadius: 8,
+    paddingVertical: 11,
+    alignItems: 'center',
+  },
+  cancelActionText: { color: T.danger, fontSize: 14, fontWeight: '800' },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(14,20,36,0.42)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: T.s4,
+  },
+  cancelModal: {
+    width: '100%',
+    maxWidth: 440,
+    backgroundColor: T.paper,
+    borderRadius: T.rSm,
+    borderWidth: 1,
+    borderColor: T.border,
+    padding: T.s5,
+    ...T.sh3,
+  },
+  cancelModalTitle: { color: T.ink, fontSize: 20, fontWeight: '800' },
+  cancelModalText: { color: T.muted, fontSize: 14, lineHeight: 20, marginTop: T.s2 },
+  cancelError: { color: T.danger, fontSize: 13, lineHeight: 18, marginTop: T.s3 },
+  cancelModalActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: T.s2, marginTop: T.s5 },
+  cancelSecondaryBtn: { paddingVertical: 11, paddingHorizontal: T.s4, borderRadius: T.rSm },
+  cancelSecondaryText: { color: T.text, fontSize: 14, fontWeight: '700' },
+  cancelConfirmBtn: {
+    minWidth: 174,
+    minHeight: 42,
+    backgroundColor: T.danger,
+    borderRadius: T.rSm,
+    paddingVertical: 11,
+    paddingHorizontal: T.s4,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cancelConfirmBtnDisabled: { opacity: 0.6 },
+  cancelConfirmText: { color: T.white, fontSize: 14, fontWeight: '800' },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
   loadingText: { marginTop: 12, color: '#667085' },
   emptyState: { alignItems: 'center', paddingVertical: 64, paddingHorizontal: 24 },

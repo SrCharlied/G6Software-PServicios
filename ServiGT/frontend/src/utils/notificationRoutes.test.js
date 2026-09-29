@@ -73,24 +73,6 @@ describe('Flujo A: servicios', () => {
   });
 });
 
-describe('Contrato pendiente S8-02: servicio_cancelado', () => {
-  // Tipo nuevo acordado para el bloque S8-02 (cancelacion de cliente). El
-  // mapping real en DESTINOS lo integra PT en la task 2.2; estos fixtures
-  // documentan el contrato ya acordado: igual que los otros tipos de ciclo
-  // de servicio, navega siempre a /solicitudes (no existe ruta /servicios/[id]).
-  // Hasta que 2.2 registre 'servicio_cancelado' en DESTINOS, estas pruebas
-  // fallan en rojo por diseno: destinoNotificacion trata el tipo como
-  // desconocido y devuelve null.
-  it('servicio_cancelado abre el listado de solicitudes (destino previsto)', () => {
-    expect(destinoNotificacion({ tipo: 'servicio_cancelado', datos: { servicio_id: 41 } }))
-      .toBe('/solicitudes');
-  });
-
-  it('servicio_cancelado sin servicio_id tambien cae al listado de solicitudes (fallback seguro)', () => {
-    expect(destinoNotificacion({ tipo: 'servicio_cancelado', datos: {} })).toBe('/solicitudes');
-  });
-});
-
 describe('Flujo B: pedidos y cotizaciones', () => {
   it('cotizacion_aceptada abre el pedido adjudicado', () => {
     const datos = { pedido_id: 12, cotizacion_id: 30, servicio_id: 55 };

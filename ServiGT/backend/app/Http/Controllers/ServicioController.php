@@ -150,22 +150,23 @@ class ServicioController extends Controller
 
     public function aceptar(int $id, Request $request): JsonResponse
     {
-        $servicio = $this->getServicioProveedor($id, $request);
+        $servicio = DB::transaction(function () use ($id, $request) {
+            $servicio = $this->lockedServicioProveedor($id, $request);
+            if ($servicio instanceof JsonResponse) return $servicio;
+            if ($servicio->estado !== 'pendiente') {
+                return $this->error('Solo se pueden aceptar solicitudes pendientes', 422);
+            }
+            $servicio->update(['estado' => 'aceptado']);
+            Notificacion::create([
+                'destinatario_id' => $servicio->cliente_id,
+                'tipo'            => 'solicitud_aceptada',
+                'titulo'          => 'Solicitud aceptada',
+                'mensaje'         => 'El proveedor acepto tu solicitud de servicio.',
+                'datos'           => ['servicio_id' => $servicio->id],
+            ]);
+            return $servicio;
+        });
         if ($servicio instanceof JsonResponse) return $servicio;
-
-        if ($servicio->estado !== 'pendiente') {
-            return $this->error('Solo se pueden aceptar solicitudes pendientes', 422);
-        }
-
-        $servicio->update(['estado' => 'aceptado']);
-
-        Notificacion::create([
-            'destinatario_id' => $servicio->cliente_id,
-            'tipo'            => 'solicitud_aceptada',
-            'titulo'          => 'Solicitud aceptada',
-            'mensaje'         => 'El proveedor acepto tu solicitud de servicio.',
-            'datos'           => ['servicio_id' => $servicio->id],
-        ]);
 
         $servicio->loadMissing(['cliente', 'proveedor.categoria', 'categoria']);
 
@@ -174,27 +175,24 @@ class ServicioController extends Controller
 
     public function rechazar(int $id, Request $request): JsonResponse
     {
-        $servicio = $this->getServicioProveedor($id, $request);
-        if ($servicio instanceof JsonResponse) return $servicio;
-
-        if ($servicio->estado !== 'pendiente') {
-            return $this->error('Solo se pueden rechazar solicitudes pendientes', 422);
-        }
-
         $request->validate(['motivo' => 'nullable|string|max:500']);
-
-        $servicio->update([
-            'estado'             => 'rechazado',
-            'motivo_cancelacion' => $request->motivo,
-        ]);
-
-        Notificacion::create([
-            'destinatario_id' => $servicio->cliente_id,
-            'tipo'            => 'solicitud_rechazada',
-            'titulo'          => 'Solicitud rechazada',
-            'mensaje'         => 'El proveedor no pudo aceptar tu solicitud.',
-            'datos'           => ['servicio_id' => $servicio->id],
-        ]);
+        $servicio = DB::transaction(function () use ($id, $request) {
+            $servicio = $this->lockedServicioProveedor($id, $request);
+            if ($servicio instanceof JsonResponse) return $servicio;
+            if ($servicio->estado !== 'pendiente') {
+                return $this->error('Solo se pueden rechazar solicitudes pendientes', 422);
+            }
+            $servicio->update(['estado' => 'rechazado', 'motivo_cancelacion' => $request->motivo]);
+            Notificacion::create([
+                'destinatario_id' => $servicio->cliente_id,
+                'tipo'            => 'solicitud_rechazada',
+                'titulo'          => 'Solicitud rechazada',
+                'mensaje'         => 'El proveedor no pudo aceptar tu solicitud.',
+                'datos'           => ['servicio_id' => $servicio->id],
+            ]);
+            return $servicio;
+        });
+        if ($servicio instanceof JsonResponse) return $servicio;
 
         $servicio->loadMissing(['cliente', 'proveedor.categoria', 'categoria']);
 
@@ -203,18 +201,17 @@ class ServicioController extends Controller
 
     public function actualizarEstado(int $id, Request $request): JsonResponse
     {
-        $servicio = $this->getServicioProveedor($id, $request);
+        $servicio = DB::transaction(function () use ($id, $request) {
+            $servicio = $this->lockedServicioProveedor($id, $request);
+            if ($servicio instanceof JsonResponse) return $servicio;
+            $request->validate(['estado' => 'required|in:en_camino']);
+            if ($servicio->estado !== 'aceptado') {
+                return $this->error('Solo un servicio aceptado puede pasar a en camino', 422);
+            }
+            $servicio->update(['estado' => 'en_camino']);
+            return $servicio;
+        });
         if ($servicio instanceof JsonResponse) return $servicio;
-
-        $request->validate([
-            'estado' => 'required|in:en_camino,completado,cancelado',
-        ]);
-
-        $servicio->update(['estado' => $request->estado]);
-
-        if ($request->estado === 'completado') {
-            $this->notificarServicioCalificable($servicio);
-        }
 
         $servicio->loadMissing(['cliente', 'proveedor.categoria', 'categoria']);
 
@@ -227,26 +224,26 @@ class ServicioController extends Controller
             'codigo' => 'required|string|size:6',
         ]);
 
-        $servicio = $this->getServicioProveedor($id, $request);
+        $servicio = DB::transaction(function () use ($id, $request) {
+            $servicio = $this->lockedServicioProveedor($id, $request);
+            if ($servicio instanceof JsonResponse) return $servicio;
+            if (!in_array($servicio->estado, ['aceptado', 'en_camino'], true)) {
+                return $this->error('Solo se puede iniciar un servicio aceptado o en camino', 422);
+            }
+            if (!hash_equals((string) $servicio->codigo_inicio, (string) $request->codigo)) {
+                return $this->error('Codigo de inicio invalido', 422);
+            }
+            $servicio->update(['estado' => 'en_progreso']);
+            Notificacion::create([
+                'destinatario_id' => $servicio->cliente_id,
+                'tipo'            => 'servicio_iniciado',
+                'titulo'          => 'Servicio iniciado',
+                'mensaje'         => 'El proveedor inicio el servicio.',
+                'datos'           => ['servicio_id' => $servicio->id],
+            ]);
+            return $servicio;
+        });
         if ($servicio instanceof JsonResponse) return $servicio;
-
-        if ($servicio->estado !== 'aceptado') {
-            return $this->error('Solo se puede iniciar un servicio aceptado', 422);
-        }
-
-        if (!hash_equals((string) $servicio->codigo_inicio, (string) $request->codigo)) {
-            return $this->error('Codigo de inicio invalido', 422);
-        }
-
-        $servicio->update(['estado' => 'en_progreso']);
-
-        Notificacion::create([
-            'destinatario_id' => $servicio->cliente_id,
-            'tipo'            => 'servicio_iniciado',
-            'titulo'          => 'Servicio iniciado',
-            'mensaje'         => 'El proveedor inicio el servicio.',
-            'datos'           => ['servicio_id' => $servicio->id],
-        ]);
 
         $servicio->loadMissing(['cliente', 'proveedor.categoria', 'categoria']);
 
@@ -255,27 +252,25 @@ class ServicioController extends Controller
 
     public function finalizar(int $id, Request $request): JsonResponse
     {
-        $servicio = $this->getServicioProveedor($id, $request);
-        if ($servicio instanceof JsonResponse) return $servicio;
-
-        if ($servicio->estado !== 'en_progreso') {
-            return $this->error('Solo se puede finalizar un servicio en progreso', 422);
-        }
-
-        $codigoFin = str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
-
-        $servicio->update([
-            'codigo_fin' => $codigoFin,
-            'estado'     => 'por_confirmar',
-        ]);
-
-        Notificacion::create([
-            'destinatario_id' => $servicio->cliente_id,
-            'tipo'            => 'servicio_por_confirmar',
-            'titulo'          => 'Confirma la finalizacion del servicio',
-            'mensaje'         => 'El proveedor termino el trabajo. Pide el codigo de 6 digitos para confirmar la finalizacion.',
-            'datos'           => ['servicio_id' => $servicio->id],
-        ]);
+        $resultado = DB::transaction(function () use ($id, $request) {
+            $servicio = $this->lockedServicioProveedor($id, $request);
+            if ($servicio instanceof JsonResponse) return $servicio;
+            if ($servicio->estado !== 'en_progreso') {
+                return $this->error('Solo se puede finalizar un servicio en progreso', 422);
+            }
+            $codigoFin = str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
+            $servicio->update(['codigo_fin' => $codigoFin, 'estado' => 'por_confirmar']);
+            Notificacion::create([
+                'destinatario_id' => $servicio->cliente_id,
+                'tipo'            => 'servicio_por_confirmar',
+                'titulo'          => 'Confirma la finalizacion del servicio',
+                'mensaje'         => 'El proveedor termino el trabajo. Pide el codigo de 6 digitos para confirmar la finalizacion.',
+                'datos'           => ['servicio_id' => $servicio->id],
+            ]);
+            return [$servicio, $codigoFin];
+        });
+        if ($resultado instanceof JsonResponse) return $resultado;
+        [$servicio, $codigoFin] = $resultado;
 
         $request->attributes->set('exponer_codigo_fin_servicio', $servicio->id);
 
@@ -291,35 +286,69 @@ class ServicioController extends Controller
             'codigo' => 'required|string|size:6',
         ]);
 
-        $servicio = $this->getServicioCliente($id, $request);
+        $servicio = DB::transaction(function () use ($id, $request) {
+            $servicio = $this->lockedServicioCliente($id, $request);
+            if ($servicio instanceof JsonResponse) return $servicio;
+            if ($servicio->estado !== 'por_confirmar') {
+                return $this->error('Este servicio no esta esperando confirmacion', 422);
+            }
+            if (!hash_equals((string) $servicio->codigo_fin, (string) $request->codigo)) {
+                return $this->error('Codigo incorrecto', 422);
+            }
+            $servicio->update(['estado' => 'completado']);
+            $servicio->loadMissing('proveedor');
+            if ($servicio->proveedor?->user_id) {
+                Notificacion::create([
+                    'destinatario_id' => $servicio->proveedor->user_id,
+                    'tipo'            => 'servicio_completado',
+                    'titulo'          => 'Servicio confirmado',
+                    'mensaje'         => 'El cliente confirmo la finalizacion del servicio.',
+                    'datos'           => ['servicio_id' => $servicio->id],
+                ]);
+            }
+            $this->notificarServicioCalificable($servicio);
+            return $servicio;
+        });
         if ($servicio instanceof JsonResponse) return $servicio;
-
-        if ($servicio->estado !== 'por_confirmar') {
-            return $this->error('Este servicio no esta esperando confirmacion', 422);
-        }
-
-        if (!hash_equals((string) $servicio->codigo_fin, (string) $request->codigo)) {
-            return $this->error('Codigo incorrecto', 422);
-        }
-
-        $servicio->update(['estado' => 'completado']);
-
-        $servicio->loadMissing('proveedor');
-        if ($servicio->proveedor?->user_id) {
-            Notificacion::create([
-                'destinatario_id' => $servicio->proveedor->user_id,
-                'tipo'            => 'servicio_completado',
-                'titulo'          => 'Servicio confirmado',
-                'mensaje'         => 'El cliente confirmo la finalizacion del servicio.',
-                'datos'           => ['servicio_id' => $servicio->id],
-            ]);
-        }
-
-        $this->notificarServicioCalificable($servicio);
 
         $servicio->loadMissing(['cliente', 'proveedor.categoria', 'categoria']);
 
         return $this->success('Servicio completado', ['servicio' => new ServicioResource($servicio)]);
+    }
+
+    /**
+     * Cancela un servicio únicamente desde la cuenta cliente propietaria.
+     * El pedido/cotización de origen y los créditos no se modifican.
+     */
+    public function cancelar(int $id, Request $request): JsonResponse
+    {
+        $request->validate(['motivo' => 'nullable|string|max:500']);
+        $servicio = DB::transaction(function () use ($id, $request) {
+            $servicio = $this->lockedServicioCliente($id, $request);
+            if ($servicio instanceof JsonResponse) return $servicio;
+            if (!in_array($servicio->estado, ['pendiente', 'aceptado', 'en_camino'], true)) {
+                return $this->error('Este servicio ya no puede cancelarse en su estado actual', 422);
+            }
+            $servicio->update([
+                'estado' => 'cancelado',
+                'motivo_cancelacion' => $request->input('motivo'),
+            ]);
+            $servicio->loadMissing('proveedor');
+            if ($servicio->proveedor?->user_id) {
+                Notificacion::create([
+                    'destinatario_id' => $servicio->proveedor->user_id,
+                    'tipo'            => 'servicio_cancelado',
+                    'titulo'          => 'Servicio cancelado por el cliente',
+                    'mensaje'         => 'El cliente cancelo la solicitud de servicio.',
+                    'datos'           => ['servicio_id' => $servicio->id],
+                ]);
+            }
+            return $servicio;
+        });
+        if ($servicio instanceof JsonResponse) return $servicio;
+
+        $servicio->loadMissing(['cliente', 'proveedor.categoria', 'categoria']);
+        return $this->success('Servicio cancelado', ['servicio' => new ServicioResource($servicio)]);
     }
 
     // ── Helper ────────────────────────────────────────────────────────────────
@@ -350,6 +379,27 @@ class ServicioController extends Controller
             return $this->error('No tienes permiso para confirmar este servicio', 403);
         }
 
+        return $servicio;
+    }
+
+    private function lockedServicioProveedor(int $id, Request $request)
+    {
+        $servicio = Servicio::whereKey($id)->lockForUpdate()->first();
+        if (!$servicio) return $this->error('Servicio no encontrado', 404);
+        $proveedor = $request->user()->proveedor;
+        if (!$proveedor || $servicio->proveedor_id !== $proveedor->id) {
+            return $this->error('No tienes permiso para gestionar este servicio', 403);
+        }
+        return $servicio;
+    }
+
+    private function lockedServicioCliente(int $id, Request $request)
+    {
+        $servicio = Servicio::whereKey($id)->lockForUpdate()->first();
+        if (!$servicio) return $this->error('Servicio no encontrado', 404);
+        if ($servicio->cliente_id !== $request->user()->id) {
+            return $this->error('No tienes permiso para gestionar este servicio', 403);
+        }
         return $servicio;
     }
 

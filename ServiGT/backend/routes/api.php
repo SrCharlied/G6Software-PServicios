@@ -93,6 +93,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/servicios/{id}/finalizar', [ServicioController::class, 'finalizar'])->where('id', '[0-9]+');
     // Cliente confirma fin del servicio validando el codigo_fin del proveedor
     Route::post('/servicios/{id}/confirmar-fin', [ServicioController::class, 'confirmarFin'])->where('id', '[0-9]+');
+    // Cancelacion unilateral exclusiva del cliente propietario.
+    Route::post('/servicios/{id}/cancelar', [ServicioController::class, 'cancelar'])->where('id', '[0-9]+');
     // Actualizar estado general (en_camino, en_progreso, completado, cancelado)
     Route::put('/servicios/{id}/estado', [ServicioController::class, 'actualizarEstado'])->where('id', '[0-9]+');
 

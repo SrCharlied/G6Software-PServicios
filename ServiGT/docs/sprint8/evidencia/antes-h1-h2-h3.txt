@@ -1,0 +1,35 @@
+========================================================================
+Evidencia ANTES - matriz H1/H2/H3 - corrida smoke 409801
+========================================================================
+
+H1 - Bypass del handshake por PUT /api/servicios/{id}/estado
+------------------------------------------------------------------------
+  estado tras aceptar                     : aceptado
+  PUT /estado {completado} por proveedor  : HTTP 200
+  estado visto por el cliente             : completado
+  -> el cliente nunca entrego codigo_inicio ni confirmo codigo_fin
+  queda calificable                       : HTTP 201
+  completado -> cancelado (terminal)      : HTTP 200 | estado cancelado
+  VEREDICTO H1                            : REPRODUCIDO
+
+H2 - Ausencia de cancelacion del cliente
+------------------------------------------------------------------------
+  POST /servicios/{id}/cancelar (cliente) : HTTP 404  (ruta inexistente)
+  PUT /estado {cancelado} por el cliente  : HTTP 403  No tienes permiso para gestionar este servici
+  estado tras iniciar                     : en_progreso
+  proveedor cancela en pleno trabajo      : HTTP 200 | estado cancelado
+  VEREDICTO H2                            : REPRODUCIDO
+
+H3 - Destinatario arbitrario en POST /api/calificaciones
+------------------------------------------------------------------------
+  servicio legitimo cliente <-> proveedor A completado
+  reputacion de B ANTES                   : promedio 0 | total 0
+  POST /calificaciones destinatario=B     : HTTP 201  Calificacion enviada
+  reputacion de B DESPUES                 : promedio 1 | total 1
+  -> el cliente nunca contrato a B; A no recibio la calificacion
+  VEREDICTO H3                            : REPRODUCIDO
+  proveedor A se califica a si mismo      : HTTP 201 | su promedio 5 | total 1
+
+========================================================================
+Resumen: H1=REPRODUCIDO  H2=REPRODUCIDO  H3=REPRODUCIDO
+========================================================================

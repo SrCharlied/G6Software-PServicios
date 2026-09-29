@@ -253,3 +253,170 @@ regresión. La salida completa está en
 No se ejecutó un escaneo ZAP nuevo. El cierre se apoya en la matriz negativa,
 el throttle aislado y el smoke HTTP reproducible; por ello no se afirma que
 exista un diff ZAP posterior ni ausencia total de vulnerabilidades.
+
+> **Actualizacion.** El diff de ZAP si se ejecuto despues, el 2026-09-29.
+> Resultados en la seccion 8; no altera las conclusiones de esta seccion.
+
+## 7. Verificación independiente y defecto encontrado
+
+Ejecutada el 2026-09-29 sobre `6a64a9b`, contra el **stack de desarrollo**
+(`localhost:8085`, base `pservicios`) y no contra el servidor efímero. El
+propósito era doble: reproducir los resultados de la sección 6 con otro script
+y cerrar la asimetría de entornos, ya que el "antes" de la sección 2 se capturó
+en ese mismo stack y la comparación no era equivalente.
+
+**Los números de la sección 6 reproducen exactamente:** 155 passed / 376
+aserciones en la matriz extendida y 5 passed / 71 en el throttle aislado.
+
+```bash
+python docs/sprint8/evidencia/verificacion-independiente.py
+# RESULTADO: 16 correctas, 0 fallidas
+```
+
+### Defecto: el código de inicio desaparecía en `en_camino`
+
+La primera corrida dio 15 de 16. La comprobación que falló:
+
+```
+[FALLA] el cliente SIGUE viendo su codigo_inicio en en_camino
+        antes=048614  despues=None
+```
+
+`/iniciar` admite el código desde `aceptado` o desde `en_camino`
+(`ServicioController::iniciar`), así que el contrato ratificado estaba bien
+implementado en el controlador. El problema era de **exposición**, en dos capas
+que no se actualizaron cuando `en_camino` pasó a ser un estado alcanzable:
+
+| Archivo | Antes | Después |
+|---|---|---|
+| `app/Http/Resources/ServicioResource.php:62` | `['aceptado','en_progreso','por_confirmar','completado']` | se agregó `'en_camino'` |
+| `frontend/src/screens/SolicitudesScreen.js:29` | `Set(['pendiente','aceptado'])` | se agregó `'en_camino'` |
+
+**Impacto.** El proveedor marcaba que iba en camino, el cliente refrescaba y el
+código se le esfumaba. El proveedor le pedía seis dígitos que el cliente ya no
+podía leer, y el servicio quedaba atascado salvo que los hubiera memorizado.
+Contradecía el criterio de aceptación de S8-01: *"si se conserva `en_camino`,
+existe una salida válida mediante código de inicio"*.
+
+No es una vulnerabilidad: no expone datos ni permite saltarse un control. Es un
+callejón sin salida funcional, el mismo que S8-01 venía a eliminar, reaparecido
+un paso más adelante.
+
+**Por qué no lo detectó nadie.** Ninguna prueba leía el código en `en_camino`;
+el E2E de 6.3 no ejercita ese estado; y las pruebas de concurrencia —incluidas
+las propias— pasan el código directo al endpoint sin pasar por la lectura del
+cliente, así que lo atravesaban sin verlo.
+
+**Regresión añadida**, roja antes del arreglo y verde después:
+
+- `backend/tests/Feature/ServicioResourceActorAwareTest.php` —
+  `test_cliente_conserva_su_codigo_inicio_cuando_el_servicio_va_en_camino`
+- `frontend/src/screens/SolicitudesScreen.test.js` — bloque
+  `SolicitudesScreen codigo de inicio`, con `aceptado` y `en_camino` por tabla
+  más el caso negativo de `en_progreso`
+
+### Gates tras la corrección
+
+```bash
+docker compose --profile test run --rm backend_test
+# Tests: 305 passed (1137 assertions)
+
+docker exec servigt_frontend npx jest --ci
+# Test Suites: 16 passed | Tests: 104 passed
+
+docker exec servigt_frontend npx expo export --platform web
+# Exported: dist — bundle 1.83 MB
+```
+
+> **Aviso sobre las imágenes.** `backend_test` solo monta `./backend/tests`, y
+> el contenedor `frontend` no monta código. Un cambio en `app/` o en
+> `frontend/src` no se refleja sin `docker compose build`. Una medición previa
+> de Jest en este sprint arrojó 14 suites / 82 tests contra una imagen obsoleta;
+> la cifra real con imagen reconstruida es 16 / 104.
+
+### Deuda menor, no corregida
+
+`ESTADOS_CON_CODIGO` incluye `'pendiente'`, pero el backend nunca expone el
+código en ese estado. Es inofensivo —el frontend solo pinta lo que recibe— y
+queda reportado en vez de corregido, por estar fuera del alcance de este
+arreglo.
+
+## 8. Diff de ZAP contra el escaneo del 07/09/2026
+
+Complementario, como indica el recorte de S8-05: *"el diff de ZAP puede ser
+complementario; no sustituye pruebas negativas"*.
+
+**Misma herramienta y misma metodología que en Sprint 7.** Imagen
+`ghcr.io/zaproxy/zaproxy:stable`, ID `781a2bdaea47` — el mismo ID del escaneo
+del 07/09, así que un cambio de versión no explica ninguna diferencia. Escaneo
+pasivo con spider por la red interna de Compose, contra `backend` y
+`frontend_prod` por nombre de servicio.
+
+```bash
+docker run --rm --network servigt_servigt_net -v "<ruta>:/zap/wrk:rw" -u 0 \
+  ghcr.io/zaproxy/zaproxy:stable zap-baseline.py \
+  -t http://backend:8000 -r zap-backend.html -w zap-backend.md -I
+
+docker run --rm --network servigt_servigt_net -v "<ruta>:/zap/wrk:rw" -u 0 \
+  ghcr.io/zaproxy/zaproxy:stable zap-baseline.py \
+  -t http://frontend_prod:80 -r zap-frontend.html -w zap-frontend.md -I
+```
+
+Reportes crudos en `docs/security/zap-2026-09-29/`.
+
+### Resultado
+
+| Objetivo | 07/09 | 29/09 | FAIL-NEW |
+|---|---|---|---|
+| backend | Med 2, Low 7, Info 3 | Med 1, Low 5, Info 2 | 0 (WARN-NEW 8, PASS 59) |
+| frontend_prod | Med 1, Low 4, Info 2 | Med 1, Low 4, Info 2 | 0 (WARN-NEW 5, PASS 62) |
+
+Cero alertas High y cero `FAIL-NEW` en ambos. **Ninguna alerta nueva**: el
+Sprint 8 no introdujo regresiones detectables por escaneo pasivo.
+
+En el frontend el resultado es **idéntico alerta por alerta**, lo que es
+coherente: el sprint no tocó la configuración de nginx.
+
+### Las cuatro alertas que desaparecieron no son mérito del Sprint 8
+
+En el backend dejaron de reportarse `Cross-Origin-Embedder-Policy`,
+`Cross-Origin-Opener-Policy`, `Missing Anti-clickjacking Header` y
+`Storable and Cacheable Content`. Antes de anotarlo como mejora se verificó la
+causa, y no es la que parece:
+
+- **No se agregaron cabeceras.** No existe middleware de cabeceras de seguridad
+  —`app/Http/Middleware/` solo contiene `CorrelationId` y `EnsureIsAdmin`— y la
+  respuesta actual del backend sigue sin `X-Frame-Options`, COOP ni COEP.
+- **Cambió la superficie.** El commit `e29b2ce` (Sprint 7, task 4.1) sustituyó
+  la página de bienvenida de Laravel en `/` por un JSON mínimo. Esas cuatro
+  reglas se disparan sobre respuestas HTML, así que dejaron de aplicar.
+
+Es remediación legítima —se eliminó una superficie que no hacía falta— pero es
+**trabajo del Sprint 7 medido tarde**, no una mejora de este sprint. El escaneo
+del 07/09 se corrió antes de que ese commit aterrizara.
+
+### Corrección a la documentación de esa ruta
+
+El comentario de `backend/routes/web.php` afirma que la ruta nueva responde
+*"sin sesión"*. No es exacto: `GET /` con `Accept: text/html` sigue emitiendo
+dos cookies.
+
+```
+Set-Cookie: XSRF-TOKEN=...;    path=/; samesite=lax          (sin httponly)
+Set-Cookie: servigt-session=...; path=/; httponly; samesite=lax
+```
+
+El grupo `web` sigue aplicando el middleware de sesión aunque la respuesta sea
+JSON. Por eso `Cookie No HttpOnly Flag` sobrevive en el escaneo: corresponde a
+`XSRF-TOKEN`, que **no debe** ser HttpOnly porque el cliente necesita leerlo.
+Es un falso positivo conocido de ZAP con Laravel, pero la afirmación del
+comentario debe corregirse o la ruta debe salir del grupo `web`. Queda como
+follow-up, fuera del alcance de esta task.
+
+### Qué no demuestra este diff
+
+Un baseline pasivo observa tráfico y cabeceras: no autentica, no recorre flujos
+de negocio y no ejercita autorización. **No aporta ninguna evidencia sobre H1,
+H2 ni H3**, que son fallos de lógica. Esa evidencia son la matriz negativa de
+la sección 6 y la verificación independiente de la sección 7. Por eso el plan
+lo clasifica como complementario y no como sustituto.

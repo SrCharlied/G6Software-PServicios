@@ -26,7 +26,7 @@ const tabs = [
   { key: 'recibidas', label: 'Recibidas' },
 ];
 
-const ESTADOS_CON_CODIGO = new Set(['pendiente', 'aceptado']);
+const ESTADOS_CON_CODIGO = new Set(['pendiente', 'aceptado', 'en_camino']);
 const ESTADOS_CANCELABLES = new Set(['pendiente', 'aceptado', 'en_camino']);
 
 function StatusChip({ estado }) {

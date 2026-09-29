@@ -59,7 +59,7 @@ class ServicioResource extends JsonResource
             'pago' => $this->whenLoaded('pago'),
         ];
 
-        if ($esCliente && in_array($this->estado, ['aceptado', 'en_progreso', 'por_confirmar', 'completado'], true)) {
+        if ($esCliente && in_array($this->estado, ['aceptado', 'en_camino', 'en_progreso', 'por_confirmar', 'completado'], true)) {
             $data['codigo_inicio'] = $this->codigo_inicio;
         }
 

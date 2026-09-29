@@ -52,6 +52,38 @@ const renderScreen = (role = 'cliente') => render(
   />,
 );
 
+describe('SolicitudesScreen codigo de inicio', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  // Regresion del contrato de `en_camino` ratificado en Sprint 8: el proveedor
+  // marca que va en camino y el cliente debe seguir viendo el codigo, porque es
+  // lo unico que permite iniciar el trabajo. Si desaparece, el proveedor pide
+  // seis digitos que el cliente ya no puede leer.
+  it.each(['aceptado', 'en_camino'])('muestra el codigo al cliente en %s', async (estado) => {
+    getSolicitudesCliente.mockResolvedValue({
+      servicios: [{ ...servicio(estado), codigo_inicio: '048614' }],
+    });
+
+    const { findByText } = renderScreen();
+
+    expect(await findByText('Codigo de inicio')).toBeTruthy();
+    expect(await findByText('048614')).toBeTruthy();
+  });
+
+  it('no muestra el codigo cuando el servicio ya arranco', async () => {
+    getSolicitudesCliente.mockResolvedValue({
+      servicios: [{ ...servicio('en_progreso'), codigo_inicio: '048614' }],
+    });
+
+    const { findByText, queryByText } = renderScreen();
+
+    await findByText('Reparar una fuga de agua');
+    expect(queryByText('Codigo de inicio')).toBeNull();
+  });
+});
+
 describe('SolicitudesScreen cancelacion', () => {
   beforeEach(() => {
     jest.clearAllMocks();

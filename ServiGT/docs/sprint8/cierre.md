@@ -33,11 +33,21 @@ el remoto SSH está configurado en WSL. No se hizo reset, merge, push ni PR.
 |---|---|---|
 | Backend focal | `docker compose --profile test run --rm backend_test ServicioFlujos... ServicioCancelacion... ServicioConcurrencia... CalificacionDestinatario... AuthSecurity...` | 45 tests, 205 aserciones, verde |
 | Frontend focal | `npm test -- --ci --runInBand` con 4 archivos focales | 4 suites, 35 tests, verde |
-| Backend completo | `docker compose --profile test run --rm backend_test` | 304 tests, 1135 aserciones, 9.68 s, verde |
-| Frontend completo | `npm test -- --ci --runInBand` | 16 suites, 101 tests, 5.87 s, verde |
+| Backend completo | `docker compose --profile test run --rm backend_test` | 305 tests, 1137 aserciones, 11.96 s, verde (rejecutado, ver nota) |
+| Frontend completo | `npm test -- --ci --runInBand` | 16 suites, 104 tests, 14.65 s, verde (rejecutado, ver nota) |
 | Build web | `npm run build:web` | Export web generado en `frontend/dist`, verde |
 | Responsive E2E | `npx playwright test e2e/sprint8-responsive.spec.js` | 6 tests, 12.3 s, verde |
 | Diff | `git diff --check 5f19664..HEAD` | Sin errores |
+
+> **Nota de reejecución (2026-09-29, posterior a este documento).** La revisión
+> independiente de 5.3 encontró un defecto en el contrato de `en_camino`: el
+> cliente perdía de vista su `codigo_inicio` al pasar a ese estado, dejando el
+> servicio sin salida. Se corrigió en `ServicioResource.php` y
+> `SolicitudesScreen.js`, con regresión en ambas capas. Las dos filas marcadas
+> arriba se volvieron a ejecutar sobre el incremento corregido; las demás no se
+> reejecutaron y conservan la medición original. Detalle en
+> [seguridad.md](seguridad.md), sección 7.
+
 | Secretos básicos | nombres sensibles y patrones de llaves/tokens sobre el diff | Sin coincidencias |
 
 El frontend completo aún imprime warnings `act(...)` de animaciones en

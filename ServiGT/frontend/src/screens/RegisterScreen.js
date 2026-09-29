@@ -143,9 +143,15 @@ export default function RegisterScreen({ navigation, onRegisterSuccess }) {
   const handleStep1 = async () => {
     const errs = {};
     if (!validateRequired(name)) errs.name = 'El nombre es requerido.';
+    else if (name.trim().length > 255) errs.name = 'El nombre no debe superar 255 caracteres.';
     if (!validateRequired(email)) errs.email = 'El correo es requerido.';
     else if (!validateEmail(email)) errs.email = 'El formato del correo no es valido.';
-    if (!validatePassword(password)) errs.password = 'La contrasena debe tener entre 6 y 72 caracteres.';
+    else if (email.trim().length > 255) errs.email = 'El correo no debe superar 255 caracteres.';
+    if (!validatePassword(password)) {
+      errs.password = password.length < 6
+        ? 'La contrasena debe tener al menos 6 caracteres.'
+        : 'La contrasena no debe superar los 72 bytes.';
+    }
     if (Object.keys(errs).length) { setErrors(errs); return; }
     setErrors({});
 
@@ -159,6 +165,15 @@ export default function RegisterScreen({ navigation, onRegisterSuccess }) {
         onRegisterSuccess && onRegisterSuccess(data.user, null);
       }
     } catch (error) {
+      const backendErrors = error.data?.errors;
+      if (backendErrors && typeof backendErrors === 'object') {
+        setErrors(Object.fromEntries(
+          Object.entries(backendErrors).map(([field, messages]) => [
+            field,
+            Array.isArray(messages) ? messages[0] : messages,
+          ]),
+        ));
+      }
       toast(error.message, 'error');
     } finally {
       setLoading(false);
@@ -283,7 +298,7 @@ export default function RegisterScreen({ navigation, onRegisterSuccess }) {
       <Text style={styles.inputLabel}>Contrasena</Text>
       <TextInput
         style={[styles.input, errors.password && styles.inputError]}
-        placeholder="Minimo 6 caracteres"
+        placeholder="Minimo 6 caracteres, maximo 72 bytes"
         value={password} onChangeText={(v) => { setPassword(v); clearError('password'); }}
         secureTextEntry
       />
@@ -310,6 +325,8 @@ export default function RegisterScreen({ navigation, onRegisterSuccess }) {
         style={[styles.btnPrimary, loading && styles.btnDisabled]}
         onPress={handleStep1}
         disabled={loading}
+        accessibilityRole="button"
+        accessibilityLabel={role === 'proveedor' ? 'Continuar registro' : 'Crear cuenta'}
       >
         {loading
           ? <ActivityIndicator color="#fff" />

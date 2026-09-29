@@ -420,3 +420,54 @@ de negocio y no ejercita autorización. **No aporta ninguna evidencia sobre H1,
 H2 ni H3**, que son fallos de lógica. Esa evidencia son la matriz negativa de
 la sección 6 y la verificación independiente de la sección 7. Por eso el plan
 lo clasifica como complementario y no como sustituto.
+
+## 9. Limpieza de datos smoke
+
+Paso 8 de S8-05 (*"limpiar exclusivamente fixtures autorizados"*), ejecutado el
+2026-09-29 con autorización explícita del responsable.
+
+Se ensayó primero dentro de una transacción con `ROLLBACK` para ver el impacto
+real antes de confirmar nada, y el borrado definitivo llevó una guarda que
+aborta la transacción si el estado final no es el esperado.
+
+```sql
+BEGIN;
+DELETE FROM users WHERE email LIKE 'smoke\_%';   -- 48 filas
+-- guarda: aborta si no quedan exactamente 11 usuarios y 0 smoke
+COMMIT;
+```
+
+El borrado se apoya en las ocho claves foráneas hacia `users`, todas en
+`ON DELETE CASCADE`: `proveedores`, `servicios`, `pedidos`, `calificaciones`
+(autor y destinatario), `mensajes` (emisor y receptor) y `notificaciones`.
+
+| Tabla | Antes | Después |
+|---|---:|---:|
+| users | 59 | 11 |
+| proveedores | 33 | 10 |
+| servicios | 24 | 0 |
+| pedidos | 2 | 0 |
+| cotizaciones | 2 | 0 |
+| calificaciones | 8 | 0 |
+| mensajes | 1 | 0 |
+| notificaciones | 73 | 0 |
+| publicaciones | 7 | 0 |
+
+Los 11 usuarios restantes son exactamente los del seed: diez proveedores
+`proveedorN@servigt.gt` y `admin@servigt.gt`. Se verificó antes de borrar que
+las siete publicaciones eran todas `smoke_` y que `sync_schema.php` no siembra
+publicaciones, así que quedar en cero es el estado limpio original y no una
+pérdida.
+
+Comprobación posterior:
+
+```
+GET /api/health          -> ok, pgsql connected
+GET /api/providers       -> 10 proveedores
+GET /api/categorias      -> 10 categorias
+POST /api/login (admin)  -> HTTP 200
+frontend :8086 / :8087   -> HTTP 200
+```
+
+La base de la suite (`pservicios_test`, tmpfs) no se tocó: es independiente de
+`pservicios` y se recrea en cada arranque de `db_test`.

@@ -29,12 +29,28 @@ const tabs = [
 const ESTADOS_CON_CODIGO = new Set(['pendiente', 'aceptado', 'en_camino']);
 const ESTADOS_CANCELABLES = new Set(['pendiente', 'aceptado', 'en_camino']);
 
+// El chip mostraba el valor crudo del backend con el guion bajo cambiado por
+// espacio, asi que decia `en camino` en minuscula mientras las otras pantallas
+// decian `En camino`. Este mapa unifica el texto.
+const ESTADO_LABEL = {
+  pendiente: 'Pendiente',
+  aceptado: 'Aceptado',
+  en_camino: 'En camino',
+  en_progreso: 'En progreso',
+  por_confirmar: 'Por confirmar',
+  completado: 'Completado',
+  cancelado: 'Cancelado',
+  rechazado: 'Rechazado',
+};
+
 function StatusChip({ estado }) {
   const normalized = estado || 'pendiente';
   const cfg = {
     pendiente: { bg: '#fff7ed', fg: '#92400e', dot: '#f59e0b' },
     aceptado: { bg: '#eef4ff', fg: '#1b5499', dot: T.blue },
-    en_camino: { bg: '#eef4ff', fg: '#1b5499', dot: T.blue },
+    // Color propio: si comparte el azul de `aceptado` el cliente no nota que
+    // el proveedor ya salio hacia su direccion, que es todo el proposito del aviso.
+    en_camino: { bg: '#e0f2fe', fg: '#075985', dot: '#0284c7' },
     en_progreso: { bg: '#eef4ff', fg: '#1b5499', dot: T.blue },
     por_confirmar: { bg: '#fef9c3', fg: '#713f12', dot: T.amber },
     completado: { bg: '#dcfce7', fg: '#166534', dot: T.success },
@@ -45,7 +61,7 @@ function StatusChip({ estado }) {
   return (
     <View style={[styles.statusChip, { backgroundColor: cfg.bg }]}>
       <View style={[styles.statusDot, { backgroundColor: cfg.dot }]} />
-      <Text style={[styles.statusText, { color: cfg.fg }]}>{normalized.replace('_', ' ')}</Text>
+      <Text style={[styles.statusText, { color: cfg.fg }]}>{ESTADO_LABEL[normalized] || normalized.replace('_', ' ')}</Text>
     </View>
   );
 }

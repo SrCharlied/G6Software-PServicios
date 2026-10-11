@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import {
   aceptarServicio,
+  actualizarEstadoServicio,
   descargarDocumento,
   finalizarServicio,
   getCalificacionesProveedor,
@@ -251,6 +252,16 @@ export default function ProviderDashboardScreen({
     finally { setMutatingServiceId(null); }
   };
 
+  // Aviso opcional de trayecto. El backend solo admite `aceptado -> en_camino`
+  // y el codigo de inicio sigue siendo obligatorio para arrancar: marcar el
+  // camino no adelanta ningun paso del handshake.
+  const handleEnCamino = async (id) => {
+    setMutatingServiceId(id);
+    try { await actualizarEstadoServicio(id, 'en_camino'); toast('Avisaste que vas en camino.', 'success'); await refreshSolicitudes(); }
+    catch (error) { toast(error.message, 'error'); }
+    finally { setMutatingServiceId(null); }
+  };
+
   const handleReject = async (id) => {
     setMutatingServiceId(id);
     try { await rechazarServicio(id); toast('Solicitud rechazada.', 'info'); await refreshSolicitudes(); }
@@ -418,6 +429,7 @@ export default function ProviderDashboardScreen({
             onReject={handleReject}
             onIniciar={openIniciar}
             onFinalizar={openFinalizar}
+            onEnCamino={handleEnCamino}
           />
         );
     }

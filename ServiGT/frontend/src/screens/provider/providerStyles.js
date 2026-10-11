@@ -220,6 +220,10 @@ export const styles = StyleSheet.create({
   rejectBtn: { backgroundColor: '#fef2f2', borderWidth: 1, borderColor: '#fee2e2', paddingHorizontal: 16, paddingVertical: 10, borderRadius: T.rSm },
   rejectBtnText: { color: T.danger, fontWeight: '700', fontSize: 13 },
   advanceBtn: { backgroundColor: T.blue, paddingHorizontal: 16, paddingVertical: 10, borderRadius: T.rSm },
+  // Delineado, no relleno: marcar el trayecto es un aviso opcional y no debe
+  // competir visualmente con iniciar el servicio, que es la accion real.
+  enRouteBtn: { backgroundColor: T.white, borderWidth: 1, borderColor: T.blue, paddingHorizontal: 16, paddingVertical: 10, borderRadius: T.rSm },
+  enRouteBtnText: { color: T.blue, fontWeight: '700', fontSize: 13 },
   advanceBtnText: { color: '#fff', fontWeight: '700', fontSize: 13 },
   disabledBlock: { opacity: 0.6 },
 

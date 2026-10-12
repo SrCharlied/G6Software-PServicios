@@ -157,3 +157,51 @@ describe('api error handling', () => {
     expect(client.post).toHaveBeenCalledWith('/servicios/17/cancelar');
   });
 });
+
+describe('api de materiales (Sprint 9)', () => {
+  afterEach(() => {
+    jest.dontMock('axios');
+    jest.dontMock('./sessionStorage');
+  });
+
+  it.each([
+    ['getMisLotesMateriales', [], 'get', '/materiales/mias', undefined],
+    ['getReservasDeLote', [7], 'get', '/materiales/7/reservas', undefined],
+    ['retirarLoteMaterial', [7], 'post', '/materiales/7/retirar', undefined],
+    ['marcarLoteVendido', [7], 'post', '/materiales/7/vendido', undefined],
+    ['aceptarReservaMaterial', [12], 'post', '/reservas-material/12/aceptar', undefined],
+    ['rechazarReservaMaterial', [12], 'post', '/reservas-material/12/rechazar', undefined],
+    ['cancelarReservaMaterial', [12], 'post', '/reservas-material/12/cancelar', undefined],
+  ])('%s llama al endpoint correcto sin body', async (fn, args, metodo, ruta) => {
+    const { apiModule, client } = buildApiModule();
+    client[metodo].mockResolvedValueOnce({ data: { success: true } });
+
+    await expect(apiModule[fn](...args)).resolves.toEqual({ success: true });
+
+    expect(client[metodo]).toHaveBeenCalledTimes(1);
+    expect(client[metodo].mock.calls[0][0]).toBe(ruta);
+    if (metodo === 'post') expect(client.post.mock.calls[0]).toHaveLength(1);
+  });
+
+  it('getMisReservasMaterial pagina con page y per_page', async () => {
+    const { apiModule, client } = buildApiModule();
+    client.get.mockResolvedValueOnce({ data: { reservas: [] } });
+
+    await apiModule.getMisReservasMaterial({ page: 2, perPage: 5 });
+
+    expect(client.get).toHaveBeenCalledWith('/reservas-material', { params: { page: 2, per_page: 5 } });
+  });
+
+  it('propaga el mensaje y el status del backend en vez de devolver un valor de negocio', async () => {
+    const { apiModule, client } = buildApiModule();
+    client.post.mockRejectedValueOnce({
+      isAxiosError: true,
+      response: { status: 422, data: { message: 'Solo se pueden aceptar solicitudes pendientes.' } },
+    });
+
+    await expect(apiModule.aceptarReservaMaterial(12)).rejects.toMatchObject({
+      message: 'Solo se pueden aceptar solicitudes pendientes.',
+      status: 422,
+    });
+  });
+});

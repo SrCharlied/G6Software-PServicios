@@ -827,4 +827,81 @@ export const getAdminCreditosPremium = async ({ estado = null } = {}) => {
   }
 };
 
+// ── Bolsa de materiales (Sprint 9, Task 3.3) ──────────────────────────────
+// Lotes y reservas propias. Contrato: docs/sprint9/materiales-api.md.
+// Las acciones sobre una reserva no llevan body: la identidad y el rol salen
+// del token y el backend decide si la accion procede.
+
+export const getMisLotesMateriales = async () => {
+  try {
+    const response = await api.get('/materiales/mias');
+    return response.data;
+  } catch (error) {
+    throwApiError(error, 'No se pudieron cargar tus lotes de materiales.');
+  }
+};
+
+export const getReservasDeLote = async (loteId) => {
+  try {
+    const response = await api.get(`/materiales/${loteId}/reservas`);
+    return response.data;
+  } catch (error) {
+    throwApiError(error, 'No se pudieron cargar las solicitudes del lote.');
+  }
+};
+
+export const retirarLoteMaterial = async (loteId) => {
+  try {
+    const response = await api.post(`/materiales/${loteId}/retirar`);
+    return response.data;
+  } catch (error) {
+    throwApiError(error, 'No se pudo retirar el lote.');
+  }
+};
+
+export const marcarLoteVendido = async (loteId) => {
+  try {
+    const response = await api.post(`/materiales/${loteId}/vendido`);
+    return response.data;
+  } catch (error) {
+    throwApiError(error, 'No se pudo marcar el lote como vendido.');
+  }
+};
+
+export const getMisReservasMaterial = async ({ page = 1, perPage = 20 } = {}) => {
+  try {
+    const response = await api.get('/reservas-material', { params: { page, per_page: perPage } });
+    return response.data;
+  } catch (error) {
+    throwApiError(error, 'No se pudieron cargar tus reservas de materiales.');
+  }
+};
+
+export const aceptarReservaMaterial = async (reservaId) => {
+  try {
+    const response = await api.post(`/reservas-material/${reservaId}/aceptar`);
+    return response.data;
+  } catch (error) {
+    throwApiError(error, 'No se pudo aceptar la solicitud.');
+  }
+};
+
+export const rechazarReservaMaterial = async (reservaId) => {
+  try {
+    const response = await api.post(`/reservas-material/${reservaId}/rechazar`);
+    return response.data;
+  } catch (error) {
+    throwApiError(error, 'No se pudo rechazar la solicitud.');
+  }
+};
+
+export const cancelarReservaMaterial = async (reservaId) => {
+  try {
+    const response = await api.post(`/reservas-material/${reservaId}/cancelar`);
+    return response.data;
+  } catch (error) {
+    throwApiError(error, 'No se pudo cancelar la reserva.');
+  }
+};
+
 export default api;

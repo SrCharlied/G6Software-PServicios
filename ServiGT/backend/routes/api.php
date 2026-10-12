@@ -8,6 +8,7 @@ use App\Http\Controllers\ProviderController;
 use App\Http\Controllers\HealthController;
 use App\Http\Controllers\MessageController;
 use App\Http\Controllers\PublicacionMaterialController;
+use App\Http\Controllers\ReporteSeguridadController;
 use App\Http\Controllers\ReservaMaterialController;
 use App\Http\Controllers\ServicioController;
 use App\Http\Controllers\DisponibilidadController;
@@ -153,6 +154,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/publicaciones/{id}/activar', [PublicacionServicioController::class, 'activar'])->where('id', '[0-9]+');
     Route::post('/publicaciones/{id}/desactivar', [PublicacionServicioController::class, 'desactivar'])->where('id', '[0-9]+');
     Route::delete('/publicaciones/{id}', [PublicacionServicioController::class, 'destroy'])->where('id', '[0-9]+');
+
+    // ── Centro de seguridad (Sprint 9) ───────────────────────────────────────
+    Route::post('/servicios/{id}/seguridad/reportes',    [ReporteSeguridadController::class, 'crear'])->where('id', '[0-9]+')->middleware('throttle:uploads');
+    Route::post('/servicios/{id}/seguridad/interrumpir', [ReporteSeguridadController::class, 'interrumpir'])->where('id', '[0-9]+')->middleware('throttle:uploads');
+    Route::get('/seguridad/reportes/{id}',               [ReporteSeguridadController::class, 'show'])->where('id', '[0-9]+');
 
     // ── Bolsa de materiales (solo proveedores; Sprint 9) ─────────────────────
     Route::get('/materiales',        [PublicacionMaterialController::class, 'index']);

@@ -461,7 +461,7 @@ class PublicacionMaterialSprint9Test extends TestCase
         $contenido = base64_decode(self::PNG_1X1);
 
         if ($kb > 0) {
-            $contenido = str_pad($contenido, $kb * 1024, " ");
+            $contenido = str_pad($contenido, $kb * 1024, "\0");
         }
 
         return UploadedFile::fake()->createWithContent($nombre, $contenido);

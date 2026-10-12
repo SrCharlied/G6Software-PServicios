@@ -70,6 +70,17 @@ try {
 // ── Seed admin por defecto ─────────────────────────────────────────────────
 $requiredSchemaChecks = [
     "SELECT to_regclass('publicaciones_servicio') IS NOT NULL",
+    "SELECT to_regclass('publicaciones_material') IS NOT NULL
+        AND to_regclass('publicaciones_material_imagenes') IS NOT NULL
+        AND to_regclass('reservas_material') IS NOT NULL",
+    "SELECT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'servicios' AND column_name = 'cancelado_desde'
+    )",
+    "SELECT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'mensajes' AND column_name = 'reserva_material_id'
+    )",
     "SELECT EXISTS (
         SELECT 1 FROM information_schema.columns
         WHERE table_name = 'servicios' AND column_name = 'publicacion_id'

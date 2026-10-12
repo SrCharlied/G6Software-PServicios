@@ -227,8 +227,12 @@ class ServicioController extends Controller
                 return $this->error('Este servicio ya no se puede cancelar', 422);
             }
 
+            // El estado de origen se captura bajo el lock, junto con la
+            // transicion: es lo que habilita (o no) la bolsa de materiales.
+            // Las cancelaciones anteriores a Sprint 9 quedan en NULL.
             $servicio->update([
                 'estado' => 'cancelado',
+                'cancelado_desde' => $servicio->estado,
                 'motivo_cancelacion' => $validated['motivo'] ?? null,
             ]);
 

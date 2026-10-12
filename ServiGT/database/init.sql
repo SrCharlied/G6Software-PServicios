@@ -549,6 +549,104 @@ UPDATE categorias
 
 
 -- ============================================================
+-- Sprint 9: bolsa de materiales, origen de cancelacion y contexto de mensajes
+-- ============================================================
+-- Todo es idempotente y converge tanto en base limpia como en volumen
+-- existente. No se infiere nada de datos historicos: `cancelado_desde`
+-- queda NULL en cancelaciones anteriores y esas no son elegibles.
+
+ALTER TABLE servicios ADD COLUMN IF NOT EXISTS cancelado_desde VARCHAR(20);
+
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint
+        WHERE conrelid = 'servicios'::regclass
+          AND conname = 'servicios_cancelado_desde_check'
+    ) THEN
+        ALTER TABLE servicios ADD CONSTRAINT servicios_cancelado_desde_check
+            CHECK (cancelado_desde IS NULL OR cancelado_desde IN ('pendiente','aceptado','en_camino'));
+    END IF;
+END $$;
+
+-- Lote de materiales: uno por servicio cancelado desde en_camino. El vendedor
+-- es siempre el proveedor del servicio.
+CREATE TABLE IF NOT EXISTS publicaciones_material (
+    id BIGSERIAL PRIMARY KEY,
+    servicio_id BIGINT NOT NULL UNIQUE REFERENCES servicios(id) ON DELETE CASCADE,
+    vendedor_id BIGINT NOT NULL REFERENCES proveedores(id) ON DELETE CASCADE,
+    titulo VARCHAR(120) NOT NULL,
+    descripcion TEXT NOT NULL,
+    cantidad DECIMAL(10,2) NOT NULL CHECK (cantidad > 0),
+    unidad VARCHAR(30) NOT NULL,
+    precio_referencial DECIMAL(10,2) NOT NULL DEFAULT 0 CHECK (precio_referencial >= 0),
+    departamento VARCHAR(60) NOT NULL,
+    municipio VARCHAR(100),
+    estado VARCHAR(20) NOT NULL DEFAULT 'disponible'
+        CHECK (estado IN ('disponible','reservado','vendido','retirado')),
+    created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_pub_material_catalogo
+    ON publicaciones_material (estado, departamento, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_pub_material_vendedor
+    ON publicaciones_material (vendedor_id, estado);
+
+-- Imagenes de catalogo (publicas): de 1 a 3 por lote.
+CREATE TABLE IF NOT EXISTS publicaciones_material_imagenes (
+    id BIGSERIAL PRIMARY KEY,
+    publicacion_id BIGINT NOT NULL REFERENCES publicaciones_material(id) ON DELETE CASCADE,
+    ruta VARCHAR(500) NOT NULL,
+    orden SMALLINT NOT NULL CHECK (orden BETWEEN 1 AND 3),
+    created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (publicacion_id, orden)
+);
+
+-- Reserva/solicitud de un proveedor comprador sobre un lote. Varias pendientes
+-- pueden coexistir; solo una aceptada. Un comprador no repite una solicitud
+-- pendiente, aceptada ni rechazada sobre el mismo lote (cancelada si puede).
+CREATE TABLE IF NOT EXISTS reservas_material (
+    id BIGSERIAL PRIMARY KEY,
+    publicacion_id BIGINT NOT NULL REFERENCES publicaciones_material(id) ON DELETE CASCADE,
+    comprador_id BIGINT NOT NULL REFERENCES proveedores(id) ON DELETE CASCADE,
+    mensaje_inicial TEXT NOT NULL CHECK (LENGTH(BTRIM(mensaje_inicial)) > 0),
+    estado VARCHAR(20) NOT NULL DEFAULT 'pendiente'
+        CHECK (estado IN ('pendiente','aceptada','rechazada','cancelada')),
+    idempotency_key VARCHAR(80) NOT NULL,
+    created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (comprador_id, idempotency_key)
+);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_reserva_material_aceptada
+    ON reservas_material (publicacion_id) WHERE estado = 'aceptada';
+CREATE UNIQUE INDEX IF NOT EXISTS uq_reserva_material_comprador_vigente
+    ON reservas_material (publicacion_id, comprador_id)
+    WHERE estado IN ('pendiente','aceptada','rechazada');
+CREATE INDEX IF NOT EXISTS idx_reservas_material_comprador
+    ON reservas_material (comprador_id, estado, created_at DESC);
+
+-- Un mensaje pertenece a un servicio, a una reserva o a ninguno (historial
+-- anterior), nunca a ambos.
+ALTER TABLE mensajes ADD COLUMN IF NOT EXISTS reserva_material_id BIGINT
+    REFERENCES reservas_material(id) ON DELETE SET NULL;
+
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint
+        WHERE conrelid = 'mensajes'::regclass
+          AND conname = 'mensajes_un_solo_contexto_check'
+    ) THEN
+        ALTER TABLE mensajes ADD CONSTRAINT mensajes_un_solo_contexto_check
+            CHECK (servicio_id IS NULL OR reserva_material_id IS NULL);
+    END IF;
+END $$;
+
+CREATE INDEX IF NOT EXISTS idx_mensajes_reserva ON mensajes (reserva_material_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_mensajes_receptor_no_leidos
+    ON mensajes (receptor_id) WHERE leido = FALSE;
+
+-- ============================================================
 -- 3. Seed de catalogo
 -- ============================================================
 INSERT INTO categorias (nombre, descripcion, icono) VALUES

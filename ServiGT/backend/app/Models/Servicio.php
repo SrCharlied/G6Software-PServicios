@@ -54,6 +54,11 @@ class Servicio extends Model
         return $this->belongsTo(PublicacionServicio::class, 'publicacion_id');
     }
 
+    public function reportesSeguridad()
+    {
+        return $this->hasMany(ReporteSeguridad::class, 'servicio_id');
+    }
+
     public function publicacionMaterial()
     {
         return $this->hasOne(PublicacionMaterial::class, 'servicio_id');

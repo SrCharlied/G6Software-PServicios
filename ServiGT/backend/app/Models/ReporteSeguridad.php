@@ -15,6 +15,17 @@ class ReporteSeguridad extends Model
 
     public const ESTADOS = ['recibido', 'en_revision', 'resuelto', 'descartado'];
 
+    /**
+     * Transiciones administrativas permitidas. Resuelto y descartado son
+     * terminales: no se reabre un reporte (y ninguna transicion toca el servicio).
+     */
+    public const TRANSICIONES = [
+        'recibido'    => ['en_revision'],
+        'en_revision' => ['resuelto', 'descartado'],
+        'resuelto'    => [],
+        'descartado'  => [],
+    ];
+
     // Categorias provisionales: la lista final es decision de producto. Se
     // validan en la app (sin CHECK) para poder ajustarla sin DDL.
     public const CATEGORIAS = ['amenaza_o_acoso', 'conducta_inapropiada', 'robo_o_dano', 'emergencia', 'otro'];

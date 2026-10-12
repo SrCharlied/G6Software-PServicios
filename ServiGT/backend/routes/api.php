@@ -8,6 +8,7 @@ use App\Http\Controllers\ProviderController;
 use App\Http\Controllers\HealthController;
 use App\Http\Controllers\MessageController;
 use App\Http\Controllers\PublicacionMaterialController;
+use App\Http\Controllers\ReservaMaterialController;
 use App\Http\Controllers\ServicioController;
 use App\Http\Controllers\DisponibilidadController;
 use App\Http\Controllers\CalificacionController;
@@ -154,6 +155,13 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('/materiales/{id}',   [PublicacionMaterialController::class, 'update'])->where('id', '[0-9]+')->middleware('throttle:uploads');
     Route::post('/materiales/{id}/retirar', [PublicacionMaterialController::class, 'retirar'])->where('id', '[0-9]+');
     Route::post('/materiales/{id}/vendido', [PublicacionMaterialController::class, 'vendido'])->where('id', '[0-9]+');
+    Route::post('/materiales/{id}/reservas', [ReservaMaterialController::class, 'solicitar'])->where('id', '[0-9]+')->middleware('throttle:messages');
+    Route::get('/materiales/{id}/reservas',  [ReservaMaterialController::class, 'delLote'])->where('id', '[0-9]+');
+    Route::get('/reservas-material',         [ReservaMaterialController::class, 'mias']);
+    Route::get('/reservas-material/{id}',    [ReservaMaterialController::class, 'show'])->where('id', '[0-9]+');
+    Route::post('/reservas-material/{id}/aceptar',  [ReservaMaterialController::class, 'aceptar'])->where('id', '[0-9]+');
+    Route::post('/reservas-material/{id}/rechazar', [ReservaMaterialController::class, 'rechazar'])->where('id', '[0-9]+');
+    Route::post('/reservas-material/{id}/cancelar', [ReservaMaterialController::class, 'cancelar'])->where('id', '[0-9]+');
 
     // ── Notificaciones ───────────────────────────────────────────────────────
     Route::get('/notificaciones',               [NotificacionController::class, 'index']);

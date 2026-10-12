@@ -841,6 +841,33 @@ export const getMisLotesMateriales = async () => {
   }
 };
 
+export const getMateriales = async ({ page = 1, q, departamento } = {}) => {
+  try {
+    const response = await api.get('/materiales', { params: { page, q: q || undefined, departamento: departamento || undefined } });
+    return response.data;
+  } catch (error) {
+    throwApiError(error, 'No se pudieron cargar los materiales.');
+  }
+};
+
+export const getMaterialDetalle = async (id) => {
+  try {
+    const response = await api.get(`/materiales/${id}`);
+    return response.data;
+  } catch (error) {
+    throwApiError(error, 'No se pudo cargar el lote.');
+  }
+};
+
+export const solicitarReservaMaterial = async (id, datos) => {
+  try {
+    const response = await api.post(`/materiales/${id}/reservas`, datos);
+    return response.data;
+  } catch (error) {
+    throwApiError(error, 'No se pudo solicitar la reserva.');
+  }
+};
+
 export const getReservasDeLote = async (loteId) => {
   try {
     const response = await api.get(`/materiales/${loteId}/reservas`);

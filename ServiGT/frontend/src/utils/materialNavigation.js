@@ -5,6 +5,10 @@
 
 export const rutaDeMaterial = (screen, params = {}) => {
   switch (screen) {
+    case 'MaterialMarketplace':
+      return '/bolsa-materiales';
+    case 'MaterialDetail':
+      return params.id ? `/bolsa-materiales/${encodeURIComponent(params.id)}` : '/bolsa-materiales';
     case 'MisLotesMaterial':
       return '/bolsa-materiales/mias';
     case 'MisReservasMaterial':

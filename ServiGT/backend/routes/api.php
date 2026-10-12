@@ -159,6 +159,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/servicios/{id}/seguridad/reportes',    [ReporteSeguridadController::class, 'crear'])->where('id', '[0-9]+')->middleware('throttle:uploads');
     Route::post('/servicios/{id}/seguridad/interrumpir', [ReporteSeguridadController::class, 'interrumpir'])->where('id', '[0-9]+')->middleware('throttle:uploads');
     Route::get('/seguridad/reportes/{id}',               [ReporteSeguridadController::class, 'show'])->where('id', '[0-9]+');
+    Route::post('/seguridad/reportes/{id}/evidencias',   [ReporteSeguridadController::class, 'subirEvidencia'])->where('id', '[0-9]+')->middleware('throttle:uploads');
+    Route::get('/seguridad/reportes/{id}/evidencias/{evidenciaId}/descargar', [ReporteSeguridadController::class, 'descargarEvidencia'])->where(['id' => '[0-9]+', 'evidenciaId' => '[0-9]+']);
 
     // ── Bolsa de materiales (solo proveedores; Sprint 9) ─────────────────────
     Route::get('/materiales',        [PublicacionMaterialController::class, 'index']);

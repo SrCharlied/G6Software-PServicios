@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Middleware\CorrelationId;
 use App\Http\Resources\ReporteSeguridadResource;
 use App\Http\Resources\ServicioResource;
+use App\Models\EvidenciaReporteSeguridad;
 use App\Models\HistorialReporteSeguridad;
 use App\Models\Notificacion;
 use App\Models\ReporteSeguridad;
@@ -14,6 +15,8 @@ use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 /**
  * Centro de seguridad (Sprint 9). Reportes de un servicio por cliente o
@@ -32,6 +35,13 @@ class ReporteSeguridadController extends Controller
 
     /** Estados en los que el Centro de seguridad esta disponible para participantes. */
     public const ESTADOS_DISPONIBLES = ['aceptado', 'en_camino', 'en_progreso', 'por_confirmar'];
+
+    /** Tipos permitidos para evidencia, con la extension que se usa en disco. */
+    private const EXTENSION_POR_MIME = [
+        'image/jpeg'      => 'jpg',
+        'image/png'       => 'png',
+        'application/pdf' => 'pdf',
+    ];
 
     /**
      * POST /api/servicios/{id}/seguridad/reportes
@@ -69,6 +79,125 @@ class ReporteSeguridadController extends Controller
         }
 
         return $this->success('OK', ['reporte' => new ReporteSeguridadResource($reporte)]);
+    }
+
+    /**
+     * POST /api/seguridad/reportes/{id}/evidencias  (multipart: archivos[])
+     * Solo el reportante. Hasta 3 archivos por reporte, JPG/PNG/PDF de maximo
+     * 5 MB, guardados en el disco PRIVADO con nombre aleatorio. El tipo se
+     * detecta por contenido, no por la extension ni el MIME que declara el cliente.
+     *
+     * Es una operacion posterior y separada del reporte: la carga nunca forma
+     * parte de la transaccion urgente de interrupcion.
+     */
+    public function subirEvidencia(Request $request, int $id): JsonResponse
+    {
+        $reporte = ReporteSeguridad::find($id);
+
+        if (!$reporte) {
+            return $this->error('Reporte no encontrado.', 404);
+        }
+
+        if ($reporte->reportante_id !== $request->user()->id) {
+            return $this->error('Solo quien escribió el reporte puede adjuntar evidencia.', 403);
+        }
+
+        $request->validate([
+            'archivos'   => 'required|array|min:1|max:' . ReporteSeguridadResource::MAX_EVIDENCIAS,
+            'archivos.*' => [
+                'file',
+                'max:5120',
+                // El tipo se detecta por CONTENIDO con finfo: ni la extension ni el
+                // MIME que declara el cliente deciden nada.
+                function (string $atributo, $archivo, \Closure $falla) {
+                    if (!isset(self::EXTENSION_POR_MIME[$this->mimePorContenido($archivo)])) {
+                        $falla('El archivo debe ser una imagen JPG o PNG, o un PDF.');
+                    }
+                },
+            ],
+        ]);
+
+        $guardadas = [];
+
+        try {
+            return DB::transaction(function () use ($request, $id, &$guardadas) {
+                // Serializa cargas concurrentes del mismo reporte: el tope de 3 no se supera.
+                $reporte = ReporteSeguridad::query()->lockForUpdate()->find($id);
+
+                $archivos = $request->file('archivos');
+                $ocupadas = $reporte->evidencias()->pluck('orden')->all();
+
+                if (count($ocupadas) + count($archivos) > ReporteSeguridadResource::MAX_EVIDENCIAS) {
+                    return $this->error('Un reporte admite como máximo ' . ReporteSeguridadResource::MAX_EVIDENCIAS . ' evidencias.', 422);
+                }
+
+                $libres = array_values(array_diff(range(1, ReporteSeguridadResource::MAX_EVIDENCIAS), $ocupadas));
+
+                foreach ($archivos as $indice => $archivo) {
+                    $mime = $this->mimePorContenido($archivo);
+                    $nombre = Str::uuid() . '.' . self::EXTENSION_POR_MIME[$mime];
+
+                    $ruta = Storage::disk('local')->putFileAs("seguridad/{$reporte->id}", $archivo, $nombre);
+                    $guardadas[] = $ruta;
+
+                    EvidenciaReporteSeguridad::create([
+                        'reporte_id'      => $reporte->id,
+                        'orden'           => $libres[$indice],
+                        'ruta_privada'    => $ruta,
+                        'nombre_original' => $this->nombreSeguro($archivo->getClientOriginalName()),
+                        'mime'            => $mime,
+                        'tamano_bytes'    => $archivo->getSize(),
+                        'sha256'          => hash_file('sha256', $archivo->getRealPath()),
+                    ]);
+                }
+
+                $reporte->load('evidencias');
+
+                return $this->success('Evidencia adjuntada.', ['reporte' => new ReporteSeguridadResource($reporte)], 201);
+            });
+        } catch (\Throwable $e) {
+            // Compensacion: la transaccion revierte las filas; los archivos viven
+            // fuera de ella y se borran a mano.
+            Storage::disk('local')->delete($guardadas);
+
+            throw $e;
+        }
+    }
+
+    /**
+     * GET /api/seguridad/reportes/{id}/evidencias/{evidenciaId}/descargar
+     * Solo el reportante y el admin. Se sirve como attachment con nosniff; nunca
+     * hay una URL publica del archivo.
+     */
+    public function descargarEvidencia(Request $request, int $id, int $evidenciaId)
+    {
+        $reporte = ReporteSeguridad::find($id);
+
+        if (!$reporte) {
+            return $this->error('Reporte no encontrado.', 404);
+        }
+
+        if (!$this->puedeVer($request, $reporte)) {
+            return $this->error('No tienes acceso a esta evidencia.', 403);
+        }
+
+        $evidencia = $reporte->evidencias()->find($evidenciaId);
+
+        if (!$evidencia) {
+            return $this->error('Evidencia no encontrada.', 404);
+        }
+
+        if (!Storage::disk('local')->exists($evidencia->ruta_privada)) {
+            return $this->error('El archivo ya no está disponible.', 404);
+        }
+
+        $nombre = "evidencia-{$reporte->id}-{$evidencia->orden}." . (self::EXTENSION_POR_MIME[$evidencia->mime] ?? 'bin');
+
+        return Storage::disk('local')->download($evidencia->ruta_privada, $nombre, [
+            'Content-Type'           => $evidencia->mime,
+            'X-Content-Type-Options' => 'nosniff',
+            'Cache-Control'          => 'private, no-store',
+        ]);
     }
 
     private function registrar(Request $request, int $servicioId, bool $interrumpe): JsonResponse
@@ -194,6 +323,24 @@ class ReporteSeguridadController extends Controller
             $proveedorUserId === $userId => (int) $servicio->cliente_id,
             default => null,
         };
+    }
+
+    /** Tipo MIME real del archivo subido, leido de su contenido. */
+    private function mimePorContenido($archivo): string
+    {
+        $ruta = $archivo?->getRealPath();
+
+        return $ruta ? (string) (new \finfo(FILEINFO_MIME_TYPE))->file($ruta) : '';
+    }
+
+    /** Nombre original saneado: solo informativo, nunca se usa como ruta en disco. */
+    private function nombreSeguro(?string $nombre): ?string
+    {
+        $base = basename(str_replace('\\', '/', (string) $nombre));
+        $limpio = preg_replace('/[^\p{L}\p{N}._ -]+/u', '_', $base);
+        $limpio = trim(mb_substr((string) $limpio, 0, 255));
+
+        return $limpio === '' ? null : $limpio;
     }
 
     private function puedeVer(Request $request, ReporteSeguridad $reporte): bool

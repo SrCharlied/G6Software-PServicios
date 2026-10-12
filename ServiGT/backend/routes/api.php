@@ -117,6 +117,13 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/mensajes/conversacion/{userId}', [MessageController::class, 'conversacion'])->where('userId', '[0-9]+');
     // Listar todas mis conversaciones
     Route::get('/mensajes/conversaciones', [MessageController::class, 'misConversaciones']);
+    // Sprint 9: bandeja por contexto e hilos tipados (servicio / reserva de material)
+    Route::get('/mensajes/hilos', [MessageController::class, 'hilos']);
+    Route::get('/mensajes/historial/{userId}', [MessageController::class, 'historial'])->where('userId', '[0-9]+');
+    Route::get('/mensajes/servicios/{servicioId}', [MessageController::class, 'conversacionServicio'])->where('servicioId', '[0-9]+');
+    Route::post('/mensajes/servicios/{servicioId}', [MessageController::class, 'enviarServicio'])->where('servicioId', '[0-9]+')->middleware('throttle:messages');
+    Route::get('/mensajes/reservas/{reservaId}', [MessageController::class, 'conversacionReserva'])->where('reservaId', '[0-9]+');
+    Route::post('/mensajes/reservas/{reservaId}', [MessageController::class, 'enviarReserva'])->where('reservaId', '[0-9]+')->middleware('throttle:messages');
 
     // ── Pedidos (Marketplace de Demanda) ─────────────────────────────────────
     Route::post('/pedidos',                              [PedidoController::class, 'store']);

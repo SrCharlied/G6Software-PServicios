@@ -7,6 +7,7 @@ use App\Http\Controllers\CategoriaController;
 use App\Http\Controllers\ProviderController;
 use App\Http\Controllers\HealthController;
 use App\Http\Controllers\MessageController;
+use App\Http\Controllers\PublicacionMaterialController;
 use App\Http\Controllers\ServicioController;
 use App\Http\Controllers\DisponibilidadController;
 use App\Http\Controllers\CalificacionController;
@@ -145,8 +146,17 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/publicaciones/{id}/desactivar', [PublicacionServicioController::class, 'desactivar'])->where('id', '[0-9]+');
     Route::delete('/publicaciones/{id}', [PublicacionServicioController::class, 'destroy'])->where('id', '[0-9]+');
 
+    // ── Bolsa de materiales (solo proveedores; Sprint 9) ─────────────────────
+    Route::get('/materiales',        [PublicacionMaterialController::class, 'index']);
+    Route::get('/materiales/mias',   [PublicacionMaterialController::class, 'mias']);
+    Route::post('/materiales',       [PublicacionMaterialController::class, 'store'])->middleware('throttle:uploads');
+    Route::get('/materiales/{id}',   [PublicacionMaterialController::class, 'show'])->where('id', '[0-9]+');
+    Route::put('/materiales/{id}',   [PublicacionMaterialController::class, 'update'])->where('id', '[0-9]+')->middleware('throttle:uploads');
+    Route::post('/materiales/{id}/retirar', [PublicacionMaterialController::class, 'retirar'])->where('id', '[0-9]+');
+    Route::post('/materiales/{id}/vendido', [PublicacionMaterialController::class, 'vendido'])->where('id', '[0-9]+');
+
     // ── Notificaciones ───────────────────────────────────────────────────────
-    Route::get('/notificaciones',                [NotificacionController::class, 'index']);
+    Route::get('/notificaciones',               [NotificacionController::class, 'index']);
     Route::put('/notificaciones/{id}/leer',      [NotificacionController::class, 'marcarLeida'])->where('id', '[0-9]+');
     Route::put('/notificaciones/leer-todas',     [NotificacionController::class, 'marcarTodasLeidas']);
 

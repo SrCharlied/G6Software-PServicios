@@ -8,6 +8,8 @@ use App\Http\Controllers\ProviderController;
 use App\Http\Controllers\HealthController;
 use App\Http\Controllers\MessageController;
 use App\Http\Controllers\PublicacionMaterialController;
+use App\Http\Controllers\ReporteSeguridadAdminController;
+use App\Http\Controllers\ReporteSeguridadController;
 use App\Http\Controllers\ReservaMaterialController;
 use App\Http\Controllers\ServicioController;
 use App\Http\Controllers\DisponibilidadController;
@@ -154,6 +156,13 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/publicaciones/{id}/desactivar', [PublicacionServicioController::class, 'desactivar'])->where('id', '[0-9]+');
     Route::delete('/publicaciones/{id}', [PublicacionServicioController::class, 'destroy'])->where('id', '[0-9]+');
 
+    // ── Centro de seguridad (Sprint 9) ───────────────────────────────────────
+    Route::post('/servicios/{id}/seguridad/reportes',    [ReporteSeguridadController::class, 'crear'])->where('id', '[0-9]+')->middleware('throttle:uploads');
+    Route::post('/servicios/{id}/seguridad/interrumpir', [ReporteSeguridadController::class, 'interrumpir'])->where('id', '[0-9]+')->middleware('throttle:uploads');
+    Route::get('/seguridad/reportes/{id}',               [ReporteSeguridadController::class, 'show'])->where('id', '[0-9]+');
+    Route::post('/seguridad/reportes/{id}/evidencias',   [ReporteSeguridadController::class, 'subirEvidencia'])->where('id', '[0-9]+')->middleware('throttle:uploads');
+    Route::get('/seguridad/reportes/{id}/evidencias/{evidenciaId}/descargar', [ReporteSeguridadController::class, 'descargarEvidencia'])->where(['id' => '[0-9]+', 'evidenciaId' => '[0-9]+']);
+
     // ── Bolsa de materiales (solo proveedores; Sprint 9) ─────────────────────
     Route::get('/materiales',        [PublicacionMaterialController::class, 'index']);
     Route::get('/materiales/mias',   [PublicacionMaterialController::class, 'mias']);
@@ -181,6 +190,10 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/usuarios',    [AdminController::class, 'listUsers']);
         Route::get('/proveedores', [AdminController::class, 'listProviders']);
         Route::get('/creditos-premium', [AdminController::class, 'creditosPremium']);
+        // Centro de seguridad (Sprint 9): cola, detalle y cambio de estado auditado.
+        Route::get('/reportes-seguridad', [ReporteSeguridadAdminController::class, 'index']);
+        Route::get('/reportes-seguridad/{id}', [ReporteSeguridadAdminController::class, 'show'])->where('id', '[0-9]+');
+        Route::post('/reportes-seguridad/{id}/estado', [ReporteSeguridadAdminController::class, 'cambiarEstado'])->where('id', '[0-9]+');
         Route::post('/proveedores/{proveedorId}/creditos', [AdminController::class, 'recargarCreditos'])
             ->where('proveedorId', '[0-9]+');
     });

@@ -141,23 +141,40 @@ class CotizacionController extends Controller
 
         $proveedor = Proveedor::where('user_id', $request->user()->id)->firstOrFail();
 
-        $cotizacion = Cotizacion::where('id', $cotizacionId)
-            ->where('pedido_id', $pedidoId)
-            ->where('proveedor_id', $proveedor->id)
-            ->firstOrFail();
+        $resultado = DB::transaction(function () use ($proveedor, $pedidoId, $cotizacionId, $validated) {
+            // Mismo orden de locks que `aceptar` (pedido -> cotizacion) para que
+            // una edicion y una adjudicacion concurrentes se serialicen sin
+            // interbloqueo y dejen un unico resultado valido.
+            $pedido = Pedido::query()->lockForUpdate()->find($pedidoId);
 
-        $credito     = CreditoProveedor::where('proveedor_id', $proveedor->id)->first();
-        $saldoActual = $credito?->saldo ?? 0;
+            $cotizacion = $pedido
+                ? Cotizacion::query()
+                    ->where('id', $cotizacionId)
+                    ->where('pedido_id', $pedidoId)
+                    ->where('proveedor_id', $proveedor->id)
+                    ->lockForUpdate()
+                    ->first()
+                : null;
 
-        if ($saldoActual < 1) {
-            return $this->error('Saldo insuficiente. Recarga créditos para editar tu cotización.', 422);
-        }
+            if (!$cotizacion) {
+                return ['error' => 'Cotización no encontrada.', 'status' => 404];
+            }
 
-        $nuevoSaldo = null;
+            if ($cotizacion->estado !== 'enviada') {
+                return ['error' => 'Solo se pueden editar cotizaciones enviadas.', 'status' => 422];
+            }
 
-        DB::transaction(function () use ($proveedor, $pedidoId, $cotizacionId, $credito, $cotizacion, $validated, &$nuevoSaldo) {
+            if ($pedido->estado !== 'abierto' || $pedido->fecha_expiracion->isPast()) {
+                return ['error' => 'El pedido ya no admite cambios en las cotizaciones.', 'status' => 422];
+            }
+
+            $credito = CreditoProveedor::where('proveedor_id', $proveedor->id)->lockForUpdate()->first();
+
+            if (($credito?->saldo ?? 0) < 1) {
+                return ['error' => 'Saldo insuficiente. Recarga créditos para editar tu cotización.', 'status' => 422];
+            }
+
             $credito->decrement('saldo', 1);
-            $nuevoSaldo = $credito->fresh()->saldo;
 
             TransaccionCredito::create([
                 'proveedor_id'  => $proveedor->id,
@@ -171,12 +188,15 @@ class CotizacionController extends Controller
                 'monto'   => $validated['monto'],
                 'mensaje' => $validated['mensaje'],
             ]);
+
+            return ['cotizacion' => $cotizacion->fresh(), 'nuevo_saldo' => $credito->fresh()->saldo];
         });
 
-        return $this->success('Cotización actualizada correctamente.', [
-            'cotizacion'  => $cotizacion->fresh(),
-            'nuevo_saldo' => $nuevoSaldo,
-        ]);
+        if (isset($resultado['error'])) {
+            return $this->error($resultado['error'], $resultado['status']);
+        }
+
+        return $this->success('Cotización actualizada correctamente.', $resultado);
     }
 
     /**

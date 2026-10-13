@@ -1,7 +1,9 @@
 const { test, expect, request } = require('@playwright/test');
+const { requireLocalStack, cleanupAccounts, respectRetryAfter } = require('./helpers/local-smoke');
+test.use({ trace: 'off' });
 
 const API_URL = process.env.E2E_API_URL || 'http://localhost:8085/api';
-const evidenceDir = '../docs/sprint8/evidencia/responsive';
+const evidenceDir = 'test-results/sprint8-responsive';
 const stamp = Date.now();
 
 const accounts = {
@@ -23,6 +25,7 @@ let api;
 let clientToken;
 let providerToken;
 let serviceId;
+const sessions = new Map();
 
 async function apiCall(method, path, { token, data } = {}) {
   const response = await api.fetch(`${API_URL}${path}`, {
@@ -35,16 +38,29 @@ async function apiCall(method, path, { token, data } = {}) {
 }
 
 async function register(account) {
-  const { response, body } = await apiCall('POST', '/register', { data: account });
+  let { response, body } = await apiCall('POST', '/register', { data: account });
+  if (await respectRetryAfter(response)) ({ response, body } = await apiCall('POST', '/register', { data: account }));
   expect(response.status(), JSON.stringify(body)).toBe(201);
   return body;
 }
 
 async function login(page, account) {
+  if (sessions.has(account.email)) {
+    await page.addInitScript(({ token, user }) => {
+      localStorage.setItem('servigt_token', token);
+      localStorage.setItem('servigt_user', JSON.stringify(user));
+    }, sessions.get(account.email));
+    await page.goto(account.role === 'proveedor' ? '/dashboard' : '/home');
+    return;
+  }
   await page.goto('/login');
   await page.getByPlaceholder('correo@ejemplo.com').fill(account.email);
   await page.getByPlaceholder('Contrasena').fill(account.password);
+  const response = page.waitForResponse((res) => res.request().method() === 'POST' && res.url().endsWith('/login'));
   await page.getByText('Ingresar', { exact: true }).click();
+  const authenticated = await response;
+  expect(authenticated.status()).toBe(200);
+  sessions.set(account.email, await authenticated.json());
   await page.waitForURL(account.role === 'proveedor' ? '**/dashboard' : '**/home');
 }
 
@@ -58,6 +74,8 @@ async function expectNoHorizontalOverflow(page) {
 
 test.describe.serial('Checklist responsive Sprint 8', () => {
   test.beforeAll(async () => {
+    test.setTimeout(90_000); // Solo el fixture: respeta la ventana real de registro (60 s).
+    requireLocalStack(API_URL);
     api = await request.newContext({ extraHTTPHeaders: { Accept: 'application/json' } });
 
     const client = await register(accounts.client);
@@ -100,7 +118,8 @@ test.describe.serial('Checklist responsive Sprint 8', () => {
   });
 
   test.afterAll(async () => {
-    await api?.dispose();
+    try { cleanupAccounts(Object.values(accounts).map((account) => account.email)); }
+    finally { await api?.dispose(); }
   });
 
   for (const viewport of [

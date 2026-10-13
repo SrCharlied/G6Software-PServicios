@@ -21,10 +21,16 @@ const TIPOS_BACKEND = [
   'servicio_calificable',
   'cotizacion_aceptada',
   'cotizacion_rechazada',
+  'reserva_material_solicitada',
+  'reserva_material_aceptada',
+  'reserva_material_rechazada',
+  'reserva_material_cancelada',
+  'servicio_seguridad_reporte',
+  'servicio_interrumpido_seguridad',
 ];
 
 describe('cobertura de tipos', () => {
-  it('mapea exactamente los 10 tipos del backend, sin faltantes ni sobrantes', () => {
+  it('mapea los tipos reales de servicios, cotizaciones, reservas y seguridad', () => {
     expect(TIPOS_CON_DESTINO.sort()).toEqual([...TIPOS_BACKEND].sort());
   });
 
@@ -74,6 +80,12 @@ describe('Flujo A: servicios', () => {
 });
 
 describe('Flujo B: pedidos y cotizaciones', () => {
+  it('navega reservas y seguridad sin revelar IDs de reportes privados', () => {
+    expect(destinoNotificacion({ tipo: 'reserva_material_solicitada', datos: { reserva_id: 8 } })).toBe('/bolsa-materiales/mias');
+    expect(destinoNotificacion({ tipo: 'reserva_material_aceptada' })).toBe('/reservas-materiales');
+    expect(destinoNotificacion({ tipo: 'reserva_material_cancelada', datos: { publicacion_id: 7 } })).toBe('/bolsa-materiales/7');
+    expect(destinoNotificacion({ tipo: 'servicio_interrumpido_seguridad', datos: { servicio_id: 2 } })).toBe('/solicitudes');
+  });
   it('cotizacion_aceptada abre el pedido adjudicado', () => {
     const datos = { pedido_id: 12, cotizacion_id: 30, servicio_id: 55 };
     expect(destinoNotificacion({ tipo: 'cotizacion_aceptada', datos })).toBe('/pedidos/12');

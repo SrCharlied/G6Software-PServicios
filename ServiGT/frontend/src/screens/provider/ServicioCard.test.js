@@ -2,6 +2,8 @@ import React from 'react';
 import { fireEvent, render } from '@testing-library/react-native';
 import ServicioCard from './ServicioCard';
 jest.mock('@expo/vector-icons', () => ({ Feather: () => null }));
+const mockPush = jest.fn();
+jest.mock('expo-router', () => ({ useRouter: () => ({ push: mockPush }) }));
 
 const servicio = (estado) => ({
   id: 21,

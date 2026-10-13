@@ -20,6 +20,7 @@ import {
 import { useToast } from '../context/ToastContext';
 import { T } from '../theme';
 import { Button, ScreenHeader } from '../components/ui';
+import { canOpenSafety } from '../utils/serviceSafety';
 
 const tabs = [
   { key: 'enviadas', label: 'Enviadas' },
@@ -41,6 +42,7 @@ const ESTADO_LABEL = {
   completado: 'Completado',
   cancelado: 'Cancelado',
   rechazado: 'Rechazado',
+  interrumpido_seguridad: 'Interrumpido por seguridad',
 };
 
 function StatusChip({ estado }) {
@@ -66,11 +68,11 @@ function StatusChip({ estado }) {
   );
 }
 
-export default function SolicitudesScreen({ navigation, user }) {
+export default function SolicitudesScreen({ navigation, user, isFocused = true }) {
   const toast = useToast();
   const { width } = useWindowDimensions();
   const wide = width >= 900;
-  const [activeTab, setActiveTab] = useState('enviadas');
+  const [activeTab, setActiveTab] = useState(user?.role === 'proveedor' ? 'recibidas' : 'enviadas');
   const [enviadas, setEnviadas] = useState([]);
   const [recibidas, setRecibidas] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -87,13 +89,13 @@ export default function SolicitudesScreen({ navigation, user }) {
   const fetchSolicitudes = useCallback(async () => {
     setLoading(true);
     try {
-      const enviadasData = await getSolicitudesCliente();
-      setEnviadas(enviadasData.servicios || []);
-
       if (canSeeRecibidas) {
+        setEnviadas([]);
         const recibidasData = await getSolicitudesProveedor();
         setRecibidas(recibidasData.servicios || []);
       } else {
+        const enviadasData = await getSolicitudesCliente();
+        setEnviadas(enviadasData.servicios || []);
         setRecibidas([]);
       }
     } catch (error) {
@@ -104,8 +106,8 @@ export default function SolicitudesScreen({ navigation, user }) {
   }, [canSeeRecibidas, toast]);
 
   useEffect(() => {
-    fetchSolicitudes();
-  }, [fetchSolicitudes]);
+    if (isFocused) fetchSolicitudes();
+  }, [fetchSolicitudes, isFocused]);
 
   const solicitudes = useMemo(
     () => (activeTab === 'enviadas' ? enviadas : recibidas),
@@ -294,6 +296,7 @@ export default function SolicitudesScreen({ navigation, user }) {
             <Text style={styles.cancelActionText}>Cancelar servicio</Text>
           </TouchableOpacity>
         ) : null}
+        {canOpenSafety(item.estado) && ['cliente', 'proveedor'].includes(user?.role) ? <Button kind="secondary" icon="shield" onPress={() => navigation.navigate('ServiceSafety', { id: item.id })}>Centro de seguridad</Button> : null}
       </View>
     );
   };
@@ -315,7 +318,7 @@ export default function SolicitudesScreen({ navigation, user }) {
       />
 
       <View style={styles.tabs}>
-        {tabs.map((tab) => {
+        {tabs.filter((tab) => tab.key === (canSeeRecibidas ? 'recibidas' : 'enviadas')).map((tab) => {
           const disabled = tab.key === 'recibidas' && !canSeeRecibidas;
           const active = activeTab === tab.key;
           return (

@@ -1063,3 +1063,23 @@ export const descargarEvidenciaSeguridad = async (reporteId, evidenciaId) => {
 };
 
 export default api;
+export const registrarReporteSeguridad = async (servicioId, datos, interrumpir = false) => {
+  try {
+    const response = await api.post(`/servicios/${servicioId}/seguridad/${interrumpir ? 'interrumpir' : 'reportes'}`, datos);
+    return response.data;
+  } catch (error) { throwApiError(error, 'No se pudo registrar el reporte.'); }
+};
+export const getReporteSeguridad = async (id) => {
+  try { return (await api.get(`/seguridad/reportes/${id}`)).data; }
+  catch (error) { throwApiError(error, 'No se pudo cargar el reporte.'); }
+};
+export const subirEvidenciasSeguridad = async (id, archivos) => {
+  try {
+    const form = new FormData();
+    for (const asset of archivos) {
+      if (Platform.OS === 'web') form.append('archivos[]', asset.file || await (await fetch(asset.uri)).blob(), asset.name);
+      else form.append('archivos[]', { uri: asset.uri, name: asset.name, type: asset.mimeType });
+    }
+    return (await api.post(`/seguridad/reportes/${id}/evidencias`, form, { headers: { 'Content-Type': 'multipart/form-data' } })).data;
+  } catch (error) { throwApiError(error, 'No se pudo adjuntar la evidencia.'); }
+};

@@ -102,7 +102,7 @@ export default function ProviderDashboardScreen({
     [solicitudes],
   );
   const historial = useMemo(
-    () => solicitudes.filter((i) => ['completado', 'rechazado', 'cancelado'].includes(i.estado)),
+    () => solicitudes.filter((i) => ['completado', 'rechazado', 'cancelado', 'interrumpido_seguridad'].includes(i.estado)),
     [solicitudes],
   );
 

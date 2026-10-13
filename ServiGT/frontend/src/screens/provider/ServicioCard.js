@@ -3,6 +3,8 @@ import styles from './providerStyles';
 import { StatusBadge } from './ProviderBadges';
 import { formatCurrency, formatDate } from './providerUtils';
 import { Button } from '../../components/ui';
+import { useRouter } from 'expo-router';
+import { canOpenSafety } from '../../utils/serviceSafety';
 
 /**
  * Tarjeta de un servicio contratado con las acciones que corresponden a su
@@ -19,6 +21,7 @@ export default function ServicioCard({
   onMaterial,
   compact = false,
 }) {
+  const router = useRouter();
   const estado    = servicio.estado;
   const canAccept = estado === 'pendiente';
   // El backend acepta el codigo de inicio desde `aceptado` y desde
@@ -96,6 +99,7 @@ export default function ServicioCard({
           </TouchableOpacity>
         </View>
       ) : null}
+      {canOpenSafety(estado) ? <Button kind="secondary" icon="shield" onPress={() => router.push(`/seguridad/servicios/${servicio.id}`)}>Centro de seguridad</Button> : null}
     </View>
   );
 }

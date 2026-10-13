@@ -1,6 +1,8 @@
 import { Text, View } from 'react-native';
 import styles from './providerStyles';
 import { ESTADO_COLORES } from './providerUtils';
+import { StatusChip } from '../../components/ui';
+import { chipDeServicio } from '../../utils/seguridadEstados';
 
 /**
  * Fila de 5 estrellas del panel de proveedor. Se mantiene separada de la
@@ -18,6 +20,7 @@ export function Stars({ value }) {
 }
 
 export function StatusBadge({ estado }) {
+  if (estado === 'interrumpido_seguridad') return <StatusChip {...chipDeServicio(estado)} />;
   const colors = ESTADO_COLORES[estado] || ESTADO_COLORES.pendiente;
   return (
     <View style={[styles.statusBadge, { backgroundColor: colors.bg }]}>

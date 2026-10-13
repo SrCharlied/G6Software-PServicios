@@ -20,6 +20,7 @@ import {
 import { useToast } from '../context/ToastContext';
 import { T } from '../theme';
 import { Button, ScreenHeader } from '../components/ui';
+import { canOpenSafety } from '../utils/serviceSafety';
 
 const tabs = [
   { key: 'enviadas', label: 'Enviadas' },
@@ -41,6 +42,7 @@ const ESTADO_LABEL = {
   completado: 'Completado',
   cancelado: 'Cancelado',
   rechazado: 'Rechazado',
+  interrumpido_seguridad: 'Interrumpido por seguridad',
 };
 
 function StatusChip({ estado }) {
@@ -294,6 +296,7 @@ export default function SolicitudesScreen({ navigation, user }) {
             <Text style={styles.cancelActionText}>Cancelar servicio</Text>
           </TouchableOpacity>
         ) : null}
+        {canOpenSafety(item.estado) && ['cliente', 'proveedor'].includes(user?.role) ? <Button kind="secondary" icon="shield" onPress={() => navigation.navigate('ServiceSafety', { id: item.id })}>Centro de seguridad</Button> : null}
       </View>
     );
   };

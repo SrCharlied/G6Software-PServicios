@@ -9,6 +9,7 @@ export default function SolicitudesRoute() {
 
   const navigation = {
     navigate: (name, params = {}) => {
+      if (name === 'ServiceSafety') { router.push(`/seguridad/servicios/${params.id}`); return; }
       const map = {
         home: '/home',
         providerdashboard: '/dashboard',

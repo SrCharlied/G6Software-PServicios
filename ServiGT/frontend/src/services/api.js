@@ -904,4 +904,61 @@ export const cancelarReservaMaterial = async (reservaId) => {
   }
 };
 
+// ── Centro de seguridad: panel administrativo (Sprint 9, Task 6.2) ─────────
+// Contrato: docs/sprint9/seguridad-api.md. Todas requieren rol admin; el
+// backend decide: el cliente nunca asume permisos ni transiciones.
+
+export const getReportesSeguridadAdmin = async ({ estado = null, interrumpio = null, page = 1, perPage = 20 } = {}) => {
+  try {
+    const params = { page, per_page: perPage };
+    if (estado) params.estado = estado;
+    if (interrumpio !== null) params.interrumpio = interrumpio ? 1 : 0;
+    const response = await api.get('/admin/reportes-seguridad', { params });
+    return response.data;
+  } catch (error) {
+    throwApiError(error, 'No se pudieron cargar los reportes de seguridad.');
+  }
+};
+
+export const getReporteSeguridadAdmin = async (reporteId) => {
+  try {
+    const response = await api.get(`/admin/reportes-seguridad/${reporteId}`);
+    return response.data;
+  } catch (error) {
+    throwApiError(error, 'No se pudo cargar el reporte de seguridad.');
+  }
+};
+
+export const cambiarEstadoReporteSeguridad = async (reporteId, { estado, notaInterna = null }) => {
+  try {
+    const body = { estado };
+    if (notaInterna) body.nota_interna = notaInterna;
+    const response = await api.post(`/admin/reportes-seguridad/${reporteId}/estado`, body);
+    return response.data;
+  } catch (error) {
+    throwApiError(error, 'No se pudo actualizar el estado del reporte.');
+  }
+};
+
+// Descarga autorizada de una evidencia. Con responseType 'blob' un error del
+// backend tambien llega como Blob: se lee su JSON para conservar el mensaje real.
+export const descargarEvidenciaSeguridad = async (reporteId, evidenciaId) => {
+  const fallback = 'No se pudo descargar la evidencia.';
+  try {
+    const response = await api.get(
+      `/seguridad/reportes/${reporteId}/evidencias/${evidenciaId}/descargar`,
+      { responseType: 'blob' },
+    );
+    return { blob: response.data, contentType: response.headers?.['content-type'] ?? null };
+  } catch (error) {
+    const cuerpo = error?.response?.data;
+    if (cuerpo && typeof cuerpo.text === 'function') {
+      let data = null;
+      try { data = JSON.parse(await cuerpo.text()); } catch { /* el cuerpo no era JSON */ }
+      throwApiError({ ...error, response: { ...error.response, data } }, fallback);
+    }
+    throwApiError(error, fallback);
+  }
+};
+
 export default api;

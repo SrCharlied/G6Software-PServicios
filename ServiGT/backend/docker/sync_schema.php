@@ -77,6 +77,17 @@ $requiredSchemaChecks = [
         SELECT 1 FROM information_schema.columns
         WHERE table_name = 'servicios' AND column_name = 'cancelado_desde'
     )",
+    "SELECT to_regclass('reportes_seguridad') IS NOT NULL
+        AND to_regclass('evidencias_reporte_seguridad') IS NOT NULL
+        AND to_regclass('historial_reportes_seguridad') IS NOT NULL",
+    // El estado terminal de seguridad debe caber y estar permitido por el CHECK efectivo.
+    "SELECT (SELECT character_maximum_length FROM information_schema.columns
+             WHERE table_name = 'servicios' AND column_name = 'estado') >= 30
+        AND EXISTS (
+            SELECT 1 FROM pg_constraint
+            WHERE conrelid = 'servicios'::regclass AND conname = 'servicios_estado_check'
+              AND pg_get_constraintdef(oid) LIKE '%interrumpido_seguridad%'
+        )",
     "SELECT EXISTS (
         SELECT 1 FROM information_schema.columns
         WHERE table_name = 'mensajes' AND column_name = 'reserva_material_id'

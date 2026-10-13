@@ -205,3 +205,90 @@ describe('api de materiales (Sprint 9)', () => {
     });
   });
 });
+
+describe('api del panel de seguridad (Sprint 9)', () => {
+  afterEach(() => {
+    jest.dontMock('axios');
+    jest.dontMock('./sessionStorage');
+  });
+
+  it('lista reportes enviando solo los filtros definidos', async () => {
+    const { apiModule, client } = buildApiModule();
+    client.get.mockResolvedValue({ data: { reportes: [] } });
+
+    await apiModule.getReportesSeguridadAdmin();
+    await apiModule.getReportesSeguridadAdmin({ estado: 'en_revision', interrumpio: true, page: 2, perPage: 5 });
+    await apiModule.getReportesSeguridadAdmin({ interrumpio: false });
+
+    expect(client.get.mock.calls[0]).toEqual(['/admin/reportes-seguridad', { params: { page: 1, per_page: 20 } }]);
+    expect(client.get.mock.calls[1]).toEqual(['/admin/reportes-seguridad', { params: { page: 2, per_page: 5, estado: 'en_revision', interrumpio: 1 } }]);
+    expect(client.get.mock.calls[2][1].params).toEqual({ page: 1, per_page: 20, interrumpio: 0 });
+  });
+
+  it('lee el detalle de un reporte', async () => {
+    const { apiModule, client } = buildApiModule();
+    client.get.mockResolvedValueOnce({ data: { reporte: { id: 8 } } });
+
+    await expect(apiModule.getReporteSeguridadAdmin(8)).resolves.toEqual({ reporte: { id: 8 } });
+    expect(client.get).toHaveBeenCalledWith('/admin/reportes-seguridad/8');
+  });
+
+  it('cambia el estado enviando la nota solo si existe', async () => {
+    const { apiModule, client } = buildApiModule();
+    client.post.mockResolvedValue({ data: { success: true } });
+
+    await apiModule.cambiarEstadoReporteSeguridad(8, { estado: 'en_revision' });
+    await apiModule.cambiarEstadoReporteSeguridad(8, { estado: 'resuelto', notaInterna: 'Cierre' });
+
+    expect(client.post.mock.calls[0]).toEqual(['/admin/reportes-seguridad/8/estado', { estado: 'en_revision' }]);
+    expect(client.post.mock.calls[1]).toEqual(['/admin/reportes-seguridad/8/estado', { estado: 'resuelto', nota_interna: 'Cierre' }]);
+  });
+
+  it('propaga el mensaje del backend cuando el cambio de estado falla', async () => {
+    const { apiModule, client } = buildApiModule();
+    client.post.mockRejectedValueOnce({
+      isAxiosError: true,
+      response: { status: 422, data: { message: 'No se puede pasar un reporte de «resuelto» a «en_revision».' } },
+    });
+
+    await expect(apiModule.cambiarEstadoReporteSeguridad(8, { estado: 'en_revision' })).rejects.toMatchObject({
+      message: 'No se puede pasar un reporte de «resuelto» a «en_revision».',
+      status: 422,
+    });
+  });
+
+  it('descarga una evidencia como blob y devuelve su tipo', async () => {
+    const { apiModule, client } = buildApiModule();
+    const blob = { size: 4 };
+    client.get.mockResolvedValueOnce({ data: blob, headers: { 'content-type': 'image/png' } });
+
+    await expect(apiModule.descargarEvidenciaSeguridad(8, 3)).resolves.toEqual({ blob, contentType: 'image/png' });
+    expect(client.get).toHaveBeenCalledWith('/seguridad/reportes/8/evidencias/3/descargar', { responseType: 'blob' });
+  });
+
+  it('conserva el mensaje real cuando el error de la descarga llega como blob', async () => {
+    const { apiModule, client } = buildApiModule();
+    client.get.mockRejectedValueOnce({
+      isAxiosError: true,
+      response: { status: 404, data: { text: async () => JSON.stringify({ message: 'El archivo ya no está disponible.' }) } },
+    });
+
+    await expect(apiModule.descargarEvidenciaSeguridad(8, 3)).rejects.toMatchObject({
+      message: 'El archivo ya no está disponible.',
+      status: 404,
+    });
+  });
+
+  it('si el blob de error no es JSON usa el mensaje por defecto', async () => {
+    const { apiModule, client } = buildApiModule();
+    client.get.mockRejectedValueOnce({
+      isAxiosError: true,
+      response: { status: 500, data: { text: async () => '<html>error</html>' } },
+    });
+
+    await expect(apiModule.descargarEvidenciaSeguridad(8, 3)).rejects.toMatchObject({
+      message: 'No se pudo descargar la evidencia.',
+      status: 500,
+    });
+  });
+});

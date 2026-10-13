@@ -389,8 +389,6 @@ export default function ProviderDashboardScreen({
           <MensajesPanel
             solicitudes={solicitudes}
             loading={loadingSolicitudes}
-            onAbrirChat={(cliente) =>
-              navigation.navigate('Chat', { chatWithUserId: cliente.userId, chatWithName: cliente.name })}
           />
         );
       case 'historial':

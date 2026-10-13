@@ -1,48 +1,21 @@
-import { ActivityIndicator, Text, TouchableOpacity, View } from 'react-native';
+import { useRouter } from 'expo-router';
+import { useSession } from '../../context/SessionContext';
+import ChatListScreen from '../ChatListScreen';
+import { chatPath } from '../../utils/chatContext';
+import { StyleSheet, Text, View } from 'react-native';
+import { Button } from '../../components/ui';
 import { T } from '../../theme';
-import styles from './providerStyles';
-
-/**
- * Clientes con los que el proveedor tiene servicios, como atajo al chat. Se
- * derivan de las solicitudes ya cargadas para no pedir las conversaciones.
- */
-export default function MensajesPanel({ solicitudes, loading, onAbrirChat }) {
-  const seen = {};
-  solicitudes.forEach((s) => {
-    if (s.cliente_id && s.cliente && !seen[s.cliente_id]) {
-      seen[s.cliente_id] = { userId: s.cliente_id, name: s.cliente.name || 'Cliente' };
-    }
-  });
-  const clientes = Object.values(seen);
-
-  return (
-    <View style={styles.sectionStack}>
-      <Text style={styles.sectionTitle}>Conversaciones con clientes</Text>
-
-      {loading && clientes.length === 0 ? (
-        <ActivityIndicator color={T.blue} style={styles.sectionLoader} />
-      ) : clientes.length === 0 ? (
-        <View style={styles.emptyState}>
-          <Text style={styles.emptyStateText}>
-            Aún no tienes conversaciones. Aparecerán aquí cuando tengas solicitudes de clientes.
-          </Text>
-        </View>
-      ) : (
-        clientes.map((c) => (
-          <TouchableOpacity
-            key={c.userId}
-            style={styles.chatClientRow}
-            activeOpacity={0.82}
-            onPress={() => onAbrirChat(c)}
-          >
-            <View style={styles.chatClientAvatar}>
-              <Text style={styles.chatClientAvatarText}>{c.name.charAt(0).toUpperCase()}</Text>
-            </View>
-            <Text style={styles.chatClientName}>{c.name}</Text>
-            <Text style={styles.chatArrow}>→</Text>
-          </TouchableOpacity>
-        ))
-      )}
-    </View>
-  );
+export default function MensajesPanel({ solicitudes = [] }) {
+  const router = useRouter();
+  const { user } = useSession();
+  return <View style={s.panel}>
+    {solicitudes.length > 0 ? <View style={s.services}>
+      {solicitudes.map((servicio) => <View key={servicio.id} style={s.service}>
+        <Text style={s.label}>{`Servicio #${servicio.id} · ${servicio.cliente?.name || 'Cliente'}`}</Text>
+        <Button kind="ghost" size="sm" icon="message-circle" onPress={() => router.push(chatPath({ tipo: 'servicio', contexto: servicio.id }))}>Abrir chat</Button>
+      </View>)}
+    </View> : null}
+    <View style={s.inbox}><ChatListScreen user={user} navigation={{ navigate: (screen, params) => router.push(screen === 'ChatDetail' ? chatPath(params) : screen === 'MaterialDetail' ? `/bolsa-materiales/${params.id}` : screen === 'Servicios' ? '/solicitudes' : '/chat') }} /></View>
+  </View>;
 }
+const s = StyleSheet.create({ panel: { gap: T.s3 }, services: { gap: T.s2 }, service: { flexDirection: 'row', flexWrap: 'wrap', gap: T.s2, alignItems: 'center' }, label: { color: T.text, flex: 1, minWidth: 160 }, inbox: { height: 560 } });

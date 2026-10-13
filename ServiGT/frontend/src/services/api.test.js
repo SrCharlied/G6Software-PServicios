@@ -78,6 +78,20 @@ describe('multipart de materiales', () => {
 });
 
 describe('api error handling', () => {
+  it('envia por contexto sin receptor arbitrario', async () => {
+    const { apiModule, client } = buildApiModule();
+    client.post.mockResolvedValue({ data: { mensaje: { id: 1 } } });
+    await apiModule.enviarMensajeContexto({ tipo: 'reserva', id: 12, contraparteId: 999 }, 'Hola');
+    expect(client.post).toHaveBeenCalledWith('/mensajes/reservas/12', { contenido: 'Hola' });
+  });
+  it('consulta hilos y preserva 409 legacy', async () => {
+    const { apiModule, client } = buildApiModule();
+    client.get.mockResolvedValueOnce({ data: { hilos: [] } });
+    await apiModule.getHilosMensajes({ page: 2 });
+    expect(client.get).toHaveBeenCalledWith('/mensajes/hilos', { params: { page: 2 } });
+    client.get.mockRejectedValueOnce({ response: { status: 409, data: { message: 'Ambiguo' } } });
+    await expect(apiModule.getMensajesContexto({ tipo: 'legacy', contraparteId: 9 })).rejects.toMatchObject({ status: 409 });
+  });
   afterEach(() => {
     jest.dontMock('axios');
     jest.dontMock('./sessionStorage');

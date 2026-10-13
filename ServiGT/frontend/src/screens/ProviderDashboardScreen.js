@@ -50,7 +50,7 @@ import { buildDisponibilidad, TABS } from './provider/providerUtils';
  * son los mismos que antes de dividir el archivo.
  */
 export default function ProviderDashboardScreen({
-  navigation, user, providerProfile, setProviderProfile, onLogout,
+  navigation, user, providerProfile, setProviderProfile, onLogout, isFocused = true,
 }) {
   const toast = useToast();
 
@@ -117,9 +117,10 @@ export default function ProviderDashboardScreen({
   }, [providerProfile]);
 
   useEffect(() => {
+    if (!isFocused) return;
     if (!profile && user) { loadProfile(); return; }
     if (profile) loadDashboardData(profile);
-  }, [user, profile?.id]);
+  }, [user, profile?.id, isFocused]);
 
   useEffect(() => {
     if (activeTab === 'oportunidades') {

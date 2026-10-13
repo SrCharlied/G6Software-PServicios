@@ -68,7 +68,7 @@ function StatusChip({ estado }) {
   );
 }
 
-export default function SolicitudesScreen({ navigation, user }) {
+export default function SolicitudesScreen({ navigation, user, isFocused = true }) {
   const toast = useToast();
   const { width } = useWindowDimensions();
   const wide = width >= 900;
@@ -106,8 +106,8 @@ export default function SolicitudesScreen({ navigation, user }) {
   }, [canSeeRecibidas, toast]);
 
   useEffect(() => {
-    fetchSolicitudes();
-  }, [fetchSolicitudes]);
+    if (isFocused) fetchSolicitudes();
+  }, [fetchSolicitudes, isFocused]);
 
   const solicitudes = useMemo(
     () => (activeTab === 'enviadas' ? enviadas : recibidas),

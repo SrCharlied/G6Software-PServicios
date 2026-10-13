@@ -47,7 +47,51 @@ const buildApiModule = () => {
   return { apiModule, client, requestHandler, responseErrorHandler, storage };
 };
 
+describe('multipart de materiales', () => {
+  const originalFormData = global.FormData;
+  beforeEach(() => { global.FormData = require('react-native/Libraries/Network/FormData'); });
+  afterEach(() => { global.FormData = originalFormData; jest.dontMock('axios'); jest.dontMock('./sessionStorage'); });
+  it('envia creacion multipart con precio cero y archivo nativo', async () => {
+    const { apiModule, client } = buildApiModule();
+    client.post.mockResolvedValue({ data: { publicacion: { id: 7 } } });
+    await apiModule.crearLoteMaterial({ servicio_id: 21, precio_referencial: 0, imagenes: [{ uri: 'file:///a.jpg', fileName: 'a.jpg', mimeType: 'image/jpeg' }] });
+    const [url, form, config] = client.post.mock.calls[0];
+    expect(url).toBe('/materiales');
+    expect(form.getParts()).toEqual(expect.arrayContaining([
+      expect.objectContaining({ fieldName: 'precio_referencial', string: '0' }),
+      expect.objectContaining({ fieldName: 'imagenes[]', uri: 'file:///a.jpg', name: 'a.jpg', type: 'image/jpeg' }),
+    ]));
+    expect(config.headers['Content-Type']).toBe('multipart/form-data');
+  });
+  it('edita con POST y _method=PUT sin borrar archivos implicitamente', async () => {
+    const { apiModule, client } = buildApiModule();
+    client.post.mockResolvedValue({ data: { publicacion: { id: 7 } } });
+    await apiModule.actualizarLoteMaterial(7, { titulo: 'Tubos', imagenes: [], eliminar_imagenes: [9] });
+    const [url, form] = client.post.mock.calls[0];
+    expect(url).toBe('/materiales/7');
+    expect(form.getParts()).toEqual(expect.arrayContaining([
+      expect.objectContaining({ fieldName: '_method', string: 'PUT' }),
+      expect.objectContaining({ fieldName: 'eliminar_imagenes[]', string: '9' }),
+    ]));
+    expect(form.getParts().some((part) => part.fieldName === 'imagenes[]')).toBe(false);
+  });
+});
+
 describe('api error handling', () => {
+  it('envia por contexto sin receptor arbitrario', async () => {
+    const { apiModule, client } = buildApiModule();
+    client.post.mockResolvedValue({ data: { mensaje: { id: 1 } } });
+    await apiModule.enviarMensajeContexto({ tipo: 'reserva', id: 12, contraparteId: 999 }, 'Hola');
+    expect(client.post).toHaveBeenCalledWith('/mensajes/reservas/12', { contenido: 'Hola' });
+  });
+  it('consulta hilos y preserva 409 legacy', async () => {
+    const { apiModule, client } = buildApiModule();
+    client.get.mockResolvedValueOnce({ data: { hilos: [] } });
+    await apiModule.getHilosMensajes({ page: 2 });
+    expect(client.get).toHaveBeenCalledWith('/mensajes/hilos', { params: { page: 2 } });
+    client.get.mockRejectedValueOnce({ response: { status: 409, data: { message: 'Ambiguo' } } });
+    await expect(apiModule.getMensajesContexto({ tipo: 'legacy', contraparteId: 9 })).rejects.toMatchObject({ status: 409 });
+  });
   afterEach(() => {
     jest.dontMock('axios');
     jest.dontMock('./sessionStorage');

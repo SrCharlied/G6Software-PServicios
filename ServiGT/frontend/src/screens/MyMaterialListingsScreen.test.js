@@ -111,6 +111,12 @@ describe('MyMaterialListingsScreen — estados de la lista', () => {
 });
 
 describe('MyMaterialListingsScreen — acciones por estado del lote', () => {
+  it('abre el formulario del lote disponible seleccionado', async () => {
+    getMisLotesMateriales.mockResolvedValue({ publicaciones: [lote(7, 'disponible')], total: 1 });
+    renderScreen();
+    fireEvent.press(await screen.findByText('Editar lote'));
+    expect(navigation.navigate).toHaveBeenCalledWith('MaterialEdit', { id: 7 });
+  });
   it('lote disponible: permite retirar y marcar vendido', async () => {
     getMisLotesMateriales.mockResolvedValue({ publicaciones: [lote(1, 'disponible')], total: 1 });
 

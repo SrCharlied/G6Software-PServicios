@@ -2,6 +2,7 @@ import { Redirect, useRouter } from 'expo-router';
 import ProviderDashboardScreen from '../../src/screens/ProviderDashboardScreen';
 import { useSession } from '../../src/context/SessionContext';
 import InternalLayout from '../../src/components/InternalLayout';
+import { rutaDeMaterial } from '../../src/utils/materialNavigation';
 
 export default function DashboardRoute() {
   const router = useRouter();
@@ -12,6 +13,10 @@ export default function DashboardRoute() {
   const navigation = {
     navigate: (name, params = {}) => {
       const key = name.toLowerCase();
+      if (name === 'MaterialDetail' || name === 'MaterialCreate') {
+        router.push(rutaDeMaterial(name, params));
+        return;
+      }
       if (key === 'chat') {
         router.push(`/chat?userId=${params.chatWithUserId}&name=${encodeURIComponent(params.chatWithName ?? '')}`);
         return;

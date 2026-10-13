@@ -175,6 +175,7 @@ export default function MyMaterialListingsScreen({ navigation }) {
                   onReintentar={() => cargarSolicitudes(lote.id)}
                   onReservaAccion={(accion, reservaId) => setPendiente({ accion, id: reservaId, tipo: 'reserva' })}
                   onChat={(reserva) => navigation.navigate('ChatContexto', { tipo: 'reserva', id: reserva.id })}
+                  onEdit={() => navigation.navigate('MaterialEdit', { id: lote.id })}
                 />
               ))}
             </View>
@@ -193,7 +194,7 @@ export default function MyMaterialListingsScreen({ navigation }) {
   );
 }
 
-function LoteCard({ lote, ancho, estadoSolicitudes, onAccion, onAlternar, onReintentar, onReservaAccion, onChat }) {
+function LoteCard({ lote, ancho, estadoSolicitudes, onAccion, onAlternar, onReintentar, onReservaAccion, onChat, onEdit }) {
   const chip = chipDeLote(lote.estado);
   const imagen = lote.imagenes?.[0]?.url ? storageUrl(lote.imagenes[0].url) : null;
   const pendientes = Number(lote.reservas_pendientes || 0);
@@ -216,6 +217,7 @@ function LoteCard({ lote, ancho, estadoSolicitudes, onAccion, onAlternar, onRein
 
       {lote.estado === 'disponible' ? (
         <View style={s.acciones}>
+          <Button kind="secondary" icon="edit-2" size="sm" onPress={onEdit}>Editar lote</Button>
           <Button kind="secondary" size="sm" onPress={() => onAccion('vendido')}>Marcar vendido</Button>
           <Button kind="ghost" size="sm" onPress={() => onAccion('retirar')}>Retirar</Button>
         </View>

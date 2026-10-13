@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { Platform } from 'react-native';
 import {
   clearPrivateSessionStorage,
   migrateLegacySession,
@@ -518,6 +519,33 @@ export const getMisConversaciones = async () => {
   }
 };
 
+export const getHilosMensajes = async ({ page = 1 } = {}) => {
+  try {
+    const response = await api.get('/mensajes/hilos', { params: { page } });
+    return response.data;
+  } catch (error) {
+    throwApiError(error, 'No se pudieron cargar los hilos.');
+  }
+};
+const messageContextPath = ({ tipo, id, contraparteId }) => {
+  if ((tipo === 'servicio' || tipo === 'reserva') && /^[1-9]\d*$/.test(String(id))) return `/mensajes/${tipo === 'servicio' ? 'servicios' : 'reservas'}/${id}`;
+  if ((tipo === 'legado' || tipo === 'legacy') && /^[1-9]\d*$/.test(String(contraparteId))) return `/mensajes/${tipo === 'legado' ? 'historial' : 'conversacion'}/${contraparteId}`;
+  throw new Error('Selecciona un contexto de conversacion valido.');
+};
+export const getMensajesContexto = async (context, lastId = null) => {
+  try {
+    const response = await api.get(messageContextPath(context), { params: lastId ? { last_id: lastId } : {} });
+    return response.data;
+  } catch (error) { throwApiError(error, 'No se pudieron cargar los mensajes.'); }
+};
+export const enviarMensajeContexto = async (context, contenido) => {
+  try {
+    if (!['servicio', 'reserva'].includes(context.tipo)) throw new Error('El historial anterior es de solo lectura.');
+    const response = await api.post(messageContextPath(context), { contenido });
+    return response.data;
+  } catch (error) { throwApiError(error, 'No se pudo enviar el mensaje.'); }
+};
+
 // ── Notificaciones ────────────────────────────────────────────────────────
 
 export const getNotificaciones = async () => {
@@ -841,6 +869,72 @@ export const getMisLotesMateriales = async () => {
   }
 };
 
+export const getMateriales = async ({ page = 1, q, departamento } = {}) => {
+  try {
+    const response = await api.get('/materiales', { params: { page, q: q || undefined, departamento: departamento || undefined } });
+    return response.data;
+  } catch (error) {
+    throwApiError(error, 'No se pudieron cargar los materiales.');
+  }
+};
+
+export const getMaterialDetalle = async (id) => {
+  try {
+    const response = await api.get(`/materiales/${id}`);
+    return response.data;
+  } catch (error) {
+    throwApiError(error, 'No se pudo cargar el lote.');
+  }
+};
+
+export const solicitarReservaMaterial = async (id, datos) => {
+  try {
+    const response = await api.post(`/materiales/${id}/reservas`, datos);
+    return response.data;
+  } catch (error) {
+    throwApiError(error, 'No se pudo solicitar la reserva.');
+  }
+};
+
+export const buildMaterialFormData = async (datos) => {
+  const form = new FormData();
+  ['servicio_id', 'titulo', 'descripcion', 'cantidad', 'unidad', 'precio_referencial', 'departamento', 'municipio'].forEach((key) => {
+    if (datos[key] !== undefined && datos[key] !== null) form.append(key, String(datos[key]));
+  });
+  for (const asset of datos.imagenes || []) {
+    const name = asset.fileName || asset.uri.split('/').pop() || 'material.jpg';
+    if (Platform.OS === 'web') {
+      const file = asset.file || await (await fetch(asset.uri)).blob();
+      form.append('imagenes[]', file, name);
+    } else {
+      form.append('imagenes[]', { uri: asset.uri, name, type: asset.mimeType });
+    }
+  }
+  (datos.eliminar_imagenes || []).forEach((id) => form.append('eliminar_imagenes[]', String(id)));
+  return form;
+};
+
+export const crearLoteMaterial = async (datos) => {
+  try {
+    const form = await buildMaterialFormData(datos);
+    const response = await api.post('/materiales', form, { headers: { 'Content-Type': 'multipart/form-data' } });
+    return response.data;
+  } catch (error) {
+    throwApiError(error, 'No se pudo publicar el lote.');
+  }
+};
+
+export const actualizarLoteMaterial = async (id, datos) => {
+  try {
+    const form = await buildMaterialFormData(datos);
+    form.append('_method', 'PUT');
+    const response = await api.post(`/materiales/${id}`, form, { headers: { 'Content-Type': 'multipart/form-data' } });
+    return response.data;
+  } catch (error) {
+    throwApiError(error, 'No se pudo actualizar el lote.');
+  }
+};
+
 export const getReservasDeLote = async (loteId) => {
   try {
     const response = await api.get(`/materiales/${loteId}/reservas`);
@@ -875,6 +969,13 @@ export const getMisReservasMaterial = async ({ page = 1, perPage = 20 } = {}) =>
   } catch (error) {
     throwApiError(error, 'No se pudieron cargar tus reservas de materiales.');
   }
+};
+
+export const getReservaMaterial = async (id) => {
+  try {
+    const response = await api.get(`/reservas-material/${id}`);
+    return response.data;
+  } catch (error) { throwApiError(error, 'No se pudo cargar la reserva.'); }
 };
 
 export const aceptarReservaMaterial = async (reservaId) => {

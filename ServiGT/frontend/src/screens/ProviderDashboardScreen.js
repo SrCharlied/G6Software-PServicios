@@ -389,12 +389,10 @@ export default function ProviderDashboardScreen({
           <MensajesPanel
             solicitudes={solicitudes}
             loading={loadingSolicitudes}
-            onAbrirChat={(cliente) =>
-              navigation.navigate('Chat', { chatWithUserId: cliente.userId, chatWithName: cliente.name })}
           />
         );
       case 'historial':
-        return <HistorialPanel historial={historial} loading={loadingSolicitudes} />;
+        return <HistorialPanel historial={historial} loading={loadingSolicitudes} onMaterial={(screen, params) => navigation.navigate(screen, params)} />;
       case 'calificaciones':
         return (
           <CalificacionesPanel

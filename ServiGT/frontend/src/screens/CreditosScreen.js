@@ -55,6 +55,14 @@ const formatDate = (value) => {
   return date.toLocaleString('es-GT', { dateStyle: 'medium', timeStyle: 'short' });
 };
 
+const SIN_ERRORES = { saldo: '', paquetes: '', transacciones: '', premium: '' };
+
+const mensajeDeFallo = (resultado) => (
+  resultado.status === 'rejected'
+    ? resultado.reason?.message || 'No se pudo cargar la informacion.'
+    : ''
+);
+
 function PremiumBadge({ compact = false }) {
   return (
     <View style={[styles.premiumBadge, compact && styles.premiumBadgeCompact]}>
@@ -133,6 +141,8 @@ function CheckoutModal({
   if (!paquete) return null;
 
   const total = paquete.total_creditos ?? (paquete.creditos_base + paquete.creditos_bonus);
+  // Sin saldo cargado no se inventa uno: las lineas dicen "No disponible".
+  const saldoConocido = typeof saldo === 'number';
   const done = status === 'completada';
   const failed = status === 'fallida';
   const cancelled = status === 'cancelada';
@@ -173,11 +183,15 @@ function CheckoutModal({
                 </Text>
                 <Text style={styles.checkoutBannerBody}>
                   {done
-                    ? `Tu saldo se actualizo a ${saldo + total} creditos.`
+                    ? saldoConocido
+                      ? `Tu saldo se actualizo a ${saldo + total} creditos.`
+                      : 'Tu saldo actualizado aparece en la pantalla de creditos.'
                     : failed
                       ? error || 'No se acreditaron creditos.'
                       : cancelled
-                        ? `Tu saldo sigue en ${saldo} creditos.`
+                        ? saldoConocido
+                          ? `Tu saldo sigue en ${saldo} creditos.`
+                          : 'No se realizo ningun cobro.'
                         : 'No cierres esta ventana mientras se registra la compra.'}
                 </Text>
               </View>
@@ -199,9 +213,9 @@ function CheckoutModal({
           </View>
 
           <View style={styles.checkoutLines}>
-            <InfoLine label="Saldo actual" value={`${saldo} creditos`} />
+            <InfoLine label="Saldo actual" value={saldoConocido ? `${saldo} creditos` : 'No disponible'} />
             <InfoLine label="Esta compra" value={`+${total}`} accent={T.success} />
-            <InfoLine label="Saldo despues" value={`${saldo + total} creditos`} />
+            <InfoLine label="Saldo despues" value={saldoConocido ? `${saldo + total} creditos` : 'No disponible'} />
           </View>
 
           <View style={styles.simNote}>
@@ -252,13 +266,14 @@ export default function CreditosScreen() {
   const [lastPage, setLastPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState('');
+  const [errores, setErrores] = useState(SIN_ERRORES);
+  const [reintentando, setReintentando] = useState(false);
   const [selectedPackageId, setSelectedPackageId] = useState(null);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [checkoutStatus, setCheckoutStatus] = useState('confirmar');
   const [checkoutCompra, setCheckoutCompra] = useState(null);
   const [checkoutError, setCheckoutError] = useState('');
-  const [checkoutBaseSaldo, setCheckoutBaseSaldo] = useState(0);
+  const [checkoutBaseSaldo, setCheckoutBaseSaldo] = useState(null);
   const [activatingPremium, setActivatingPremium] = useState(false);
 
   // Clave de idempotencia de la compra en curso. Vive en un ref porque no se
@@ -266,36 +281,60 @@ export default function CreditosScreen() {
   // en src/utils/purchaseIntent.js, con sus pruebas.
   const intentoCompra = useRef(INTENTO_VACIO);
 
+  // Numera las cargas para descartar respuestas que llegan tarde.
+  const cargaActual = useRef(0);
+
   const selectedPackage = useMemo(
     () => paquetes.find((paquete) => paquete.id === selectedPackageId) ?? paquetes[0],
     [paquetes, selectedPackageId],
   );
 
   const loadData = useCallback(async ({ showLoader = true, targetPage = 1 } = {}) => {
+    const carga = ++cargaActual.current;
     if (showLoader) setLoading(true);
-    setError('');
-    try {
-      const [creditoData, paquetesData, txData, premiumData] = await Promise.all([
-        getMiCredito(),
-        getCreditosPaquetes(),
-        getCreditosTransacciones({ page: targetPage, perPage: 8 }),
-        getPremiumMiEstado(),
-      ]);
 
-      setSaldo(Number(creditoData.saldo ?? 0));
-      const paquetesList = paquetesData.paquetes || [];
-      setPaquetes(paquetesList);
-      setSelectedPackageId((current) => current ?? paquetesList[0]?.id ?? null);
-      setTransacciones(txData.transacciones || []);
-      setPage(txData.pagina_actual || targetPage);
-      setLastPage(txData.ultima_pagina || 1);
-      setPremium(premiumData);
-    } catch (err) {
-      setError(err.message);
-      toast(err.message, 'error');
-    } finally {
-      setLoading(false);
+    // Cada fuente se resuelve por separado: un fallo parcial no tumba las
+    // demas ni se disfraza de valor. Lo que falla queda como desconocido
+    // (saldo null, seccion sin pintar), nunca como 0 ni como lista vacia.
+    const [credito, catalogo, historial, estadoPremium] = await Promise.allSettled([
+      getMiCredito(),
+      getCreditosPaquetes(),
+      getCreditosTransacciones({ page: targetPage, perPage: 8 }),
+      getPremiumMiEstado(),
+    ]);
+
+    // Si entretanto arranco otra carga (reintento, compra, cambio de pagina),
+    // esta respuesta es vieja y podria pisar un saldo mas reciente.
+    if (carga !== cargaActual.current) return;
+
+    const saldoValido = credito.status === 'fulfilled' && typeof credito.value?.saldo === 'number';
+    setSaldo(saldoValido ? credito.value.saldo : null);
+
+    const paquetesList = catalogo.status === 'fulfilled' ? catalogo.value?.paquetes || [] : [];
+    setPaquetes(paquetesList);
+    setSelectedPackageId((current) => current ?? paquetesList[0]?.id ?? null);
+
+    if (historial.status === 'fulfilled') {
+      setTransacciones(historial.value?.transacciones || []);
+      setPage(historial.value?.pagina_actual || targetPage);
+      setLastPage(historial.value?.ultima_pagina || 1);
+    } else {
+      setTransacciones([]);
     }
+
+    setPremium(estadoPremium.status === 'fulfilled' ? estadoPremium.value : null);
+
+    const nuevosErrores = {
+      saldo: saldoValido ? '' : mensajeDeFallo(credito) || 'La respuesta del saldo no es valida.',
+      paquetes: mensajeDeFallo(catalogo),
+      transacciones: mensajeDeFallo(historial),
+      premium: mensajeDeFallo(estadoPremium),
+    };
+    setErrores(nuevosErrores);
+
+    const primerError = Object.values(nuevosErrores).find(Boolean);
+    if (primerError) toast(primerError, 'error');
+    setLoading(false);
   }, [toast]);
 
   useEffect(() => {
@@ -308,6 +347,14 @@ export default function CreditosScreen() {
     setRefreshing(false);
   };
 
+  // Solo repite lecturas: nunca reenvia una compra ni una activacion Premium.
+  // El boton queda en progreso mientras tanto, asi un doble toque no duplica.
+  const reintentar = async () => {
+    setReintentando(true);
+    await loadData({ showLoader: false, targetPage: page });
+    setReintentando(false);
+  };
+
   const openCheckout = (paquete) => {
     // Conserva la clave si es el mismo paquete: cerrar el modal tras un fallo y
     // reabrirlo sigue siendo el mismo intento de compra.
@@ -317,7 +364,7 @@ export default function CreditosScreen() {
     setCheckoutStatus('confirmar');
     setCheckoutCompra(null);
     setCheckoutError('');
-    setCheckoutBaseSaldo(saldo ?? 0);
+    setCheckoutBaseSaldo(saldo);
     setCheckoutOpen(true);
   };
 
@@ -390,6 +437,8 @@ export default function CreditosScreen() {
     );
   }
 
+  const mensajesError = [...new Set(Object.values(errores).filter(Boolean))];
+
   return (
     <ScrollView
       style={styles.container}
@@ -408,24 +457,52 @@ export default function CreditosScreen() {
         </Button>
       </View>
 
-      {error ? (
+      {mensajesError.length > 0 ? (
         <Card style={styles.errorCard}>
           <Text style={styles.errorTitle}>No se pudo cargar la informacion</Text>
-          <Text style={styles.errorText}>{error}</Text>
+          {mensajesError.map((mensaje) => (
+            <Text key={mensaje} style={styles.errorText}>{mensaje}</Text>
+          ))}
+          <Button
+            icon="refresh-cw"
+            kind="secondary"
+            size="sm"
+            loading={reintentando}
+            onPress={reintentar}
+            style={styles.retryButton}
+          >
+            Reintentar
+          </Button>
         </Card>
       ) : null}
 
       <View style={[styles.heroGrid, isDesktop && styles.heroGridDesktop]}>
         <Card padding={0} style={styles.balanceCard}>
-          <View style={styles.balanceHero}>
+          <View style={styles.balanceHero} testID="saldo-actual">
             <Text style={styles.balanceLabel}>Saldo disponible</Text>
-            <Text style={styles.balanceValue}>{saldo ?? 0}</Text>
-            <Text style={styles.balanceHint}>
-              Equivale a {saldo ?? 0} cotizaciones en slots pagados.
-            </Text>
+            {saldo === null ? (
+              <>
+                <Text style={styles.balanceValue} accessibilityLabel="Saldo no disponible">—</Text>
+                <Text style={styles.balanceHint}>
+                  {errores.saldo ? 'No se pudo cargar tu saldo. Reintenta para verlo.' : 'Cargando saldo...'}
+                </Text>
+              </>
+            ) : (
+              <>
+                <Text style={styles.balanceValue}>{saldo}</Text>
+                <Text style={styles.balanceHint}>
+                  Equivale a {saldo} cotizaciones en slots pagados.
+                </Text>
+              </>
+            )}
           </View>
           <View style={styles.balanceActions}>
-            <Button icon="shopping-cart" size="sm" onPress={() => selectedPackage && openCheckout(selectedPackage)}>
+            <Button
+              icon="shopping-cart"
+              size="sm"
+              disabled={!selectedPackage}
+              onPress={() => selectedPackage && openCheckout(selectedPackage)}
+            >
               Comprar creditos
             </Button>
             <Button kind="ghost" size="sm" icon="help-circle">
@@ -456,16 +533,25 @@ export default function CreditosScreen() {
         <Text style={styles.sectionTitle}>Paquetes</Text>
         <Text style={styles.sectionMeta}>Acreditacion inmediata</Text>
       </View>
-      <View style={[styles.packagesGrid, isDesktop && styles.packagesGridDesktop]}>
-        {paquetes.map((paquete) => (
-          <PackageCard
-            key={paquete.id}
-            paquete={paquete}
-            selected={selectedPackage?.id === paquete.id}
-            onPress={() => openCheckout(paquete)}
-          />
-        ))}
-      </View>
+      {errores.paquetes ? (
+        <Card padding={0} style={styles.unavailableCard}>
+          <View style={styles.emptyState}>
+            <Text style={styles.emptyTitle}>Paquetes no disponibles</Text>
+            <Text style={styles.emptyText}>No se pudo cargar el catalogo. Reintenta para verlo.</Text>
+          </View>
+        </Card>
+      ) : (
+        <View style={[styles.packagesGrid, isDesktop && styles.packagesGridDesktop]}>
+          {paquetes.map((paquete) => (
+            <PackageCard
+              key={paquete.id}
+              paquete={paquete}
+              selected={selectedPackage?.id === paquete.id}
+              onPress={() => openCheckout(paquete)}
+            />
+          ))}
+        </View>
+      )}
 
       <View style={styles.assistedBox}>
         <View style={styles.assistedCopy}>
@@ -482,28 +568,39 @@ export default function CreditosScreen() {
           <View style={styles.premiumHeadCopy}>
             <PremiumBadge />
             <Text style={styles.premiumTitle}>
-              {premium?.estado === 'activo'
-                ? 'Premium activo'
-                : premium?.estado === 'vencido'
-                  ? 'Premium vencido'
-                  : 'Activa Premium'}
+              {premium === null
+                ? 'Estado Premium no disponible'
+                : premium.estado === 'activo'
+                  ? 'Premium activo'
+                  : premium.estado === 'vencido'
+                    ? 'Premium vencido'
+                    : 'Activa Premium'}
             </Text>
             <Text style={styles.premiumText}>
               Q115 por 30 dias, badge, visibilidad limitada y 10 creditos por ciclo.
             </Text>
           </View>
-          <StatusChip
-            variant={PREMIUM_VARIANT[premium?.estado] ?? 'neutral'}
-            label={premium?.estado || 'nunca'}
-          />
+          {premium ? (
+            <StatusChip
+              variant={PREMIUM_VARIANT[premium.estado] ?? 'neutral'}
+              label={premium.estado || 'nunca'}
+            />
+          ) : null}
         </View>
 
-        <View style={styles.premiumLines}>
-          <InfoLine label="Vigencia" value={premium?.vence_at ? formatDate(premium.vence_at) : 'Nunca activado'} />
-          <InfoLine label="Dias restantes" value={`${premium?.dias_restantes ?? 0}`} />
-          <InfoLine label="Renovaciones" value={`${premium?.renovaciones ?? 0}`} />
-          <InfoLine label="Creditos incluidos" value={`${premium?.creditos_por_ciclo ?? 10}`} accent={T.success} />
-        </View>
+        {/* Sin estado cargado no se afirma "nunca activado" ni se ofrece activar. */}
+        {premium ? (
+          <View style={styles.premiumLines}>
+            <InfoLine label="Vigencia" value={premium.vence_at ? formatDate(premium.vence_at) : 'Nunca activado'} />
+            <InfoLine label="Dias restantes" value={`${premium.dias_restantes ?? 0}`} />
+            <InfoLine label="Renovaciones" value={`${premium.renovaciones ?? 0}`} />
+            <InfoLine label="Creditos incluidos" value={`${premium.creditos_por_ciclo ?? 10}`} accent={T.success} />
+          </View>
+        ) : (
+          <Text style={styles.premiumUnavailable}>
+            No se pudo cargar tu vigencia. Reintenta antes de activar o renovar.
+          </Text>
+        )}
 
         <View style={styles.benefitsGrid}>
           {(premium?.beneficios || []).map((beneficio) => (
@@ -514,15 +611,17 @@ export default function CreditosScreen() {
           ))}
         </View>
 
-        <Button
-          icon="star"
-          loading={activatingPremium}
-          disabled={activatingPremium || premium?.estado === 'activo'}
-          onPress={handlePremium}
-          style={styles.premiumButton}
-        >
-          {premium?.estado === 'activo' ? 'Ciclo activo' : premium?.estado === 'vencido' ? 'Reactivar Premium' : 'Activar Premium'}
-        </Button>
+        {premium ? (
+          <Button
+            icon="star"
+            loading={activatingPremium}
+            disabled={activatingPremium || premium.estado === 'activo'}
+            onPress={handlePremium}
+            style={styles.premiumButton}
+          >
+            {premium.estado === 'activo' ? 'Ciclo activo' : premium.estado === 'vencido' ? 'Reactivar Premium' : 'Activar Premium'}
+          </Button>
+        ) : null}
       </Card>
 
       <View style={styles.sectionHeader}>
@@ -531,7 +630,12 @@ export default function CreditosScreen() {
       </View>
 
       <Card padding={0} style={styles.transactionsCard}>
-        {transacciones.length === 0 ? (
+        {errores.transacciones ? (
+          <View style={styles.emptyState}>
+            <Text style={styles.emptyTitle}>Movimientos no disponibles</Text>
+            <Text style={styles.emptyText}>No se pudo cargar tu historial. Reintenta para verlo.</Text>
+          </View>
+        ) : transacciones.length === 0 ? (
           <View style={styles.emptyState}>
             <Text style={styles.emptyTitle}>Sin movimientos todavia</Text>
             <Text style={styles.emptyText}>Tus compras, bonos, gastos y recargas apareceran aqui.</Text>
@@ -613,6 +717,8 @@ const styles = StyleSheet.create({
   errorCard: { borderColor: '#fecdd3', backgroundColor: '#fff1f2', marginBottom: T.s4 },
   errorTitle: { color: T.danger, fontSize: 14, fontWeight: '900' },
   errorText: { color: T.danger, fontSize: 13, marginTop: 4 },
+  retryButton: { alignSelf: 'flex-start', marginTop: T.s3 },
+  unavailableCard: { marginBottom: T.s4 },
   heroGrid: { gap: T.s3, marginBottom: T.s5 },
   heroGridDesktop: { flexDirection: 'row' },
   balanceCard: { overflow: 'hidden', flex: 1.1 },
@@ -693,6 +799,7 @@ const styles = StyleSheet.create({
   premiumTitle: { color: T.ink, fontSize: 20, fontWeight: '900', marginTop: T.s3 },
   premiumText: { color: T.muted, fontSize: 13, lineHeight: 19, marginTop: 4 },
   premiumLines: { marginTop: T.s3, paddingTop: T.s2, borderTopWidth: 1, borderTopColor: T.border },
+  premiumUnavailable: { color: T.muted, fontSize: 13, lineHeight: 19, marginTop: T.s3 },
   benefitsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: T.s2, marginTop: T.s4 },
   benefitItem: {
     flexDirection: 'row',

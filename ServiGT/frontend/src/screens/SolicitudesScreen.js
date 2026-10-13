@@ -70,7 +70,7 @@ export default function SolicitudesScreen({ navigation, user }) {
   const toast = useToast();
   const { width } = useWindowDimensions();
   const wide = width >= 900;
-  const [activeTab, setActiveTab] = useState('enviadas');
+  const [activeTab, setActiveTab] = useState(user?.role === 'proveedor' ? 'recibidas' : 'enviadas');
   const [enviadas, setEnviadas] = useState([]);
   const [recibidas, setRecibidas] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -87,13 +87,13 @@ export default function SolicitudesScreen({ navigation, user }) {
   const fetchSolicitudes = useCallback(async () => {
     setLoading(true);
     try {
-      const enviadasData = await getSolicitudesCliente();
-      setEnviadas(enviadasData.servicios || []);
-
       if (canSeeRecibidas) {
+        setEnviadas([]);
         const recibidasData = await getSolicitudesProveedor();
         setRecibidas(recibidasData.servicios || []);
       } else {
+        const enviadasData = await getSolicitudesCliente();
+        setEnviadas(enviadasData.servicios || []);
         setRecibidas([]);
       }
     } catch (error) {
@@ -315,7 +315,7 @@ export default function SolicitudesScreen({ navigation, user }) {
       />
 
       <View style={styles.tabs}>
-        {tabs.map((tab) => {
+        {tabs.filter((tab) => tab.key === (canSeeRecibidas ? 'recibidas' : 'enviadas')).map((tab) => {
           const disabled = tab.key === 'recibidas' && !canSeeRecibidas;
           const active = activeTab === tab.key;
           return (

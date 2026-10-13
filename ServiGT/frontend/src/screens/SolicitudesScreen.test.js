@@ -53,6 +53,14 @@ const renderScreen = (role = 'cliente') => render(
 );
 
 describe('SolicitudesScreen codigo de inicio', () => {
+  it('el proveedor consulta sus trabajos sin llamar al endpoint exclusivo de clientes', async () => {
+    jest.clearAllMocks();
+    getSolicitudesProveedor.mockResolvedValue({ servicios: [servicio('aceptado')] });
+    const { findByText } = renderScreen('proveedor');
+    await findByText('Reparar una fuga de agua');
+    expect(getSolicitudesProveedor).toHaveBeenCalledTimes(1);
+    expect(getSolicitudesCliente).not.toHaveBeenCalled();
+  });
   beforeEach(() => {
     jest.clearAllMocks();
   });

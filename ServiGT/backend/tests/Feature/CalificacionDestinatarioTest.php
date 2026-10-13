@@ -15,134 +15,116 @@ class CalificacionDestinatarioTest extends TestCase
 {
     use DatabaseTransactions;
 
-    public function test_ruta_alternativa_no_permite_calificar_a_un_destinatario_ajeno(): void
+    public function test_ruta_alternativa_deriva_el_destinatario_del_servicio(): void
     {
-        [$cliente, $proveedorReal] = $this->crearActores();
+        $servicio = $this->crearServicio('completado');
         $proveedorAjeno = $this->crearProveedor();
-        $servicio = $this->crearServicio($cliente, $proveedorReal);
-
-        Sanctum::actingAs($cliente);
+        Sanctum::actingAs($servicio->cliente);
 
         $this->postJson('/api/calificaciones', [
             'servicio_id' => $servicio->id,
             'destinatario_id' => $proveedorAjeno->user_id,
             'puntuacion' => 1,
-            'comentario' => 'Intento afectar reputacion ajena',
-        ])->assertStatus(422);
+            'comentario' => 'La calificacion debe ir al proveedor contratado.',
+        ])->assertCreated()
+            ->assertJsonPath('calificacion.destinatario_id', $servicio->proveedor->user_id);
 
+        $this->assertDatabaseHas('calificaciones', [
+            'servicio_id' => $servicio->id,
+            'autor_id' => $servicio->cliente_id,
+            'destinatario_id' => $servicio->proveedor->user_id,
+            'es_verificada' => true,
+        ]);
         $this->assertDatabaseMissing('calificaciones', [
             'servicio_id' => $servicio->id,
             'destinatario_id' => $proveedorAjeno->user_id,
         ]);
-
-        $this->assertSame('0.00', (string) $proveedorAjeno->fresh()->calificacion_promedio);
+        $this->assertSame(1, $servicio->proveedor->fresh()->total_calificaciones);
         $this->assertSame(0, $proveedorAjeno->fresh()->total_calificaciones);
     }
 
-    public function test_ruta_alternativa_deriva_el_destinatario_del_servicio(): void
+    public function test_ruta_alternativa_no_requiere_destinatario_enviado_por_cliente(): void
     {
-        [$cliente, $proveedor] = $this->crearActores();
-        $servicio = $this->crearServicio($cliente, $proveedor);
-
-        Sanctum::actingAs($cliente);
+        $servicio = $this->crearServicio('completado');
+        Sanctum::actingAs($servicio->cliente);
 
         $this->postJson('/api/calificaciones', [
             'servicio_id' => $servicio->id,
             'puntuacion' => 5,
-            'comentario' => 'Buen trabajo',
         ])->assertCreated()
-            ->assertJsonPath('calificacion.destinatario_id', $proveedor->user_id)
-            ->assertJsonPath('calificacion.autor_id', $cliente->id);
-
-        $this->assertDatabaseHas('calificaciones', [
-            'servicio_id' => $servicio->id,
-            'autor_id' => $cliente->id,
-            'destinatario_id' => $proveedor->user_id,
-            'es_verificada' => true,
-        ]);
+            ->assertJsonPath('calificacion.destinatario_id', $servicio->proveedor->user_id);
     }
 
-    public function test_ruta_alternativa_rechaza_tercero_autocalificacion_duplicados_y_estado_incorrecto(): void
+    public function test_proveedor_no_puede_autocalificarse(): void
     {
-        [$cliente, $proveedor] = $this->crearActores();
-        $servicio = $this->crearServicio($cliente, $proveedor);
+        $servicio = $this->crearServicio('completado');
+        Sanctum::actingAs($servicio->proveedor->user);
 
-        Sanctum::actingAs(User::factory()->cliente()->create());
         $this->postJson('/api/calificaciones', [
             'servicio_id' => $servicio->id,
-            'destinatario_id' => $proveedor->user_id,
-            'puntuacion' => 4,
+            'destinatario_id' => $servicio->proveedor->user_id,
+            'puntuacion' => 5,
         ])->assertForbidden();
 
-        $pendiente = $this->crearServicio($cliente, $proveedor, ['estado' => 'pendiente']);
-        Sanctum::actingAs($cliente);
+        $this->assertDatabaseCount('calificaciones', 0);
+    }
+
+    public function test_tercero_no_puede_calificar_el_servicio(): void
+    {
+        $servicio = $this->crearServicio('completado');
+        Sanctum::actingAs(User::factory()->cliente()->create());
+
+        $this->postJson('/api/calificaciones', [
+            'servicio_id' => $servicio->id,
+            'puntuacion' => 4,
+        ])->assertForbidden();
+    }
+
+    public function test_no_permite_duplicados_ni_servicios_sin_completar(): void
+    {
+        $servicio = $this->crearServicio('completado');
+        Sanctum::actingAs($servicio->cliente);
+        $payload = ['servicio_id' => $servicio->id, 'puntuacion' => 4];
+
+        $this->postJson('/api/calificaciones', $payload)->assertCreated();
+        $this->postJson('/api/calificaciones', $payload)->assertStatus(422);
+
+        $pendiente = $this->crearServicio('aceptado');
+        Sanctum::actingAs($pendiente->cliente);
         $this->postJson('/api/calificaciones', [
             'servicio_id' => $pendiente->id,
-            'destinatario_id' => $proveedor->user_id,
-            'puntuacion' => 4,
-        ])->assertStatus(422);
-
-        $proveedorLegado = $this->crearProveedor();
-        $servicioLegado = $this->crearServicio($proveedorLegado->user, $proveedorLegado);
-        Sanctum::actingAs($proveedorLegado->user);
-        $this->postJson('/api/calificaciones', [
-            'servicio_id' => $servicioLegado->id,
-            'destinatario_id' => $proveedorLegado->user_id,
-            'puntuacion' => 5,
-        ])->assertForbidden();
-
-        Sanctum::actingAs($cliente);
-        $this->postJson('/api/calificaciones', [
-            'servicio_id' => $servicio->id,
-            'destinatario_id' => $proveedor->user_id,
-            'puntuacion' => 5,
-        ])->assertCreated();
-
-        $this->postJson('/api/calificaciones', [
-            'servicio_id' => $servicio->id,
-            'destinatario_id' => $proveedor->user_id,
             'puntuacion' => 4,
         ])->assertStatus(422);
 
         $this->assertSame(1, Calificacion::where('servicio_id', $servicio->id)->count());
+        $this->assertSame(0, Calificacion::where('servicio_id', $pendiente->id)->count());
     }
 
-    public function test_proveedor_participante_califica_a_la_contraparte_cliente(): void
+    public function test_ruta_principal_conserva_su_contrato(): void
     {
-        [$cliente, $proveedor] = $this->crearActores();
-        $servicio = $this->crearServicio($cliente, $proveedor);
-
-        Sanctum::actingAs($proveedor->user);
-
-        $this->postJson('/api/calificaciones', [
-            'servicio_id' => $servicio->id,
-            'destinatario_id' => $cliente->id,
-            'puntuacion' => 4,
-        ])->assertCreated()
-            ->assertJsonPath('calificacion.destinatario_id', $cliente->id)
-            ->assertJsonPath('calificacion.autor_id', $proveedor->user_id);
-    }
-
-    public function test_ruta_servicio_calificar_se_preserva_para_cliente(): void
-    {
-        [$cliente, $proveedor] = $this->crearActores();
-        $servicio = $this->crearServicio($cliente, $proveedor);
-
-        Sanctum::actingAs($cliente);
+        $servicio = $this->crearServicio('completado');
+        Sanctum::actingAs($servicio->cliente);
 
         $this->postJson("/api/servicios/{$servicio->id}/calificar", [
             'puntuacion' => 5,
-            'comentario' => 'Excelente servicio',
+            'comentario' => 'Excelente trabajo.',
         ])->assertCreated()
-            ->assertJsonPath('calificacion.destinatario_id', $proveedor->user_id);
+            ->assertJsonPath('calificacion.destinatario_id', $servicio->proveedor->user_id);
     }
 
-    private function crearActores(): array
+    private function crearServicio(string $estado): Servicio
     {
-        $cliente = User::factory()->cliente()->create();
         $proveedor = $this->crearProveedor();
+        $cliente = User::factory()->cliente()->create();
 
-        return [$cliente, $proveedor];
+        return Servicio::create([
+            'cliente_id' => $cliente->id,
+            'proveedor_id' => $proveedor->id,
+            'categoria_id' => $proveedor->categoria_id,
+            'descripcion' => 'Servicio para probar destinatarios de calificacion.',
+            'estado' => $estado,
+            'codigo_inicio' => '123456',
+        ])->setRelation('cliente', $cliente)->setRelation('proveedor', $proveedor);
     }
 
     private function crearProveedor(): Proveedor
@@ -157,19 +139,7 @@ class CalificacionDestinatarioTest extends TestCase
             'departamento' => 'Guatemala',
             'municipio' => 'Guatemala',
             'categoria_id' => $categoria->id,
-            'descripcion' => 'Proveedor de prueba para calificaciones.',
+            'descripcion' => 'Proveedor para pruebas de calificacion.',
         ])->setRelation('user', $user);
-    }
-
-    private function crearServicio(User $cliente, Proveedor $proveedor, array $overrides = []): Servicio
-    {
-        return Servicio::create(array_merge([
-            'cliente_id' => $cliente->id,
-            'proveedor_id' => $proveedor->id,
-            'categoria_id' => $proveedor->categoria_id,
-            'descripcion' => 'Servicio completado para probar calificaciones.',
-            'direccion' => 'Zona 10, Guatemala',
-            'estado' => 'completado',
-        ], $overrides));
     }
 }

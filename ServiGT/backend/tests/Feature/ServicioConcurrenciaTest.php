@@ -79,10 +79,9 @@ use Tests\TestCase;
  * Que `/estado` rechace `completado` y `cancelado` es una regla de maquina de
  * estados, no de atomicidad: vive en las pruebas de 1.1, no aqui.
  *
- * ── Fuera de alcance en esta entrega ────────────────────────────────────────
- *
- * - `cancelar`: la ruta no existe todavia (task 2.1, D). La carrera
- *   cancelar/iniciar es el escenario central de 1.2 y se agrega al aterrizar.
+ * La cancelacion de 2.1 usa la misma estrategia: transaccion, lectura bajo
+ * lock y revalidacion. Los tests tambien recorren ambos ordenes validos de la
+ * carrera cancelar/iniciar para comprobar que ninguno resucita al perdedor.
  */
 #[Group('concurrencia')]
 class ServicioConcurrenciaTest extends TestCase
@@ -188,6 +187,47 @@ class ServicioConcurrenciaTest extends TestCase
         });
 
         $this->assertTransicionAtomica($traza, 'rechazar');
+    }
+
+    public function test_cancelar_protege_la_transicion_contra_una_peticion_simultanea(): void
+    {
+        $servicio = $this->crearServicio('aceptado');
+
+        $traza = $this->trazarTransicion(function () use ($servicio) {
+            Sanctum::actingAs($servicio->cliente);
+            return $this->postJson("/api/servicios/{$servicio->id}/cancelar");
+        });
+
+        $this->assertTransicionAtomica($traza, 'cancelar');
+    }
+
+    public function test_cancelar_e_iniciar_solo_admiten_un_orden_valido(): void
+    {
+        $cancelarPrimero = $this->crearServicio('aceptado');
+
+        Sanctum::actingAs($cancelarPrimero->cliente);
+        $this->postJson("/api/servicios/{$cancelarPrimero->id}/cancelar")->assertOk();
+
+        Sanctum::actingAs($cancelarPrimero->proveedor->user);
+        $this->postJson("/api/servicios/{$cancelarPrimero->id}/iniciar", ['codigo' => '123456'])
+            ->assertStatus(422);
+
+        $this->assertSame('cancelado', $cancelarPrimero->fresh()->estado);
+        $this->assertSame(1, $this->notificacionesDelServicio($cancelarPrimero->id, 'servicio_cancelado'));
+        $this->assertSame(0, $this->notificacionesDelServicio($cancelarPrimero->id, 'servicio_iniciado'));
+
+        $iniciarPrimero = $this->crearServicio('aceptado');
+
+        Sanctum::actingAs($iniciarPrimero->proveedor->user);
+        $this->postJson("/api/servicios/{$iniciarPrimero->id}/iniciar", ['codigo' => '123456'])
+            ->assertOk();
+
+        Sanctum::actingAs($iniciarPrimero->cliente);
+        $this->postJson("/api/servicios/{$iniciarPrimero->id}/cancelar")->assertStatus(422);
+
+        $this->assertSame('en_progreso', $iniciarPrimero->fresh()->estado);
+        $this->assertSame(1, $this->notificacionesDelServicio($iniciarPrimero->id, 'servicio_iniciado'));
+        $this->assertSame(0, $this->notificacionesDelServicio($iniciarPrimero->id, 'servicio_cancelado'));
     }
 
     public function test_finalizar_protege_la_transicion_contra_una_peticion_simultanea(): void
@@ -433,6 +473,14 @@ class ServicioConcurrenciaTest extends TestCase
         $pdo->prepare(
             "UPDATE servicios SET codigo_fin = :codigo, estado = 'por_confirmar' WHERE id = :id"
         )->execute(['codigo' => $codigo, 'id' => $id]);
+    }
+
+    private function notificacionesDelServicio(int $servicioId, string $tipo): int
+    {
+        return Notificacion::query()
+            ->where('tipo', $tipo)
+            ->where('datos->servicio_id', $servicioId)
+            ->count();
     }
 
     /**

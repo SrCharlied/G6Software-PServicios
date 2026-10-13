@@ -68,13 +68,14 @@ describe('ProviderDetailScreen publicaciones', () => {
     getPublicaciones.mockResolvedValue({ publicaciones: [publicacion] });
   });
 
+  // El primer render de React Native en un proceso frio puede superar 5 s en CI.
   it('carga publicaciones visibles del proveedor y reutiliza PublicacionCard', async () => {
     renderScreen();
 
     expect(await screen.findByText('Instalacion electrica residencial')).toBeTruthy();
     expect(screen.getByText('Q250.00')).toBeTruthy();
     expect(getPublicaciones).toHaveBeenCalledWith({ proveedorId: proveedor.id, perPage: 50 });
-  });
+  }, 10000);
 
   it('muestra loading, vacio y error sin convertir fallos en lista vacia silenciosa', async () => {
     let resolver;

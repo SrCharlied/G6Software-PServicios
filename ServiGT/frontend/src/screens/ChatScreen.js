@@ -1,386 +1,127 @@
 import { useEffect, useRef, useState } from 'react';
-import {
-  ActivityIndicator,
-  FlatList,
-  KeyboardAvoidingView,
-  Platform,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-} from 'react-native';
-import { getConversacion, sendMensaje } from '../services/api';
-import { sessionStorage } from '../services/sessionStorage';
-import { useToast } from '../context/ToastContext';
+import { ActivityIndicator, FlatList, KeyboardAvoidingView, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Feather } from '@expo/vector-icons';
+import { enviarMensajeContexto, getMensajesContexto, getReservaMaterial } from '../services/api';
+import { Button, Input } from '../components/ui';
+import { chatContextKey } from '../utils/chatContext';
 import { T } from '../theme';
 
-export default function ChatScreen({
-  navigation,
-  user,
-  chatWithUserId,
-  chatWithName,
-  embedded = false,
-}) {
-  const toast = useToast();
-  const [mensajes, setMensajes] = useState([]);
-  const [texto, setTexto] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [sending, setSending] = useState(false);
-  const flatListRef = useRef(null);
-  const pollRef = useRef(null);
-  const mensajesRef = useRef([]);
-
-  useEffect(() => {
-    mensajesRef.current = mensajes;
-  }, [mensajes]);
-
-  const getStorageKey = () => `chat_${user?.id}_${chatWithUserId}`;
-
-  useEffect(() => {
-    if (!chatWithUserId) return undefined;
-    loadMensajes();
-    pollRef.current = setInterval(loadMensajesSilencioso, 5000);
-    return () => clearInterval(pollRef.current);
-  }, [chatWithUserId]);
-
-  if (!chatWithUserId) {
-    return (
-      <View style={styles.loadingContainer}>
-        <Text style={styles.emptyText}>No se encontro la conversacion seleccionada.</Text>
-        <TouchableOpacity style={styles.backHomeBtn} onPress={() => navigation.navigate('Home')}>
-          <Text style={styles.backHomeBtnText}>Volver al listado</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
-
-  const loadMensajes = async () => {
-    let locales = [];
-    try {
-      const localData = await sessionStorage.getItem(getStorageKey());
-      if (localData) {
-        locales = JSON.parse(localData);
-        setMensajes(locales);
-        setLoading(false);
-      }
-    } catch (e) {
-      console.log('Error sessionStorage', e);
-    }
-
-    if (locales.length === 0) setLoading(true);
-
-    try {
-      let lastId = null;
-      if (locales.length > 0) {
-        const validIds = locales.filter((m) => !String(m.id).startsWith('temp-')).map((m) => m.id);
-        if (validIds.length > 0) lastId = Math.max(...validIds);
-      }
-
-      const data = await getConversacion(chatWithUserId, lastId);
-      if (data.mensajes && data.mensajes.length > 0) {
-        const filtrados = locales.filter((m) => !String(m.id).startsWith('temp-'));
-        const finales = [...filtrados, ...data.mensajes];
-        setMensajes(finales);
-        sessionStorage.setItem(getStorageKey(), JSON.stringify(finales));
-      }
-    } catch (error) {
-      if (locales.length === 0) toast(error.message, 'error');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const loadMensajesSilencioso = async () => {
-    try {
-      const actuales = mensajesRef.current;
-      let lastId = null;
-      if (actuales.length > 0) {
-        const validIds = actuales.filter((m) => !String(m.id).startsWith('temp-')).map((m) => m.id);
-        if (validIds.length > 0) lastId = Math.max(...validIds);
-      }
-      const data = await getConversacion(chatWithUserId, lastId);
-      if (data.mensajes && data.mensajes.length > 0) {
-        const filtrados = actuales.filter((m) => !String(m.id).startsWith('temp-'));
-        const nuevos = [...filtrados, ...data.mensajes];
-        setMensajes(nuevos);
-        sessionStorage.setItem(getStorageKey(), JSON.stringify(nuevos));
-      }
-    } catch {
-      // Evita ruido visual durante polling.
-    }
-  };
-
-  const handleSend = async () => {
-    if (!texto.trim()) return;
-
-    const contenido = texto.trim();
-    setTexto('');
-
-    const tempMsg = {
-      id: `temp-${Date.now()}`,
-      emisor_id: user.id,
-      receptor_id: chatWithUserId,
-      contenido,
-      leido: false,
-      created_at: new Date().toISOString(),
-      emisor: user,
-    };
-    setMensajes((prev) => [...prev, tempMsg]);
-
-    setSending(true);
-    try {
-      const data = await sendMensaje(chatWithUserId, contenido);
-      setMensajes((prev) => {
-        const nuevos = prev.map((m) => (m.id === tempMsg.id ? data.mensaje : m));
-        sessionStorage.setItem(getStorageKey(), JSON.stringify(nuevos));
-        return nuevos;
-      });
-    } catch (error) {
-      setMensajes((prev) => prev.filter((m) => m.id !== tempMsg.id));
-      toast(error.message, 'error');
-    } finally {
-      setSending(false);
-    }
-  };
-
-  const formatTime = (iso) => {
-    try {
-      return new Date(iso).toLocaleTimeString('es-GT', {
-        hour: '2-digit',
-        minute: '2-digit',
-      });
-    } catch {
-      return '';
-    }
-  };
-
-  const getCheckMark = (item) => {
-    if (String(item.id).startsWith('temp-')) {
-      return <Text style={[styles.checkMarks, styles.checkPending]}>...</Text>;
-    }
-    if (item.leido) {
-      return <Text style={[styles.checkMarks, styles.checkRead]}>✓✓</Text>;
-    }
-    return <Text style={[styles.checkMarks, styles.checkUnread]}>✓</Text>;
-  };
-
-  const renderMensaje = ({ item }) => {
-    const esMio = item.emisor_id === user.id;
-    return (
-      <View style={[styles.bubbleContainer, esMio ? styles.bubbleRight : styles.bubbleLeft]}>
-        <View style={[styles.bubble, esMio ? styles.bubbleMio : styles.bubbleOtro]}>
-          <Text style={[styles.bubbleText, esMio ? styles.bubbleTextMio : styles.bubbleTextOtro]}>
-            {item.contenido}
-          </Text>
-          <View style={styles.timeRow}>
-            <Text style={[styles.bubbleTime, esMio ? styles.bubbleTimeMio : styles.bubbleTimeOtro]}>
-              {formatTime(item.created_at)}
-            </Text>
-            {esMio && getCheckMark(item)}
-          </View>
-        </View>
-      </View>
-    );
-  };
-
-  return (
-    <KeyboardAvoidingView
-      style={[styles.container, embedded && styles.containerEmbedded]}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={80}
-    >
-      <View style={[styles.header, embedded && styles.headerEmbedded]}>
-        {!embedded ? (
-          <TouchableOpacity
-            onPress={() => navigation.navigate('ChatList')}
-            style={styles.backBtn}
-            accessibilityRole="button"
-            accessibilityLabel="Volver a mensajes"
-          >
-            <Text style={styles.backText}>←</Text>
-            <Text style={styles.backLabel}>Mensajes</Text>
-          </TouchableOpacity>
-        ) : null}
-        <View style={styles.headerInfo}>
-          <View style={styles.avatarSmall}>
-            <Text style={styles.avatarSmallText}>{(chatWithName || '?')[0].toUpperCase()}</Text>
-          </View>
-          <View>
-            <Text style={[styles.headerName, embedded && styles.headerNameEmbedded]}>{chatWithName}</Text>
-            <Text style={[styles.headerStatus, embedded && styles.headerStatusEmbedded]}>
-              Conversacion activa
-            </Text>
-          </View>
-        </View>
-      </View>
-
-      {loading ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={T.blue} />
-        </View>
-      ) : (
-        <FlatList
-          ref={flatListRef}
-          data={mensajes}
-          keyExtractor={(item) => String(item.id)}
-          renderItem={renderMensaje}
-          contentContainerStyle={styles.listContent}
-          onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
-          ListEmptyComponent={
-            <View style={styles.emptyContainer}>
-              <Text style={styles.emptyText}>Inicia la conversacion con {chatWithName}.</Text>
-            </View>
-          }
-        />
-      )}
-
-      <View style={styles.inputRow}>
-        <View style={styles.inputContainer}>
-          <TextInput
-            style={styles.textInput}
-            placeholder="Escribe un mensaje"
-            placeholderTextColor={T.faint}
-            value={texto}
-            onChangeText={setTexto}
-            multiline
-            maxLength={2000}
-            onSubmitEditing={handleSend}
-            returnKeyType="send"
-            blurOnSubmit={false}
-          />
-        </View>
-        <TouchableOpacity
-          style={[styles.sendBtn, (!texto.trim() || sending) && styles.sendBtnDisabled]}
-          onPress={handleSend}
-          disabled={!texto.trim() || sending}
-        >
-          {sending ? (
-            <ActivityIndicator color={T.white} size="small" />
-          ) : (
-            <Text style={styles.sendBtnIcon}>›</Text>
-          )}
-        </TouchableOpacity>
-      </View>
-    </KeyboardAvoidingView>
-  );
+export default function ChatScreen({ context, chatWithUserId, ...props }) {
+  const selected = context || (chatWithUserId ? { tipo: 'legacy', contraparteId: chatWithUserId } : null);
+  if (!selected) return <View style={s.center}><Text>Selecciona una conversacion.</Text><Button onPress={() => props.navigation.navigate('ChatList')}>Volver a mensajes</Button></View>;
+  // La identidad del componente aisla borrador, mensajes y respuestas pendientes.
+  return <ChatThread key={chatContextKey(selected, props.user?.id)} context={selected} {...props} />;
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: T.canvas },
-  containerEmbedded: { backgroundColor: T.white },
-
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: T.paper,
-    paddingTop: 20,
-    paddingBottom: 12,
-    paddingHorizontal: T.s3,
-    gap: T.s2,
-    borderBottomWidth: 1,
-    borderBottomColor: T.border,
-  },
-  headerEmbedded: { paddingTop: T.s4, paddingHorizontal: T.s4, backgroundColor: T.white },
-  backBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: T.s2, paddingRight: T.s2 },
-  backText: { color: T.blue, fontSize: 22, fontWeight: '900' },
-  backLabel: { color: T.blue, fontSize: 13, fontWeight: '700' },
-  headerInfo: { flexDirection: 'row', alignItems: 'center', gap: T.s3, flex: 1 },
-  avatarSmall: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: '#eef4ff',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: T.inputBorder,
-  },
-  avatarSmallText: { color: T.deep, fontWeight: '900', fontSize: 17 },
-  headerName: { color: T.ink, fontWeight: '900', fontSize: 17 },
-  headerNameEmbedded: { fontSize: 18 },
-  headerStatus: { color: T.muted, fontSize: 12, marginTop: 1 },
-  headerStatusEmbedded: { color: T.muted },
-
-  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  backHomeBtn: {
-    marginTop: T.s4,
-    backgroundColor: T.blue,
-    paddingHorizontal: T.s4,
-    paddingVertical: 10,
-    borderRadius: T.rSm,
-  },
-  backHomeBtnText: { color: T.white, fontWeight: '800', fontSize: 14 },
-  listContent: { padding: T.s4, paddingBottom: T.s5 },
-  emptyContainer: { paddingTop: 60, alignItems: 'center', paddingHorizontal: 40 },
-  emptyText: {
-    color: T.muted,
-    fontSize: 14,
-    textAlign: 'center',
-    backgroundColor: T.paper,
-    padding: T.s3,
-    borderRadius: T.rSm,
-  },
-
-  bubbleContainer: { marginBottom: 12, maxWidth: '82%' },
-  bubbleLeft: { alignSelf: 'flex-start' },
-  bubbleRight: { alignSelf: 'flex-end' },
-  bubble: {
-    borderRadius: T.rMd,
-    paddingHorizontal: T.s3,
-    paddingVertical: 9,
-    borderWidth: 1,
-    borderColor: T.border,
-  },
-  bubbleMio: { backgroundColor: '#eef4ff', borderTopRightRadius: 4 },
-  bubbleOtro: { backgroundColor: T.paper, borderTopLeftRadius: 4 },
-  bubbleText: { fontSize: 15, lineHeight: 21 },
-  bubbleTextMio: { color: T.deep },
-  bubbleTextOtro: { color: T.text },
-  timeRow: { flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', marginTop: 5, gap: 5 },
-  bubbleTime: { fontSize: 11 },
-  bubbleTimeMio: { color: T.muted },
-  bubbleTimeOtro: { color: T.muted },
-  checkMarks: { fontSize: 11, fontWeight: '800' },
-  checkRead: { color: T.blue },
-  checkUnread: { color: T.faint },
-  checkPending: { color: T.faint, fontSize: 10 },
-
-  inputRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    backgroundColor: T.paper,
-    borderTopWidth: 1,
-    borderTopColor: T.border,
-    paddingHorizontal: T.s3,
-    paddingVertical: T.s3,
-    gap: T.s2,
-  },
-  inputContainer: {
-    flex: 1,
-    backgroundColor: T.white,
-    borderRadius: T.rSm,
-    minHeight: 46,
-    justifyContent: 'center',
-    paddingHorizontal: T.s3,
-    borderWidth: 1,
-    borderColor: T.inputBorder,
-  },
-  textInput: {
-    fontSize: 15,
-    color: T.text,
-    maxHeight: 120,
-    paddingTop: 11,
-    paddingBottom: 11,
-  },
-  sendBtn: {
-    backgroundColor: T.blue,
-    width: 46,
-    height: 46,
-    borderRadius: T.rSm,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  sendBtnDisabled: { backgroundColor: T.soft },
-  sendBtnIcon: { color: T.white, fontSize: 28, fontWeight: '900', lineHeight: 28 },
+function ChatThread({ context, user, navigation, embedded = false, onRead }) {
+  const [mensajes, setMensajes] = useState([]);
+  const [serverContext, setServerContext] = useState(null);
+  const [counterpart, setCounterpart] = useState(null);
+  const [texto, setTexto] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [sending, setSending] = useState(false);
+  const [ambiguous, setAmbiguous] = useState(false);
+  const active = useRef(true);
+  const reading = useRef(false);
+  const sendingRef = useRef(false);
+  const messagesRef = useRef([]);
+  const listRef = useRef(null);
+  const onReadRef = useRef(onRead);
+  onReadRef.current = onRead;
+  const historical = context.tipo === 'legado' || context.tipo === 'legacy';
+  const readOnly = historical || !serverContext || serverContext.solo_lectura || serverContext.estado === 'interrumpido_seguridad' || ambiguous;
+  const merge = (items) => {
+    const map = new Map(messagesRef.current.map((msg) => [msg.id, msg]));
+    items.forEach((msg) => map.set(msg.id, msg));
+    const merged = [...map.values()].sort((a, b) => Number(a.id) - Number(b.id));
+    messagesRef.current = merged; setMensajes(merged);
+  };
+  const load = async (initial = false) => {
+    if (reading.current) return;
+    reading.current = true;
+    if (initial) setLoading(true);
+    try {
+      const lastId = initial ? null : messagesRef.current[messagesRef.current.length - 1]?.id;
+      const data = await getMensajesContexto(context, lastId);
+      if (!active.current) return;
+      setServerContext(data.contexto || null); setCounterpart(data.contraparte || null);
+      merge(data.mensajes || []); setError(''); setAmbiguous(false);
+      if (initial || (data.mensajes || []).some((msg) => msg.emisor_id !== user?.id)) onReadRef.current?.();
+    } catch (err) {
+      if (!active.current) return;
+      if (err.status === 409 && context.tipo === 'legacy') {
+        setAmbiguous(true); setError('Hay varios contextos con esta persona. Abre el hilo desde la bandeja.');
+      } else {
+        setError(err.message);
+        if ([401, 403, 404].includes(err.status)) { messagesRef.current = []; setMensajes([]); setServerContext(null); setCounterpart(null); }
+      }
+    } finally { reading.current = false; if (active.current) setLoading(false); }
+  };
+  useEffect(() => {
+    active.current = true; load(true);
+    const timer = setInterval(() => load(), 5000);
+    return () => { active.current = false; clearInterval(timer); };
+  }, []);
+  const send = async () => {
+    if (!texto.trim() || readOnly || sendingRef.current) return;
+    sendingRef.current = true; setSending(true); setError('');
+    const contenido = texto.trim();
+    try {
+      const data = await enviarMensajeContexto(context, contenido);
+      if (!active.current) return;
+      if (!data.mensaje?.id) throw new Error('El servidor no confirmo el mensaje.');
+      merge([data.mensaje]); setTexto('');
+    } catch (err) {
+      if (active.current) {
+        setError(err.message);
+        if (err.status === 409) { setServerContext((prev) => ({ ...prev, solo_lectura: true })); load(); }
+      }
+    } finally { sendingRef.current = false; if (active.current) setSending(false); }
+  };
+  const title = serverContext?.tipo === 'reserva' ? `Reserva #${serverContext.id}` : serverContext?.tipo === 'servicio' ? `Servicio #${serverContext.id}` : historical ? 'Historial anterior' : 'Conversacion';
+  const openResource = async () => {
+    if (serverContext?.tipo === 'servicio') { navigation.navigate('Servicios'); return; }
+    try {
+      const data = await getReservaMaterial(serverContext.id);
+      if (!data.reserva?.publicacion?.id) throw new Error('No se encontro el lote de esta reserva.');
+      if (active.current) navigation.navigate('MaterialDetail', { id: data.reserva.publicacion.id });
+    } catch (err) { if (active.current) setError(err.message); }
+  };
+  return <KeyboardAvoidingView style={s.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <View style={s.header}>
+      {!embedded ? <TouchableOpacity accessibilityRole="button" accessibilityLabel="Volver a mensajes" onPress={() => navigation.navigate('ChatList')} style={s.back}><Feather name="arrow-left" size={22} color={T.blue} /></TouchableOpacity> : null}
+      <View style={s.headerCopy}><Text style={s.name}>{counterpart?.name || 'Mensajes'}</Text><Text style={s.meta}>{title}{serverContext?.estado ? ` · ${serverContext.estado.replace(/_/g, ' ')}` : ''}</Text></View>
+      {!historical && serverContext ? <Button kind="ghost" size="sm" onPress={openResource}>{serverContext.tipo === 'reserva' ? 'Ver lote' : 'Ver servicios'}</Button> : null}
+    </View>
+    {error ? <View style={s.notice}><Text style={s.error}>{error}</Text><Button kind="ghost" size="sm" onPress={() => ambiguous ? navigation.navigate('ChatList') : load(true)}>{ambiguous ? 'Ver hilos' : 'Reintentar'}</Button></View> : null}
+    {loading ? <View style={s.center}><ActivityIndicator color={T.blue} /></View> : <FlatList
+      ref={listRef} data={mensajes} keyExtractor={(item) => String(item.id)} contentContainerStyle={s.messages}
+      onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: true })}
+      ListEmptyComponent={<Text style={s.meta}>{error ? '' : 'Aun no hay mensajes en este hilo.'}</Text>}
+      renderItem={({ item }) => <View style={[s.bubble, item.emisor_id === user?.id ? s.own : s.other]}>
+        <Text style={s.message}>{item.contenido}</Text>
+        <Text style={s.time}>{item.created_at ? new Date(item.created_at).toLocaleTimeString('es-GT', { hour: '2-digit', minute: '2-digit' }) : ''}{item.emisor_id === user?.id ? (item.leido ? ' · Leido' : ' · Enviado') : ''}</Text>
+      </View>}
+    />}
+    {readOnly ? <Text style={s.readOnly}>{serverContext?.estado === 'interrumpido_seguridad' ? 'Servicio interrumpido por seguridad. Chat de solo lectura.' : historical ? 'Historial de solo lectura. Abre un contexto desde la bandeja para escribir.' : 'Chat de solo lectura.'}</Text> : <View style={s.composer}>
+      <Input style={s.input} placeholder="Escribe un mensaje" value={texto} onChangeText={setTexto} multiline maxLength={2000} editable={!sending} />
+      <TouchableOpacity style={[s.send, (!texto.trim() || sending) && s.disabled]} disabled={!texto.trim() || sending} onPress={send} accessibilityRole="button" accessibilityLabel="Enviar mensaje">
+        {sending ? <ActivityIndicator color={T.white} /> : <Feather name="send" size={20} color={T.white} />}
+      </TouchableOpacity>
+    </View>}
+  </KeyboardAvoidingView>;
+}
+const s = StyleSheet.create({
+  container: { flex: 1, minWidth: 0, backgroundColor: T.canvas },
+  header: { flexDirection: 'row', gap: T.s3, padding: T.s3, backgroundColor: T.paper, borderBottomWidth: 1, borderBottomColor: T.border, alignItems: 'center' },
+  headerCopy: { flex: 1, minWidth: 0 }, back: { padding: T.s2 },
+  name: { color: T.ink, fontSize: 17, fontWeight: '800' }, meta: { color: T.muted, fontSize: 13, lineHeight: 20 },
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center' }, notice: { padding: T.s3, gap: T.s2 }, error: { color: T.danger },
+  messages: { padding: T.s3, gap: T.s3 }, bubble: { maxWidth: '85%', padding: T.s3, borderRadius: T.rSm, gap: T.s1 },
+  own: { alignSelf: 'flex-end', backgroundColor: T.tint }, other: { alignSelf: 'flex-start', backgroundColor: T.paper },
+  message: { fontSize: 15, lineHeight: 22, color: T.text }, time: { color: T.muted, fontSize: 11, alignSelf: 'flex-end' },
+  readOnly: { color: T.muted, padding: T.s3, backgroundColor: T.paper },
+  composer: { flexDirection: 'row', alignItems: 'flex-end', gap: T.s2, padding: T.s3, backgroundColor: T.paper },
+  input: { flex: 1, minWidth: 0 }, send: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', backgroundColor: T.blue, borderRadius: T.rSm }, disabled: { opacity: 0.5 },
 });

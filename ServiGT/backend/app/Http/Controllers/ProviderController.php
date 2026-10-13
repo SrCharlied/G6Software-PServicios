@@ -88,6 +88,13 @@ class ProviderController extends Controller
 
     public function store(Request $request): JsonResponse
     {
+        // El perfil de proveedor es exclusivo del rol proveedor (Task 1.1,
+        // Sprint 9). Antes cualquier autenticado podia crearse uno, y con el un
+        // cliente quedaba habilitado para cotizar sus propios pedidos.
+        if ($request->user()->role !== 'proveedor') {
+            return $this->error('Solo un proveedor puede crear un perfil de proveedor.', 403);
+        }
+
         if (Proveedor::where('user_id', $request->user()->id)->exists()) {
             return $this->error('Ya tienes un perfil de proveedor.', 422);
         }

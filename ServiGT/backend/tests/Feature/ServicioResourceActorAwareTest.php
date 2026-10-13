@@ -48,6 +48,31 @@ class ServicioResourceActorAwareTest extends TestCase
             ->assertJsonMissingPath('servicio.codigo_fin');
     }
 
+    /**
+     * Regresion del contrato de `en_camino` ratificado en Sprint 8.
+     *
+     * `/iniciar` admite el codigo desde `aceptado` o desde `en_camino`, pero de
+     * nada sirve si el cliente deja de ver el codigo justo al entrar en
+     * `en_camino`: el proveedor le pediria seis digitos que ya no puede leer y
+     * el servicio quedaria atascado, que es el callejon sin salida que S8-01
+     * venia a eliminar ("si se conserva en_camino, existe una salida valida
+     * mediante codigo de inicio").
+     *
+     * No lo cubria ninguna prueba: las de concurrencia pasan el codigo directo
+     * al endpoint sin pasar por la lectura del cliente.
+     */
+    public function test_cliente_conserva_su_codigo_inicio_cuando_el_servicio_va_en_camino(): void
+    {
+        [$cliente, $proveedor] = $this->crearActores();
+        $servicio = $this->crearServicio($cliente, $proveedor, ['estado' => 'en_camino']);
+
+        Sanctum::actingAs($cliente);
+
+        $this->getJson("/api/servicios/{$servicio->id}")
+            ->assertOk()
+            ->assertJsonPath('servicio.codigo_inicio', '123456');
+    }
+
     public function test_tercero_no_puede_ver_servicio_ni_codigos(): void
     {
         [$cliente, $proveedor] = $this->crearActores();

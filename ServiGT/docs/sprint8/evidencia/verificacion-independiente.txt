@@ -1,0 +1,29 @@
+========================================================================
+Verificacion independiente DESPUES - stack de desarrollo :8085 - 318832
+========================================================================
+
+H1 - Bypass del handshake por PUT /estado
+  [OK]    PUT /estado {completado} rechazado  HTTP 422
+  [OK]    PUT /estado {cancelado} rechazado  HTTP 422
+  [OK]    el servicio conserva aceptado  aceptado
+  [OK]    no queda calificable sin el handshake  HTTP 422
+  [OK]    aceptado -> en_camino sigue permitido  HTTP 200
+  [OK]    el cliente SIGUE viendo su codigo_inicio en en_camino  antes=454098 despues=454098
+  [OK]    iniciar con codigo desde en_camino  HTTP 200
+
+H2 - Cancelacion del cliente
+  [OK]    cliente cancela un servicio pendiente  HTTP 200
+  [OK]    queda cancelado  cancelado
+  [OK]    un cancelado no se puede aceptar  HTTP 422
+  [OK]    cliente NO cancela trabajo ya iniciado  HTTP 422
+  [OK]    proveedor no cancela unilateralmente  HTTP 403
+  [OK]    tercero no cancela servicio ajeno  HTTP 403
+
+H3 - Destinatario arbitrario en POST /calificaciones
+  [OK]    la reputacion del proveedor ajeno NO cambia  antes=0 despues=0
+  [OK]    la calificacion aterriza en el proveedor real  total A=1
+  [OK]    proveedor no puede autocalificarse  HTTP 403
+
+========================================================================
+RESULTADO: 16 correctas, 0 fallidas
+========================================================================

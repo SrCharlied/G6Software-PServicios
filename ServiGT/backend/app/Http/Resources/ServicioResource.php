@@ -59,7 +59,22 @@ class ServicioResource extends JsonResource
             'pago' => $this->whenLoaded('pago'),
         ];
 
-        if ($esCliente && in_array($this->estado, ['aceptado', 'en_progreso', 'por_confirmar', 'completado'], true)) {
+        // Bolsa de materiales (Sprint 9). El backend calcula el permiso: el
+        // frontend no reconstruye la elegibilidad con estados locales. Solo el
+        // proveedor del servicio cancelado desde en_camino dispara la consulta
+        // del lote, asi que el resto de listados no incurre en N+1.
+        $puedePublicarMateriales = false;
+        $publicacionMaterialId = null;
+
+        if ($esProveedor && $this->estado === 'cancelado' && $this->cancelado_desde === 'en_camino') {
+            $publicacionMaterialId = $this->publicacionMaterial?->id;
+            $puedePublicarMateriales = $publicacionMaterialId === null;
+        }
+
+        $data['puede_publicar_materiales'] = $puedePublicarMateriales;
+        $data['publicacion_material_id'] = $publicacionMaterialId;
+
+        if ($esCliente && in_array($this->estado, ['aceptado', 'en_camino', 'en_progreso', 'por_confirmar', 'completado'], true)) {
             $data['codigo_inicio'] = $this->codigo_inicio;
         }
 

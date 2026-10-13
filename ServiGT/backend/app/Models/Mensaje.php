@@ -15,6 +15,7 @@ class Mensaje extends Model
         'emisor_id',
         'receptor_id',
         'servicio_id',
+        'reserva_material_id',
         'contenido',
         'leido',
     ];
@@ -36,5 +37,10 @@ class Mensaje extends Model
     public function servicio()
     {
         return $this->belongsTo(Servicio::class);
+    }
+
+    public function reservaMaterial()
+    {
+        return $this->belongsTo(ReservaMaterial::class, 'reserva_material_id');
     }
 }

@@ -549,6 +549,211 @@ UPDATE categorias
 
 
 -- ============================================================
+-- Sprint 9: bolsa de materiales, origen de cancelacion y contexto de mensajes
+-- ============================================================
+-- Todo es idempotente y converge tanto en base limpia como en volumen
+-- existente. No se infiere nada de datos historicos: `cancelado_desde`
+-- queda NULL en cancelaciones anteriores y esas no son elegibles.
+
+ALTER TABLE servicios ADD COLUMN IF NOT EXISTS cancelado_desde VARCHAR(20);
+
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint
+        WHERE conrelid = 'servicios'::regclass
+          AND conname = 'servicios_cancelado_desde_check'
+    ) THEN
+        ALTER TABLE servicios ADD CONSTRAINT servicios_cancelado_desde_check
+            CHECK (cancelado_desde IS NULL OR cancelado_desde IN ('pendiente','aceptado','en_camino'));
+    END IF;
+END $$;
+
+-- Lote de materiales: uno por servicio cancelado desde en_camino. El vendedor
+-- es siempre el proveedor del servicio.
+CREATE TABLE IF NOT EXISTS publicaciones_material (
+    id BIGSERIAL PRIMARY KEY,
+    servicio_id BIGINT NOT NULL UNIQUE REFERENCES servicios(id) ON DELETE CASCADE,
+    vendedor_id BIGINT NOT NULL REFERENCES proveedores(id) ON DELETE CASCADE,
+    titulo VARCHAR(120) NOT NULL,
+    descripcion TEXT NOT NULL,
+    cantidad DECIMAL(10,2) NOT NULL CHECK (cantidad > 0),
+    unidad VARCHAR(30) NOT NULL,
+    precio_referencial DECIMAL(10,2) NOT NULL DEFAULT 0 CHECK (precio_referencial >= 0),
+    departamento VARCHAR(60) NOT NULL,
+    municipio VARCHAR(100),
+    estado VARCHAR(20) NOT NULL DEFAULT 'disponible'
+        CHECK (estado IN ('disponible','reservado','vendido','retirado')),
+    created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_pub_material_catalogo
+    ON publicaciones_material (estado, departamento, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_pub_material_vendedor
+    ON publicaciones_material (vendedor_id, estado);
+
+-- Imagenes de catalogo (publicas): de 1 a 3 por lote.
+CREATE TABLE IF NOT EXISTS publicaciones_material_imagenes (
+    id BIGSERIAL PRIMARY KEY,
+    publicacion_id BIGINT NOT NULL REFERENCES publicaciones_material(id) ON DELETE CASCADE,
+    ruta VARCHAR(500) NOT NULL,
+    orden SMALLINT NOT NULL CHECK (orden BETWEEN 1 AND 3),
+    created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (publicacion_id, orden)
+);
+
+-- Reserva/solicitud de un proveedor comprador sobre un lote. Varias pendientes
+-- pueden coexistir; solo una aceptada. Un comprador no repite una solicitud
+-- pendiente, aceptada ni rechazada sobre el mismo lote (cancelada si puede).
+CREATE TABLE IF NOT EXISTS reservas_material (
+    id BIGSERIAL PRIMARY KEY,
+    publicacion_id BIGINT NOT NULL REFERENCES publicaciones_material(id) ON DELETE CASCADE,
+    comprador_id BIGINT NOT NULL REFERENCES proveedores(id) ON DELETE CASCADE,
+    mensaje_inicial TEXT NOT NULL CHECK (LENGTH(BTRIM(mensaje_inicial)) > 0),
+    estado VARCHAR(20) NOT NULL DEFAULT 'pendiente'
+        CHECK (estado IN ('pendiente','aceptada','rechazada','cancelada')),
+    idempotency_key VARCHAR(80) NOT NULL,
+    created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (comprador_id, idempotency_key)
+);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_reserva_material_aceptada
+    ON reservas_material (publicacion_id) WHERE estado = 'aceptada';
+CREATE UNIQUE INDEX IF NOT EXISTS uq_reserva_material_comprador_vigente
+    ON reservas_material (publicacion_id, comprador_id)
+    WHERE estado IN ('pendiente','aceptada','rechazada');
+CREATE INDEX IF NOT EXISTS idx_reservas_material_comprador
+    ON reservas_material (comprador_id, estado, created_at DESC);
+
+-- Un mensaje pertenece a un servicio, a una reserva o a ninguno (historial
+-- anterior), nunca a ambos.
+ALTER TABLE mensajes ADD COLUMN IF NOT EXISTS reserva_material_id BIGINT
+    REFERENCES reservas_material(id) ON DELETE SET NULL;
+
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint
+        WHERE conrelid = 'mensajes'::regclass
+          AND conname = 'mensajes_un_solo_contexto_check'
+    ) THEN
+        ALTER TABLE mensajes ADD CONSTRAINT mensajes_un_solo_contexto_check
+            CHECK (servicio_id IS NULL OR reserva_material_id IS NULL);
+    END IF;
+END $$;
+
+CREATE INDEX IF NOT EXISTS idx_mensajes_reserva ON mensajes (reserva_material_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_mensajes_receptor_no_leidos
+    ON mensajes (receptor_id) WHERE leido = FALSE;
+
+-- ============================================================
+-- Sprint 9: Centro de seguridad (reportes, evidencia privada y auditoria)
+-- ============================================================
+-- Idempotente: converge en base limpia y en volumen existente sin perder
+-- datos. No depende de la deteccion vieja de 'por_confirmar' de arriba.
+
+-- servicios.estado gana el estado terminal 'interrumpido_seguridad' (22
+-- caracteres: no cabia en VARCHAR(20)). Cada paso se aplica solo si hace falta,
+-- para no tomar un lock exclusivo ni reescribir la tabla en cada arranque.
+DO $$
+BEGIN
+    IF (SELECT character_maximum_length FROM information_schema.columns
+        WHERE table_name = 'servicios' AND column_name = 'estado') < 30 THEN
+        ALTER TABLE servicios ALTER COLUMN estado TYPE VARCHAR(30);
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint
+        WHERE conrelid = 'servicios'::regclass
+          AND conname = 'servicios_estado_check'
+          AND pg_get_constraintdef(oid) LIKE '%interrumpido_seguridad%'
+    ) THEN
+        ALTER TABLE servicios DROP CONSTRAINT IF EXISTS servicios_estado_check;
+        ALTER TABLE servicios ADD CONSTRAINT servicios_estado_check
+            CHECK (estado IN ('pendiente','aceptado','en_camino','en_progreso','por_confirmar','completado','cancelado','rechazado','interrumpido_seguridad'));
+    END IF;
+END $$;
+
+-- Reporte de seguridad de un servicio. Lo ve solo su autor y el admin.
+CREATE TABLE IF NOT EXISTS reportes_seguridad (
+    id BIGSERIAL PRIMARY KEY,
+    servicio_id BIGINT NOT NULL REFERENCES servicios(id) ON DELETE CASCADE,
+    reportante_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    categoria VARCHAR(40) NOT NULL,
+    descripcion TEXT NOT NULL CHECK (LENGTH(BTRIM(descripcion)) > 0),
+    interrumpio_servicio BOOLEAN NOT NULL DEFAULT FALSE,
+    estado_servicio_previo VARCHAR(30) NOT NULL,
+    estado VARCHAR(20) NOT NULL DEFAULT 'recibido'
+        CHECK (estado IN ('recibido','en_revision','resuelto','descartado')),
+    idempotency_key VARCHAR(80) NOT NULL,
+    created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (reportante_id, idempotency_key)
+);
+-- Una sola interrupcion por servicio, protegida por la base y no solo por la app.
+CREATE UNIQUE INDEX IF NOT EXISTS uq_reporte_seguridad_interrupcion
+    ON reportes_seguridad (servicio_id) WHERE interrumpio_servicio;
+CREATE INDEX IF NOT EXISTS idx_reportes_seguridad_cola
+    ON reportes_seguridad (estado, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_reportes_seguridad_servicio
+    ON reportes_seguridad (servicio_id);
+
+-- Evidencia privada: de 1 a 3 archivos por reporte. La ruta es fisica y nunca
+-- se serializa en ninguna respuesta.
+CREATE TABLE IF NOT EXISTS evidencias_reporte_seguridad (
+    id BIGSERIAL PRIMARY KEY,
+    reporte_id BIGINT NOT NULL REFERENCES reportes_seguridad(id) ON DELETE CASCADE,
+    orden SMALLINT NOT NULL CHECK (orden BETWEEN 1 AND 3),
+    ruta_privada VARCHAR(500) NOT NULL,
+    nombre_original VARCHAR(255),
+    mime VARCHAR(100) NOT NULL CHECK (mime IN ('image/jpeg','image/png','application/pdf')),
+    tamano_bytes INT NOT NULL CHECK (tamano_bytes > 0 AND tamano_bytes <= 5242880),
+    sha256 CHAR(64) NOT NULL,
+    created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (reporte_id, orden)
+);
+
+-- Auditoria: un evento por creacion y por cada cambio administrativo. Es
+-- inmutable (el trigger rechaza UPDATE); no bloquea el borrado en cascada.
+CREATE TABLE IF NOT EXISTS historial_reportes_seguridad (
+    id BIGSERIAL PRIMARY KEY,
+    reporte_id BIGINT NOT NULL REFERENCES reportes_seguridad(id) ON DELETE CASCADE,
+    actor_id BIGINT REFERENCES users(id) ON DELETE SET NULL,
+    estado_anterior VARCHAR(20)
+        CHECK (estado_anterior IS NULL OR estado_anterior IN ('recibido','en_revision','resuelto','descartado')),
+    estado_nuevo VARCHAR(20) NOT NULL
+        CHECK (estado_nuevo IN ('recibido','en_revision','resuelto','descartado')),
+    nota_interna TEXT,
+    correlation_id VARCHAR(64),
+    created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_historial_reportes_seguridad
+    ON historial_reportes_seguridad (reporte_id, id);
+
+-- Unica excepcion: la FK `actor_id ... ON DELETE SET NULL` anonimiza al actor
+-- cuando se borra su usuario (UPDATE interno de PostgreSQL). Se permite solo si
+-- cambia unicamente actor_id de un valor a NULL; cualquier otro UPDATE se rechaza.
+CREATE OR REPLACE FUNCTION historial_reportes_seguridad_inmutable() RETURNS trigger AS $fn$
+BEGIN
+    IF OLD.actor_id IS NOT NULL AND NEW.actor_id IS NULL
+       AND (to_jsonb(NEW) - 'actor_id') = (to_jsonb(OLD) - 'actor_id') THEN
+        RETURN NEW;
+    END IF;
+
+    RAISE EXCEPTION 'historial_reportes_seguridad es inmutable: no admite UPDATE';
+END;
+$fn$ LANGUAGE plpgsql;
+
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'trg_historial_reportes_seguridad_inmutable') THEN
+        CREATE TRIGGER trg_historial_reportes_seguridad_inmutable
+            BEFORE UPDATE ON historial_reportes_seguridad
+            FOR EACH ROW EXECUTE FUNCTION historial_reportes_seguridad_inmutable();
+    END IF;
+END $$;
+
+-- ============================================================
 -- 3. Seed de catalogo
 -- ============================================================
 INSERT INTO categorias (nombre, descripcion, icono) VALUES

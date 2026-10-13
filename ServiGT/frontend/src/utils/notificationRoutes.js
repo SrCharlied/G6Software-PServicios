@@ -22,6 +22,7 @@ const DESTINOS = {
   servicio_iniciado:      () => '/solicitudes',
   servicio_por_confirmar: () => '/solicitudes',
   servicio_completado:    () => '/solicitudes',
+  servicio_cancelado:     () => '/solicitudes',
 
   // Unico tipo del Flujo A con pantalla dedicada.
   servicio_calificable: (datos) =>
@@ -31,6 +32,12 @@ const DESTINOS = {
   // Ambos tipos traen pedido_id garantizado desde CotizacionController.
   cotizacion_aceptada:  (datos) => (datos.pedido_id ? `/pedidos/${datos.pedido_id}` : null),
   cotizacion_rechazada: (datos) => (datos.pedido_id ? `/pedidos/${datos.pedido_id}` : null),
+  reserva_material_solicitada: () => '/bolsa-materiales/mias',
+  reserva_material_aceptada: () => '/reservas-materiales',
+  reserva_material_rechazada: () => '/reservas-materiales',
+  reserva_material_cancelada: (datos) => datos.publicacion_id ? `/bolsa-materiales/${encodeURIComponent(datos.publicacion_id)}` : '/bolsa-materiales',
+  servicio_seguridad_reporte: () => '/solicitudes',
+  servicio_interrumpido_seguridad: () => '/solicitudes',
 };
 
 /**

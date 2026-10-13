@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { Platform } from 'react-native';
 import {
   clearPrivateSessionStorage,
   migrateLegacySession,
@@ -410,6 +411,15 @@ export const rechazarServicio = async (id, motivo = '') => {
   }
 };
 
+export const cancelarServicio = async (id) => {
+  try {
+    const response = await api.post(`/servicios/${id}/cancelar`);
+    return response.data;
+  } catch (error) {
+    throwApiError(error, 'No se pudo cancelar el servicio.');
+  }
+};
+
 export const actualizarEstadoServicio = async (id, estado) => {
   try {
     const response = await api.put(`/servicios/${id}/estado`, { estado });
@@ -507,6 +517,33 @@ export const getMisConversaciones = async () => {
   } catch (error) {
     throwApiError(error, 'No se pudieron cargar las conversaciones.');
   }
+};
+
+export const getHilosMensajes = async ({ page = 1 } = {}) => {
+  try {
+    const response = await api.get('/mensajes/hilos', { params: { page } });
+    return response.data;
+  } catch (error) {
+    throwApiError(error, 'No se pudieron cargar los hilos.');
+  }
+};
+const messageContextPath = ({ tipo, id, contraparteId }) => {
+  if ((tipo === 'servicio' || tipo === 'reserva') && /^[1-9]\d*$/.test(String(id))) return `/mensajes/${tipo === 'servicio' ? 'servicios' : 'reservas'}/${id}`;
+  if ((tipo === 'legado' || tipo === 'legacy') && /^[1-9]\d*$/.test(String(contraparteId))) return `/mensajes/${tipo === 'legado' ? 'historial' : 'conversacion'}/${contraparteId}`;
+  throw new Error('Selecciona un contexto de conversacion valido.');
+};
+export const getMensajesContexto = async (context, lastId = null) => {
+  try {
+    const response = await api.get(messageContextPath(context), { params: lastId ? { last_id: lastId } : {} });
+    return response.data;
+  } catch (error) { throwApiError(error, 'No se pudieron cargar los mensajes.'); }
+};
+export const enviarMensajeContexto = async (context, contenido) => {
+  try {
+    if (!['servicio', 'reserva'].includes(context.tipo)) throw new Error('El historial anterior es de solo lectura.');
+    const response = await api.post(messageContextPath(context), { contenido });
+    return response.data;
+  } catch (error) { throwApiError(error, 'No se pudo enviar el mensaje.'); }
 };
 
 // ── Notificaciones ────────────────────────────────────────────────────────
@@ -818,4 +855,231 @@ export const getAdminCreditosPremium = async ({ estado = null } = {}) => {
   }
 };
 
+// ── Bolsa de materiales (Sprint 9, Task 3.3) ──────────────────────────────
+// Lotes y reservas propias. Contrato: docs/sprint9/materiales-api.md.
+// Las acciones sobre una reserva no llevan body: la identidad y el rol salen
+// del token y el backend decide si la accion procede.
+
+export const getMisLotesMateriales = async () => {
+  try {
+    const response = await api.get('/materiales/mias');
+    return response.data;
+  } catch (error) {
+    throwApiError(error, 'No se pudieron cargar tus lotes de materiales.');
+  }
+};
+
+export const getMateriales = async ({ page = 1, q, departamento } = {}) => {
+  try {
+    const response = await api.get('/materiales', { params: { page, q: q || undefined, departamento: departamento || undefined } });
+    return response.data;
+  } catch (error) {
+    throwApiError(error, 'No se pudieron cargar los materiales.');
+  }
+};
+
+export const getMaterialDetalle = async (id) => {
+  try {
+    const response = await api.get(`/materiales/${id}`);
+    return response.data;
+  } catch (error) {
+    throwApiError(error, 'No se pudo cargar el lote.');
+  }
+};
+
+export const solicitarReservaMaterial = async (id, datos) => {
+  try {
+    const response = await api.post(`/materiales/${id}/reservas`, datos);
+    return response.data;
+  } catch (error) {
+    throwApiError(error, 'No se pudo solicitar la reserva.');
+  }
+};
+
+export const buildMaterialFormData = async (datos) => {
+  const form = new FormData();
+  ['servicio_id', 'titulo', 'descripcion', 'cantidad', 'unidad', 'precio_referencial', 'departamento', 'municipio'].forEach((key) => {
+    if (datos[key] !== undefined && datos[key] !== null) form.append(key, String(datos[key]));
+  });
+  for (const asset of datos.imagenes || []) {
+    const name = asset.fileName || asset.uri.split('/').pop() || 'material.jpg';
+    if (Platform.OS === 'web') {
+      const file = asset.file || await (await fetch(asset.uri)).blob();
+      form.append('imagenes[]', file, name);
+    } else {
+      form.append('imagenes[]', { uri: asset.uri, name, type: asset.mimeType });
+    }
+  }
+  (datos.eliminar_imagenes || []).forEach((id) => form.append('eliminar_imagenes[]', String(id)));
+  return form;
+};
+
+export const crearLoteMaterial = async (datos) => {
+  try {
+    const form = await buildMaterialFormData(datos);
+    const response = await api.post('/materiales', form, { headers: { 'Content-Type': 'multipart/form-data' } });
+    return response.data;
+  } catch (error) {
+    throwApiError(error, 'No se pudo publicar el lote.');
+  }
+};
+
+export const actualizarLoteMaterial = async (id, datos) => {
+  try {
+    const form = await buildMaterialFormData(datos);
+    form.append('_method', 'PUT');
+    const response = await api.post(`/materiales/${id}`, form, { headers: { 'Content-Type': 'multipart/form-data' } });
+    return response.data;
+  } catch (error) {
+    throwApiError(error, 'No se pudo actualizar el lote.');
+  }
+};
+
+export const getReservasDeLote = async (loteId) => {
+  try {
+    const response = await api.get(`/materiales/${loteId}/reservas`);
+    return response.data;
+  } catch (error) {
+    throwApiError(error, 'No se pudieron cargar las solicitudes del lote.');
+  }
+};
+
+export const retirarLoteMaterial = async (loteId) => {
+  try {
+    const response = await api.post(`/materiales/${loteId}/retirar`);
+    return response.data;
+  } catch (error) {
+    throwApiError(error, 'No se pudo retirar el lote.');
+  }
+};
+
+export const marcarLoteVendido = async (loteId) => {
+  try {
+    const response = await api.post(`/materiales/${loteId}/vendido`);
+    return response.data;
+  } catch (error) {
+    throwApiError(error, 'No se pudo marcar el lote como vendido.');
+  }
+};
+
+export const getMisReservasMaterial = async ({ page = 1, perPage = 20 } = {}) => {
+  try {
+    const response = await api.get('/reservas-material', { params: { page, per_page: perPage } });
+    return response.data;
+  } catch (error) {
+    throwApiError(error, 'No se pudieron cargar tus reservas de materiales.');
+  }
+};
+
+export const getReservaMaterial = async (id) => {
+  try {
+    const response = await api.get(`/reservas-material/${id}`);
+    return response.data;
+  } catch (error) { throwApiError(error, 'No se pudo cargar la reserva.'); }
+};
+
+export const aceptarReservaMaterial = async (reservaId) => {
+  try {
+    const response = await api.post(`/reservas-material/${reservaId}/aceptar`);
+    return response.data;
+  } catch (error) {
+    throwApiError(error, 'No se pudo aceptar la solicitud.');
+  }
+};
+
+export const rechazarReservaMaterial = async (reservaId) => {
+  try {
+    const response = await api.post(`/reservas-material/${reservaId}/rechazar`);
+    return response.data;
+  } catch (error) {
+    throwApiError(error, 'No se pudo rechazar la solicitud.');
+  }
+};
+
+export const cancelarReservaMaterial = async (reservaId) => {
+  try {
+    const response = await api.post(`/reservas-material/${reservaId}/cancelar`);
+    return response.data;
+  } catch (error) {
+    throwApiError(error, 'No se pudo cancelar la reserva.');
+  }
+};
+
+// ── Centro de seguridad: panel administrativo (Sprint 9, Task 6.2) ─────────
+// Contrato: docs/sprint9/seguridad-api.md. Todas requieren rol admin; el
+// backend decide: el cliente nunca asume permisos ni transiciones.
+
+export const getReportesSeguridadAdmin = async ({ estado = null, interrumpio = null, page = 1, perPage = 20 } = {}) => {
+  try {
+    const params = { page, per_page: perPage };
+    if (estado) params.estado = estado;
+    if (interrumpio !== null) params.interrumpio = interrumpio ? 1 : 0;
+    const response = await api.get('/admin/reportes-seguridad', { params });
+    return response.data;
+  } catch (error) {
+    throwApiError(error, 'No se pudieron cargar los reportes de seguridad.');
+  }
+};
+
+export const getReporteSeguridadAdmin = async (reporteId) => {
+  try {
+    const response = await api.get(`/admin/reportes-seguridad/${reporteId}`);
+    return response.data;
+  } catch (error) {
+    throwApiError(error, 'No se pudo cargar el reporte de seguridad.');
+  }
+};
+
+export const cambiarEstadoReporteSeguridad = async (reporteId, { estado, notaInterna = null }) => {
+  try {
+    const body = { estado };
+    if (notaInterna) body.nota_interna = notaInterna;
+    const response = await api.post(`/admin/reportes-seguridad/${reporteId}/estado`, body);
+    return response.data;
+  } catch (error) {
+    throwApiError(error, 'No se pudo actualizar el estado del reporte.');
+  }
+};
+
+// Descarga autorizada de una evidencia. Con responseType 'blob' un error del
+// backend tambien llega como Blob: se lee su JSON para conservar el mensaje real.
+export const descargarEvidenciaSeguridad = async (reporteId, evidenciaId) => {
+  const fallback = 'No se pudo descargar la evidencia.';
+  try {
+    const response = await api.get(
+      `/seguridad/reportes/${reporteId}/evidencias/${evidenciaId}/descargar`,
+      { responseType: 'blob' },
+    );
+    return { blob: response.data, contentType: response.headers?.['content-type'] ?? null };
+  } catch (error) {
+    const cuerpo = error?.response?.data;
+    if (cuerpo && typeof cuerpo.text === 'function') {
+      let data = null;
+      try { data = JSON.parse(await cuerpo.text()); } catch { /* el cuerpo no era JSON */ }
+      throwApiError({ ...error, response: { ...error.response, data } }, fallback);
+    }
+    throwApiError(error, fallback);
+  }
+};
+
 export default api;
+export const registrarReporteSeguridad = async (servicioId, datos, interrumpir = false) => {
+  try {
+    const response = await api.post(`/servicios/${servicioId}/seguridad/${interrumpir ? 'interrumpir' : 'reportes'}`, datos);
+    return response.data;
+  } catch (error) { throwApiError(error, 'No se pudo registrar el reporte.'); }
+};
+export const getReporteSeguridad = async (id) => {
+  try { return (await api.get(`/seguridad/reportes/${id}`)).data; }
+  catch (error) { throwApiError(error, 'No se pudo cargar el reporte.'); }
+};
+export const subirEvidenciasSeguridad = async (id, archivos) => {
+  try {
+    const form = new FormData();
+    for (const asset of archivos) {
+      if (Platform.OS === 'web') form.append('archivos[]', asset.file || await (await fetch(asset.uri)).blob(), asset.name);
+      else form.append('archivos[]', { uri: asset.uri, name: asset.name, type: asset.mimeType });
+    }
+    return (await api.post(`/seguridad/reportes/${id}/evidencias`, form, { headers: { 'Content-Type': 'multipart/form-data' } })).data;
+  } catch (error) { throwApiError(error, 'No se pudo adjuntar la evidencia.'); }
+};

@@ -10,9 +10,13 @@ use App\Models\Proveedor;
 use App\Models\Servicio;
 use App\Models\User;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Laravel\Sanctum\Sanctum;
 use PHPUnit\Framework\Attributes\DataProvider;
+use Symfony\Component\HttpKernel\Exception\MethodNotAllowedHttpException;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
+use Tests\Feature\Concerns\CreaEscenarioSeguridad;
 use Tests\TestCase;
 
 /**
@@ -21,6 +25,11 @@ use Tests\TestCase;
  * Cubre los cinco casos que exige el criterio —no autenticado, rol incorrecto,
  * ownership ajeno, ID inexistente y estado invalido— sobre servicios, pedidos,
  * cotizaciones, mensajes, creditos, Premium, publicaciones y admin.
+ *
+ * Task 7.1 (Sprint 9) la extiende al incremento: separacion de roles (1.1),
+ * bolsa y reservas de materiales, hilos de mensajes por contexto y Centro de
+ * seguridad. Los fixtures de esos dominios salen de los mismos traits que usan
+ * sus pruebas de task, para no mantener dos versiones de cada escenario.
  *
  * Esta dirigida por tablas y no por un test por caso a proposito: la gracia de
  * una matriz es que agregar un endpoint sea agregar una fila, y que el fallo
@@ -31,6 +40,7 @@ use Tests\TestCase;
 class MatrizAutorizacionTest extends TestCase
 {
     use DatabaseTransactions;
+    use CreaEscenarioSeguridad;
 
     protected function setUp(): void
     {
@@ -82,6 +92,7 @@ class MatrizAutorizacionTest extends TestCase
             ['POST', '/api/servicios/1/finalizar'],
             ['POST', '/api/servicios/1/confirmar-fin'],
             ['PUT', '/api/servicios/1/estado'],
+            ['POST', '/api/servicios/1/cancelar'],
 
             ['GET', '/api/disponibilidad/mia'],
             ['POST', '/api/disponibilidad'],
@@ -92,6 +103,12 @@ class MatrizAutorizacionTest extends TestCase
             ['POST', '/api/mensajes'],
             ['GET', '/api/mensajes/conversacion/1'],
             ['GET', '/api/mensajes/conversaciones'],
+            ['GET', '/api/mensajes/hilos'],
+            ['GET', '/api/mensajes/historial/1'],
+            ['GET', '/api/mensajes/servicios/1'],
+            ['POST', '/api/mensajes/servicios/1'],
+            ['GET', '/api/mensajes/reservas/1'],
+            ['POST', '/api/mensajes/reservas/1'],
 
             ['POST', '/api/pedidos'],
             ['GET', '/api/pedidos/mios'],
@@ -114,6 +131,27 @@ class MatrizAutorizacionTest extends TestCase
             ['POST', '/api/publicaciones/1/desactivar'],
             ['DELETE', '/api/publicaciones/1'],
 
+            ['GET', '/api/materiales'],
+            ['GET', '/api/materiales/mias'],
+            ['POST', '/api/materiales'],
+            ['GET', '/api/materiales/1'],
+            ['PUT', '/api/materiales/1'],
+            ['POST', '/api/materiales/1/retirar'],
+            ['POST', '/api/materiales/1/vendido'],
+            ['POST', '/api/materiales/1/reservas'],
+            ['GET', '/api/materiales/1/reservas'],
+            ['GET', '/api/reservas-material'],
+            ['GET', '/api/reservas-material/1'],
+            ['POST', '/api/reservas-material/1/aceptar'],
+            ['POST', '/api/reservas-material/1/rechazar'],
+            ['POST', '/api/reservas-material/1/cancelar'],
+
+            ['POST', '/api/servicios/1/seguridad/reportes'],
+            ['POST', '/api/servicios/1/seguridad/interrumpir'],
+            ['GET', '/api/seguridad/reportes/1'],
+            ['POST', '/api/seguridad/reportes/1/evidencias'],
+            ['GET', '/api/seguridad/reportes/1/evidencias/1/descargar'],
+
             ['GET', '/api/notificaciones'],
             ['PUT', '/api/notificaciones/1/leer'],
             ['PUT', '/api/notificaciones/leer-todas'],
@@ -123,6 +161,9 @@ class MatrizAutorizacionTest extends TestCase
             ['GET', '/api/admin/proveedores'],
             ['GET', '/api/admin/creditos-premium'],
             ['POST', '/api/admin/proveedores/1/creditos'],
+            ['GET', '/api/admin/reportes-seguridad'],
+            ['GET', '/api/admin/reportes-seguridad/1'],
+            ['POST', '/api/admin/reportes-seguridad/1/estado'],
         ];
 
         $casos = [];
@@ -149,6 +190,13 @@ class MatrizAutorizacionTest extends TestCase
         $this->assertDenegado('GET', '/api/servicios/proveedor');
         $this->assertDenegado('GET', '/api/disponibilidad/mia');
         $this->assertDenegado('POST', '/api/disponibilidad');
+
+        // Sprint 9: el perfil de proveedor (1.1) y la bolsa de materiales.
+        $this->assertDenegado('POST', '/api/providers');
+        $this->assertDenegado('GET', '/api/materiales');
+        $this->assertDenegado('GET', '/api/materiales/mias');
+        $this->assertDenegado('POST', '/api/materiales');
+        $this->assertDenegado('GET', '/api/reservas-material');
     }
 
     public function test_un_proveedor_no_alcanza_endpoints_exclusivos_de_cliente(): void
@@ -161,6 +209,11 @@ class MatrizAutorizacionTest extends TestCase
             'proveedor_id' => $proveedor->id,
             'descripcion'  => 'Un proveedor no contrata servicios',
         ]);
+
+        // Publicar pedidos y adjudicar cotizaciones tambien (Sprint 9, 1.1).
+        ['pedido' => $pedido, 'cotizacion' => $cotizacion] = $this->crearPedidoConCotizacion();
+        $this->assertDenegado('POST', '/api/pedidos');
+        $this->assertDenegado('POST', "/api/pedidos/{$pedido->id}/cotizaciones/{$cotizacion->id}/aceptar");
     }
 
     public function test_ningun_rol_distinto_de_admin_alcanza_el_area_administrativa(): void
@@ -171,6 +224,9 @@ class MatrizAutorizacionTest extends TestCase
             ['GET', '/api/admin/proveedores'],
             ['GET', '/api/admin/creditos-premium'],
             ['POST', '/api/admin/proveedores/1/creditos'],
+            ['GET', '/api/admin/reportes-seguridad'],
+            ['GET', '/api/admin/reportes-seguridad/1'],
+            ['POST', '/api/admin/reportes-seguridad/1/estado'],
         ];
 
         foreach (['cliente', 'proveedor'] as $rol) {
@@ -180,6 +236,30 @@ class MatrizAutorizacionTest extends TestCase
                 $this->json($metodo, $uri)->assertForbidden();
             }
         }
+    }
+
+    /**
+     * Sprint 9: el admin modera desde su area, pero no opera la bolsa de
+     * materiales ni entra a los hilos o al Centro de seguridad de un servicio
+     * como si fuera una de las partes.
+     */
+    public function test_el_admin_no_opera_como_participante_de_materiales_mensajes_ni_seguridad(): void
+    {
+        $servicio = $this->servicioSeguro('en_progreso');
+        Sanctum::actingAs($this->crearAdmin());
+
+        foreach ([
+            ['GET',  '/api/materiales'],
+            ['GET',  '/api/reservas-material'],
+            ['GET',  "/api/mensajes/servicios/{$servicio->id}"],
+            ['POST', "/api/mensajes/servicios/{$servicio->id}"],
+            ['POST', "/api/servicios/{$servicio->id}/seguridad/reportes"],
+            ['POST', "/api/servicios/{$servicio->id}/seguridad/interrumpir"],
+        ] as [$metodo, $uri]) {
+            $this->assertDenegado($metodo, $uri, $this->payloadSprint9());
+        }
+
+        $this->assertSame('en_progreso', $servicio->fresh()->estado);
     }
 
     // ── Caso 3 · Ownership ajeno ────────────────────────────────────────
@@ -200,9 +280,74 @@ class MatrizAutorizacionTest extends TestCase
             ['POST', "/api/servicios/{$servicio->id}/confirmar-fin"],
             ['PUT',  "/api/servicios/{$servicio->id}/estado"],
             ['POST', "/api/servicios/{$servicio->id}/calificar"],
+            ['POST', "/api/servicios/{$servicio->id}/cancelar"],
+            // Sprint 9: el hilo del servicio y su Centro de seguridad.
+            ['GET',  "/api/mensajes/servicios/{$servicio->id}"],
+            ['POST', "/api/mensajes/servicios/{$servicio->id}"],
+            ['POST', "/api/servicios/{$servicio->id}/seguridad/reportes"],
+            ['POST', "/api/servicios/{$servicio->id}/seguridad/interrumpir"],
         ] as [$metodo, $uri]) {
-            $this->assertDenegado($metodo, $uri, ['codigo' => '000000', 'estado' => 'completado', 'puntuacion' => 5]);
+            $this->assertDenegado($metodo, $uri, array_merge(
+                ['codigo' => '000000', 'estado' => 'completado', 'puntuacion' => 5],
+                $this->payloadSprint9()
+            ));
         }
+
+        $this->assertSame('aceptado', $servicio->fresh()->estado);
+    }
+
+    public function test_un_tercero_no_administra_un_lote_ni_opera_reservas_ajenas(): void
+    {
+        $vendedor = $this->crearProveedorComprador();
+        $lote = $this->crearLote($this->servicioCanceladoDesdeEnCamino($vendedor));
+        $reserva = $this->crearReserva($lote, $this->crearProveedorComprador());
+
+        Sanctum::actingAs($this->crearProveedorComprador()->user);
+
+        foreach ([
+            ['PUT',  "/api/materiales/{$lote->id}"],
+            ['POST', "/api/materiales/{$lote->id}/retirar"],
+            ['POST', "/api/materiales/{$lote->id}/vendido"],
+            ['GET',  "/api/materiales/{$lote->id}/reservas"],
+            ['GET',  "/api/reservas-material/{$reserva->id}"],
+            ['POST', "/api/reservas-material/{$reserva->id}/aceptar"],
+            ['POST', "/api/reservas-material/{$reserva->id}/rechazar"],
+            ['POST', "/api/reservas-material/{$reserva->id}/cancelar"],
+            ['GET',  "/api/mensajes/reservas/{$reserva->id}"],
+            ['POST', "/api/mensajes/reservas/{$reserva->id}"],
+        ] as [$metodo, $uri]) {
+            $this->assertDenegado($metodo, $uri, $this->payloadSprint9());
+        }
+
+        $this->assertSame('disponible', $lote->fresh()->estado);
+        $this->assertSame('pendiente', $reserva->fresh()->estado);
+    }
+
+    /**
+     * Un reporte de seguridad, su evidencia y su descarga son solo de quien lo
+     * escribio (el admin los ve desde su area). La contraparte del servicio y
+     * un tercero quedan fuera. El autor si entra, para que el rechazo no se
+     * deba a un fixture roto.
+     */
+    public function test_un_reporte_de_seguridad_solo_lo_ve_quien_lo_escribio(): void
+    {
+        $servicio = $this->servicioSeguro('en_progreso');
+        $reporte = $this->crearReporte($servicio, $servicio->cliente);
+
+        foreach ([$servicio->proveedor->user, $this->crearCliente()] as $intruso) {
+            Sanctum::actingAs($intruso);
+
+            foreach ([
+                ['GET',  "/api/seguridad/reportes/{$reporte->id}"],
+                ['POST', "/api/seguridad/reportes/{$reporte->id}/evidencias"],
+                ['GET',  "/api/seguridad/reportes/{$reporte->id}/evidencias/1/descargar"],
+            ] as [$metodo, $uri]) {
+                $this->assertDenegado($metodo, $uri);
+            }
+        }
+
+        Sanctum::actingAs($servicio->cliente);
+        $this->getJson("/api/seguridad/reportes/{$reporte->id}")->assertOk();
     }
 
     public function test_no_se_puede_adjudicar_ni_editar_cotizaciones_de_un_pedido_ajeno(): void
@@ -264,6 +409,42 @@ class MatrizAutorizacionTest extends TestCase
         }
     }
 
+    public function test_recursos_inexistentes_del_sprint_9_responden_404(): void
+    {
+        Sanctum::actingAs($this->crearProveedorComprador()->user);
+
+        foreach ([
+            ['GET',  '/api/materiales/999999'],
+            ['PUT',  '/api/materiales/999999'],
+            ['POST', '/api/materiales/999999/retirar'],
+            ['POST', '/api/materiales/999999/vendido'],
+            ['POST', '/api/materiales/999999/reservas'],
+            ['GET',  '/api/materiales/999999/reservas'],
+            ['GET',  '/api/reservas-material/999999'],
+            ['POST', '/api/reservas-material/999999/aceptar'],
+            ['POST', '/api/reservas-material/999999/rechazar'],
+            ['POST', '/api/reservas-material/999999/cancelar'],
+            ['GET',  '/api/mensajes/servicios/999999'],
+            ['POST', '/api/mensajes/servicios/999999'],
+            ['GET',  '/api/mensajes/reservas/999999'],
+            ['POST', '/api/mensajes/reservas/999999'],
+            ['POST', '/api/servicios/999999/seguridad/reportes'],
+            ['POST', '/api/servicios/999999/seguridad/interrumpir'],
+            ['GET',  '/api/seguridad/reportes/999999'],
+            ['POST', '/api/seguridad/reportes/999999/evidencias'],
+            ['GET',  '/api/seguridad/reportes/999999/evidencias/1/descargar'],
+        ] as [$metodo, $uri]) {
+            $this->assertRutaRegistrada($metodo, $uri);
+
+            $status = $this->json($metodo, $uri, $this->payloadSprint9())->getStatusCode();
+            $this->assertSame(404, $status, "{$metodo} {$uri} debia responder 404 y respondio {$status}.");
+        }
+
+        Sanctum::actingAs($this->crearAdmin());
+        $this->getJson('/api/admin/reportes-seguridad/999999')->assertNotFound();
+        $this->postJson('/api/admin/reportes-seguridad/999999/estado', ['estado' => 'en_revision'])->assertNotFound();
+    }
+
     public function test_un_admin_recargando_creditos_a_un_proveedor_inexistente_recibe_404(): void
     {
         Sanctum::actingAs(User::factory()->admin()->create());
@@ -319,7 +500,81 @@ class MatrizAutorizacionTest extends TestCase
             ->assertStatus(422);
     }
 
+    /**
+     * Sprint 9: un representante por dominio de que cada accion valida el
+     * estado previo, no solo el permiso. Los casos exhaustivos viven en las
+     * pruebas de cada task.
+     */
+    public function test_las_acciones_del_sprint_9_validan_el_estado_previo(): void
+    {
+        $vendedor = $this->crearProveedorComprador();
+        $comprador = $this->crearProveedorComprador();
+        $vendido = $this->crearLote($this->servicioCanceladoDesdeEnCamino($vendedor), ['estado' => 'vendido']);
+        $reservado = $this->crearLote($this->servicioCanceladoDesdeEnCamino($vendedor), ['estado' => 'reservado']);
+
+        // Materiales: no se solicita un lote vendido ni se retira uno reservado.
+        Sanctum::actingAs($comprador->user);
+        $this->postJson("/api/materiales/{$vendido->id}/reservas", $this->payloadSprint9())->assertStatus(422);
+
+        Sanctum::actingAs($vendedor->user);
+        $this->postJson("/api/materiales/{$reservado->id}/retirar")->assertStatus(422);
+
+        // Reservas: no se acepta una rechazada ni se cancela la de un lote vendido.
+        $disponible = $this->crearLote($this->servicioCanceladoDesdeEnCamino($vendedor));
+        $rechazada = $this->crearReserva($disponible, $comprador, ['estado' => 'rechazada']);
+        $this->postJson("/api/reservas-material/{$rechazada->id}/aceptar")->assertStatus(422);
+
+        $aceptada = $this->crearReserva($vendido, $comprador, ['estado' => 'aceptada']);
+        $this->postJson("/api/reservas-material/{$aceptada->id}/cancelar")->assertStatus(422);
+
+        // Seguridad: un servicio completado ya no se interrumpe.
+        $completado = $this->servicioSeguro('completado');
+        Sanctum::actingAs($completado->cliente);
+        $this->postJson("/api/servicios/{$completado->id}/seguridad/interrumpir", $this->payloadSprint9())->assertStatus(422);
+
+        // Mensajes: un servicio interrumpido conserva su chat solo para leer.
+        $interrumpido = $this->servicioSeguro('interrumpido_seguridad');
+        Sanctum::actingAs($interrumpido->cliente);
+        $this->postJson("/api/mensajes/servicios/{$interrumpido->id}", $this->payloadSprint9())->assertStatus(409);
+
+        $this->assertSame('completado', $completado->fresh()->estado);
+        $this->assertSame('aceptada', $aceptada->fresh()->estado);
+    }
+
     // ── Helpers ─────────────────────────────────────────────────────────
+
+    /**
+     * Un 404 del router (una fila con la ruta mal escrita) tambien "deniega", y
+     * haria pasar en falso la fila. Cada fila que acepta 404 debe apuntar a una
+     * ruta registrada.
+     */
+    private function assertRutaRegistrada(string $metodo, string $uri): void
+    {
+        try {
+            app('router')->getRoutes()->match(Request::create($uri, $metodo));
+        } catch (NotFoundHttpException|MethodNotAllowedHttpException) {
+            $this->fail("{$metodo} {$uri} no corresponde a ninguna ruta registrada.");
+        }
+
+        $this->addToAssertionCount(1);
+    }
+
+    /**
+     * Cuerpo valido para los endpoints del Sprint 9 que validan antes de
+     * autorizar (reportes de seguridad, solicitudes de reserva). Con el, un
+     * rechazo solo puede venir del permiso, la existencia o el estado, nunca
+     * de la validacion del formulario.
+     */
+    private function payloadSprint9(): array
+    {
+        return [
+            'contenido'       => 'Mensaje de la matriz de autorizacion',
+            'mensaje_inicial' => 'Me interesa el lote de la matriz',
+            'categoria'       => 'otro',
+            'descripcion'     => 'Descripcion valida de la matriz de autorizacion',
+            'idempotency_key' => 'matriz-' . uniqid(),
+        ];
+    }
 
     /**
      * Un rechazo valido es 401, 403 o 404 segun el recurso: algunos endpoints
@@ -328,6 +583,8 @@ class MatrizAutorizacionTest extends TestCase
      */
     private function assertDenegado(string $metodo, string $uri, array $payload = []): void
     {
+        $this->assertRutaRegistrada($metodo, $uri);
+
         $status = $this->json($metodo, $uri, $payload)->getStatusCode();
 
         $this->assertContains(

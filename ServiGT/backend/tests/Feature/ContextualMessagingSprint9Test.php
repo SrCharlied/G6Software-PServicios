@@ -254,6 +254,32 @@ class ContextualMessagingSprint9Test extends TestCase
         $this->getJson("/api/mensajes/reservas/{$rb->id}")->assertOk()->assertJsonCount(1, 'mensajes')->assertJsonPath('mensajes.0.contenido', 'de B');
     }
 
+    /**
+     * Brecha cubierta al adoptar la Task 4.1. La prueba anterior usa dos
+     * solicitantes distintos, y a esos ya los separa el filtro por contraparte.
+     * Aqui la contraparte es la MISMA en los dos hilos (un comprador con dos
+     * reservas del mismo vendedor): solo el filtro por reserva los separa. Sin
+     * el, `GET /mensajes/reservas/{id}` mezclaba ambos hilos y ninguna prueba
+     * lo detectaba.
+     */
+    public function test_el_mismo_comprador_con_dos_reservas_del_mismo_vendedor_tiene_hilos_aislados(): void
+    {
+        [$r1, $comprador, $vendedor] = $this->reservaConPartes();
+        $r2 = $this->crearReserva($this->crearLote($this->servicioCanceladoDesdeEnCamino($vendedor)), $comprador);
+
+        Mensaje::create(['emisor_id' => $vendedor->user_id, 'receptor_id' => $comprador->user_id, 'reserva_material_id' => $r1->id, 'contenido' => 'de la reserva 1']);
+        Mensaje::create(['emisor_id' => $vendedor->user_id, 'receptor_id' => $comprador->user_id, 'reserva_material_id' => $r2->id, 'contenido' => 'de la reserva 2']);
+
+        Sanctum::actingAs($comprador->user);
+
+        $this->getJson("/api/mensajes/reservas/{$r1->id}")->assertOk()
+            ->assertJsonCount(1, 'mensajes')->assertJsonPath('mensajes.0.contenido', 'de la reserva 1');
+        $this->assertFalse((bool) Mensaje::where('contenido', 'de la reserva 2')->value('leido'), 'Leer la reserva 1 marco como leido el mensaje de la reserva 2.');
+
+        $this->getJson("/api/mensajes/reservas/{$r2->id}")->assertOk()
+            ->assertJsonCount(1, 'mensajes')->assertJsonPath('mensajes.0.contenido', 'de la reserva 2');
+    }
+
     // ── Auxiliares ───────────────────────────────────────────────────────────
 
     /** @return array{0: \App\Models\ReservaMaterial, 1: \App\Models\Proveedor, 2: \App\Models\Proveedor} */

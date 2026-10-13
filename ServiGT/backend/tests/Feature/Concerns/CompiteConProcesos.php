@@ -17,6 +17,9 @@ use Illuminate\Support\Facades\DB;
  * Requiere CreaEscenarioMateriales (usuariosMat / categoriaMat) y NO usa
  * DatabaseTransactions: los fixtures se comitean y `limpiarCommiteados` los
  * borra de forma dirigida.
+ *
+ * Una peticion puede llevar archivos (quinto elemento, opcional): entonces
+ * viaja como multipart, con el cuerpo como campos del formulario (Task 7.1).
  */
 trait CompiteConProcesos
 {
@@ -37,7 +40,8 @@ trait CompiteConProcesos
      * Lanza las peticiones en procesos independientes y las libera a la vez.
      * Antes de soltarlas mantiene un FOR UPDATE sobre la fila ($tabla, $id).
      *
-     * @param list<array{0: string, 1: string, 2: string, 3: array}> $peticiones [metodo, url, token, cuerpo]
+     * @param list<array{0: string, 1: string, 2: string, 3: array, 4?: array<string, list<string>>}> $peticiones
+     *        [metodo, url, token, cuerpo, archivos]; `archivos` mapea un campo a rutas locales.
      * @return list<array{status: int, body: mixed}>
      */
     protected function competir(string $tabla, int $id, array $peticiones): array
@@ -48,8 +52,9 @@ trait CompiteConProcesos
 
         $hijos = [];
         try {
-            foreach ($peticiones as [$metodo, $url, $token, $cuerpo]) {
-                $hijos[] = $this->lanzarHijo($metodo, $url, $token, $cuerpo);
+            foreach ($peticiones as $peticion) {
+                [$metodo, $url, $token, $cuerpo] = $peticion;
+                $hijos[] = $this->lanzarHijo($metodo, $url, $token, $cuerpo, $peticion[4] ?? []);
             }
 
             $this->esperarBloqueados($rival, $hijos);
@@ -74,18 +79,30 @@ trait CompiteConProcesos
         return $salidas;
     }
 
-    protected function lanzarHijo(string $metodo, string $url, string $token, array $cuerpo): array
+    protected function lanzarHijo(string $metodo, string $url, string $token, array $cuerpo, array $archivos = []): array
     {
         $codigo = <<<'PHP'
 require getenv('R_BASE') . '/vendor/autoload.php';
 $app = require getenv('R_BASE') . '/bootstrap/app.php';
 $kernel = $app->make(Illuminate\Contracts\Http\Kernel::class);
 $json = getenv('R_BODY');
-$peticion = Illuminate\Http\Request::create(getenv('R_URL'), getenv('R_METHOD'), [], [], [], [
+$servidor = [
     'HTTP_AUTHORIZATION' => 'Bearer ' . getenv('R_TOKEN'),
     'HTTP_ACCEPT'        => 'application/json',
-    'CONTENT_TYPE'       => 'application/json',
-], $json !== '' ? $json : null);
+];
+$archivos = getenv('R_FILES') ? json_decode(getenv('R_FILES'), true) : [];
+if ($archivos) {
+    // Multipart: el cuerpo viaja como campos y cada ruta como archivo subido.
+    $subidos = [];
+    foreach ($archivos as $campo => $rutas) {
+        foreach ($rutas as $ruta) {
+            $subidos[$campo][] = new Illuminate\Http\UploadedFile($ruta, basename($ruta), null, null, true);
+        }
+    }
+    $peticion = Illuminate\Http\Request::create(getenv('R_URL'), getenv('R_METHOD'), $json !== '' ? json_decode($json, true) : [], [], $subidos, $servidor);
+} else {
+    $peticion = Illuminate\Http\Request::create(getenv('R_URL'), getenv('R_METHOD'), [], [], [], $servidor + ['CONTENT_TYPE' => 'application/json'], $json !== '' ? $json : null);
+}
 $respuesta = $kernel->handle($peticion);
 echo json_encode(['status' => $respuesta->getStatusCode(), 'body' => json_decode($respuesta->getContent(), true)]);
 PHP;
@@ -107,6 +124,7 @@ PHP;
             'R_METHOD' => $metodo,
             'R_TOKEN'  => $token,
             'R_BODY'   => $cuerpo ? json_encode($cuerpo) : '',
+            'R_FILES'  => $archivos ? json_encode($archivos) : '',
         ]);
 
         $proc = proc_open([PHP_BINARY, '-d', 'display_errors=1', '-d', 'error_reporting=-1', '-r', $codigo], [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes, null, $entorno);

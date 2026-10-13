@@ -430,6 +430,43 @@ class ReservaMaterialSprint9Test extends TestCase
         $this->assertSame('pendiente', $reserva->fresh()->estado);
     }
 
+    // ── Lote vendido ─────────────────────────────────────────────────────────
+    //
+    // Regresion (Task 2.3): `vendido` es terminal y no se deshace, asi que
+    // cancelar la reserva aceptada ya no libera nada. Antes `cancelar` no
+    // miraba el lote y el Resource seguia ofreciendo la accion a las dos
+    // partes: la reserva quedaba `cancelada` sobre una venta cerrada y la
+    // contraparte recibia un aviso de cancelacion falso. El escenario se arma
+    // con la API real (aceptar y despues marcar vendido), no con estados
+    // puestos a mano.
+
+    public function test_tras_vender_el_lote_ninguna_parte_ve_la_accion_de_cancelar(): void
+    {
+        [$reserva, , $vendedor, $comprador] = $this->reservaAceptadaDeLoteVendido();
+
+        foreach (['comprador' => $comprador->user, 'vendedor' => $vendedor->user] as $rol => $usuario) {
+            Sanctum::actingAs($usuario);
+
+            $this->assertSame([], $this->getJson("/api/reservas-material/{$reserva->id}")->json('reserva.acciones'),
+                "Al {$rol} no se le debe ofrecer ninguna accion sobre la reserva de un lote vendido.");
+        }
+    }
+
+    public function test_tras_vender_el_lote_ninguna_parte_puede_cancelar_la_reserva(): void
+    {
+        foreach (['comprador', 'vendedor'] as $quienCancela) {
+            [$reserva, $lote, $vendedor, $comprador] = $this->reservaAceptadaDeLoteVendido();
+
+            Sanctum::actingAs($quienCancela === 'comprador' ? $comprador->user : $vendedor->user);
+            $this->postJson("/api/reservas-material/{$reserva->id}/cancelar")->assertStatus(422);
+
+            $this->assertSame('aceptada', $reserva->fresh()->estado, "Cancela {$quienCancela}: la reserva de un lote vendido no debe cambiar.");
+            $this->assertSame('vendido', $lote->fresh()->estado);
+            $this->assertSame(0, Notificacion::whereIn('destinatario_id', [$comprador->user_id, $vendedor->user_id])
+                ->where('tipo', 'reserva_material_cancelada')->count(), "Cancela {$quienCancela}: no debe salir un aviso de cancelacion.");
+        }
+    }
+
     // ── Acciones calculadas por backend ──────────────────────────────────────
 
     public function test_el_backend_informa_que_acciones_permite_cada_rol_en_cada_estado(): void
@@ -463,6 +500,24 @@ class ReservaMaterialSprint9Test extends TestCase
         $lote = $this->crearLote($this->servicioCanceladoDesdeEnCamino($vendedor), $extra);
 
         return [$lote, $vendedor];
+    }
+
+    /**
+     * Reserva aceptada sobre un lote ya vendido, armada con la API real.
+     *
+     * @return array{0: ReservaMaterial, 1: PublicacionMaterial, 2: \App\Models\Proveedor, 3: \App\Models\Proveedor}
+     */
+    private function reservaAceptadaDeLoteVendido(): array
+    {
+        [$lote, $vendedor] = $this->loteDisponible();
+        $comprador = $this->crearProveedorComprador();
+        $reserva = $this->crearReserva($lote, $comprador);
+
+        Sanctum::actingAs($vendedor->user);
+        $this->postJson("/api/reservas-material/{$reserva->id}/aceptar")->assertOk();
+        $this->postJson("/api/materiales/{$lote->id}/vendido")->assertOk()->assertJsonPath('publicacion.estado', 'vendido');
+
+        return [$reserva, $lote, $vendedor, $comprador];
     }
 
     private function solicitar(PublicacionMaterial $lote, string $clave, string $mensaje = 'Me interesa el lote, ¿sigue disponible?')

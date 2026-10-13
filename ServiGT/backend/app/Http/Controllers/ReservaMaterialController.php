@@ -284,6 +284,13 @@ class ReservaMaterialController extends Controller
                 );
             }
 
+            // Un lote cerrado congela sus reservas. `vendido` es terminal y no se
+            // deshace: cancelar ya no libera nada y solo notificaria una
+            // cancelacion falsa sobre una venta cerrada.
+            if (in_array($lote->estado, ['vendido', 'retirado'], true)) {
+                return $this->error('Este lote ya se cerró; la reserva ya no se puede cancelar.', 422);
+            }
+
             $eraAceptada = $reserva->estado === 'aceptada';
             $reserva->update(['estado' => 'cancelada']);
 

@@ -65,6 +65,12 @@ class ReservaMaterialResource extends JsonResource
      */
     private function acciones(?string $rol): array
     {
+        // Un lote vendido o retirado congela sus reservas: no queda ninguna
+        // accion que ofrecer (ver ReservaMaterialController::cancelar).
+        if (in_array($this->publicacion?->estado, ['vendido', 'retirado'], true)) {
+            return [];
+        }
+
         return match (true) {
             $rol === 'vendedor' && $this->estado === 'pendiente' => $this->publicacion?->estado === 'disponible'
                 ? ['aceptar', 'rechazar']

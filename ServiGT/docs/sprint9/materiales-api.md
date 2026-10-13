@@ -73,7 +73,7 @@ Detalle para comprador o vendedor (`403` a otros, `404` si no existe).
 ### `POST /api/reservas-material/{id}/aceptar` · `/rechazar` · `/cancelar`
 - **aceptar** (vendedor, reserva `pendiente`, lote `disponible`): reserva → `aceptada`, lote → `reservado`, las demás `pendiente` → `rechazada`. Una reserva `cancelada` no se convierte en rechazada.
 - **rechazar** (vendedor, `pendiente`): → `rechazada`; el lote sigue disponible.
-- **cancelar**: el comprador cancela `pendiente` o `aceptada`; el vendedor solo `aceptada`. Cancelar una aceptada libera el lote (`disponible`).
+- **cancelar**: el comprador cancela `pendiente` o `aceptada`; el vendedor solo `aceptada`. Cancelar una aceptada libera el lote (`disponible`). Con el lote ya `vendido` o `retirado` no se cancela nada (`422`) y `acciones` llega vacío.
 
 Todas devuelven `{ reserva }`. Errores: `403` sin permiso · `404` · `422` estado inválido. Bloqueo: lote primero y reserva después.
 

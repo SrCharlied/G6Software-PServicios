@@ -2,6 +2,7 @@ import { Text, TouchableOpacity, View } from 'react-native';
 import styles from './providerStyles';
 import { StatusBadge } from './ProviderBadges';
 import { formatCurrency, formatDate } from './providerUtils';
+import { Button } from '../../components/ui';
 
 /**
  * Tarjeta de un servicio contratado con las acciones que corresponden a su
@@ -15,6 +16,7 @@ export default function ServicioCard({
   onIniciar,
   onFinalizar,
   onEnCamino,
+  onMaterial,
   compact = false,
 }) {
   const estado    = servicio.estado;
@@ -50,6 +52,11 @@ export default function ServicioCard({
           <Text style={styles.reasonLabel}>Motivo</Text>
           <Text style={styles.reasonText}>{servicio.motivo_cancelacion}</Text>
         </View>
+      ) : null}
+      {onMaterial && servicio.publicacion_material_id ? (
+        <Button kind="secondary" icon="package" onPress={() => onMaterial('MaterialDetail', { id: servicio.publicacion_material_id })}>Ver lote de materiales</Button>
+      ) : onMaterial && servicio.puede_publicar_materiales === true ? (
+        <Button kind="secondary" icon="package" onPress={() => onMaterial('MaterialCreate', { servicioId: servicio.id })}>Publicar materiales</Button>
       ) : null}
 
       {porConfirmar && servicio.codigo_fin ? (

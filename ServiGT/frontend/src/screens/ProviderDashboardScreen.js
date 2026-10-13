@@ -394,7 +394,7 @@ export default function ProviderDashboardScreen({
           />
         );
       case 'historial':
-        return <HistorialPanel historial={historial} loading={loadingSolicitudes} />;
+        return <HistorialPanel historial={historial} loading={loadingSolicitudes} onMaterial={(screen, params) => navigation.navigate(screen, params)} />;
       case 'calificaciones':
         return (
           <CalificacionesPanel

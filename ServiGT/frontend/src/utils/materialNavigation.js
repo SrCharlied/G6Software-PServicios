@@ -9,6 +9,10 @@ export const rutaDeMaterial = (screen, params = {}) => {
       return '/bolsa-materiales';
     case 'MaterialDetail':
       return params.id ? `/bolsa-materiales/${encodeURIComponent(params.id)}` : '/bolsa-materiales';
+    case 'MaterialCreate':
+      return params.servicioId ? `/bolsa-materiales/publicar?servicioId=${encodeURIComponent(params.servicioId)}` : '/bolsa-materiales';
+    case 'MaterialEdit':
+      return params.id ? `/bolsa-materiales/editar/${encodeURIComponent(params.id)}` : '/bolsa-materiales';
     case 'MisLotesMaterial':
       return '/bolsa-materiales/mias';
     case 'MisReservasMaterial':

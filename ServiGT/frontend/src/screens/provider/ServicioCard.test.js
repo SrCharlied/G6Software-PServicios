@@ -1,6 +1,7 @@
 import React from 'react';
 import { fireEvent, render } from '@testing-library/react-native';
 import ServicioCard from './ServicioCard';
+jest.mock('@expo/vector-icons', () => ({ Feather: () => null }));
 
 const servicio = (estado) => ({
   id: 21,
@@ -73,5 +74,25 @@ describe('ServicioCard aviso de trayecto', () => {
     const { queryByText } = renderCard('aceptado', { onEnCamino: undefined });
 
     expect(queryByText('Voy en camino')).toBeNull();
+  });
+});
+
+describe('ServicioCard materiales autorizados', () => {
+  it('publica solo cuando el backend entrega true', () => {
+    const onMaterial = jest.fn();
+    const { getByText } = render(<ServicioCard servicio={{ ...servicio('cancelado'), puede_publicar_materiales: true }} onMaterial={onMaterial} />);
+    fireEvent.press(getByText('Publicar materiales'));
+    expect(onMaterial).toHaveBeenCalledWith('MaterialCreate', { servicioId: 21 });
+  });
+  it.each([false, undefined, 'true'])('no infiere elegibilidad con %s', (permiso) => {
+    const { queryByText } = render(<ServicioCard servicio={{ ...servicio('cancelado'), puede_publicar_materiales: permiso }} onMaterial={jest.fn()} />);
+    expect(queryByText('Publicar materiales')).toBeNull();
+  });
+  it('prefiere abrir el lote existente', () => {
+    const onMaterial = jest.fn();
+    const { getByText, queryByText } = render(<ServicioCard servicio={{ ...servicio('cancelado'), puede_publicar_materiales: true, publicacion_material_id: 7 }} onMaterial={onMaterial} />);
+    expect(queryByText('Publicar materiales')).toBeNull();
+    fireEvent.press(getByText('Ver lote de materiales'));
+    expect(onMaterial).toHaveBeenCalledWith('MaterialDetail', { id: 7 });
   });
 });

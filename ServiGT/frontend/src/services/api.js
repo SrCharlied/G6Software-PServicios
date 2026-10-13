@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { Platform } from 'react-native';
 import {
   clearPrivateSessionStorage,
   migrateLegacySession,
@@ -865,6 +866,45 @@ export const solicitarReservaMaterial = async (id, datos) => {
     return response.data;
   } catch (error) {
     throwApiError(error, 'No se pudo solicitar la reserva.');
+  }
+};
+
+export const buildMaterialFormData = async (datos) => {
+  const form = new FormData();
+  ['servicio_id', 'titulo', 'descripcion', 'cantidad', 'unidad', 'precio_referencial', 'departamento', 'municipio'].forEach((key) => {
+    if (datos[key] !== undefined && datos[key] !== null) form.append(key, String(datos[key]));
+  });
+  for (const asset of datos.imagenes || []) {
+    const name = asset.fileName || asset.uri.split('/').pop() || 'material.jpg';
+    if (Platform.OS === 'web') {
+      const file = asset.file || await (await fetch(asset.uri)).blob();
+      form.append('imagenes[]', file, name);
+    } else {
+      form.append('imagenes[]', { uri: asset.uri, name, type: asset.mimeType });
+    }
+  }
+  (datos.eliminar_imagenes || []).forEach((id) => form.append('eliminar_imagenes[]', String(id)));
+  return form;
+};
+
+export const crearLoteMaterial = async (datos) => {
+  try {
+    const form = await buildMaterialFormData(datos);
+    const response = await api.post('/materiales', form, { headers: { 'Content-Type': 'multipart/form-data' } });
+    return response.data;
+  } catch (error) {
+    throwApiError(error, 'No se pudo publicar el lote.');
+  }
+};
+
+export const actualizarLoteMaterial = async (id, datos) => {
+  try {
+    const form = await buildMaterialFormData(datos);
+    form.append('_method', 'PUT');
+    const response = await api.post(`/materiales/${id}`, form, { headers: { 'Content-Type': 'multipart/form-data' } });
+    return response.data;
+  } catch (error) {
+    throwApiError(error, 'No se pudo actualizar el lote.');
   }
 };
 

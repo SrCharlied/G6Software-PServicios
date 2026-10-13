@@ -97,6 +97,7 @@ export default function MaterialDetailScreen({ navigation, user, materialId }) {
         <Input accessibilityLabel="Mensaje inicial" placeholder="Mensaje al vendedor" multiline maxLength={1000} value={mensaje} onChangeText={setMensaje} editable={!sending} />
         <Button onPress={solicitar} loading={sending} disabled={sending}>Solicitar reserva</Button>
       </View> : null}
+      {lote.es_mio && lote.estado === 'disponible' ? <Button kind="secondary" icon="edit-2" onPress={() => navigation.navigate('MaterialEdit', { id: lote.id })}>Editar lote</Button> : null}
     </ScrollView>
   );
 }

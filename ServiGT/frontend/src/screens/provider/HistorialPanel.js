@@ -3,7 +3,7 @@ import { T } from '../../theme';
 import styles from './providerStyles';
 import ServicioCard from './ServicioCard';
 
-export default function HistorialPanel({ historial, loading }) {
+export default function HistorialPanel({ historial, loading, onMaterial }) {
   return (
     <View style={styles.sectionStack}>
       <View style={styles.sectionHeaderRow}>
@@ -19,7 +19,7 @@ export default function HistorialPanel({ historial, loading }) {
         </View>
       ) : (
         historial.map((servicio) => (
-          <ServicioCard key={servicio.id} servicio={servicio} compact />
+          <ServicioCard key={servicio.id} servicio={servicio} compact onMaterial={onMaterial} />
         ))
       )}
     </View>

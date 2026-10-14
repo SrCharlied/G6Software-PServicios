@@ -26,6 +26,8 @@ const ESTADO_LABEL = {
   aceptado:    'Aceptados',
   en_camino:   'En camino',
   en_progreso: 'En progreso',
+  por_confirmar: 'Por confirmar',
+  interrumpido_seguridad: 'Interrumpidos por seguridad',
   completado:  'Completados',
   cancelado:   'Cancelados',
   rechazado:   'Rechazados',
@@ -607,6 +609,10 @@ export default function AdminDashboardScreen({ navigation, user }) {
             </TouchableOpacity>
           );
         })}
+        {/* Acceso a la cola del Centro de seguridad (pantalla propia). */}
+        <TouchableOpacity style={styles.tabBtn} onPress={() => navigation.navigate('ReportesSeguridad')}>
+          <Text style={styles.tabText}>Reportes de seguridad</Text>
+        </TouchableOpacity>
       </View>
 
       <View style={styles.tabContent}>

@@ -25,6 +25,7 @@ const NAV_BY_ROLE = {
     { label: 'Creditos',       path: '/creditos', icon: 'credit-card' },
     { label: 'Trabajos',       path: '/solicitudes', icon: 'briefcase' },
     { label: 'Mensajes',       path: '/chat', icon: 'message-circle' },
+    { label: 'Materiales',     path: '/bolsa-materiales', icon: 'package', match: ['/bolsa-materiales/', '/reservas-materiales'] },
     { label: 'Mi perfil',      path: '/profile/edit', icon: 'user' },
   ],
   admin: [

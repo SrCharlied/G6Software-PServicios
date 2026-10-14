@@ -7,6 +7,10 @@ use App\Http\Controllers\CategoriaController;
 use App\Http\Controllers\ProviderController;
 use App\Http\Controllers\HealthController;
 use App\Http\Controllers\MessageController;
+use App\Http\Controllers\PublicacionMaterialController;
+use App\Http\Controllers\ReporteSeguridadAdminController;
+use App\Http\Controllers\ReporteSeguridadController;
+use App\Http\Controllers\ReservaMaterialController;
 use App\Http\Controllers\ServicioController;
 use App\Http\Controllers\DisponibilidadController;
 use App\Http\Controllers\CalificacionController;
@@ -115,6 +119,13 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/mensajes/conversacion/{userId}', [MessageController::class, 'conversacion'])->where('userId', '[0-9]+');
     // Listar todas mis conversaciones
     Route::get('/mensajes/conversaciones', [MessageController::class, 'misConversaciones']);
+    // Sprint 9: bandeja por contexto e hilos tipados (servicio / reserva de material)
+    Route::get('/mensajes/hilos', [MessageController::class, 'hilos']);
+    Route::get('/mensajes/historial/{userId}', [MessageController::class, 'historial'])->where('userId', '[0-9]+');
+    Route::get('/mensajes/servicios/{servicioId}', [MessageController::class, 'conversacionServicio'])->where('servicioId', '[0-9]+');
+    Route::post('/mensajes/servicios/{servicioId}', [MessageController::class, 'enviarServicio'])->where('servicioId', '[0-9]+')->middleware('throttle:messages');
+    Route::get('/mensajes/reservas/{reservaId}', [MessageController::class, 'conversacionReserva'])->where('reservaId', '[0-9]+');
+    Route::post('/mensajes/reservas/{reservaId}', [MessageController::class, 'enviarReserva'])->where('reservaId', '[0-9]+')->middleware('throttle:messages');
 
     // ── Pedidos (Marketplace de Demanda) ─────────────────────────────────────
     Route::post('/pedidos',                              [PedidoController::class, 'store']);
@@ -145,8 +156,31 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/publicaciones/{id}/desactivar', [PublicacionServicioController::class, 'desactivar'])->where('id', '[0-9]+');
     Route::delete('/publicaciones/{id}', [PublicacionServicioController::class, 'destroy'])->where('id', '[0-9]+');
 
+    // ── Centro de seguridad (Sprint 9) ───────────────────────────────────────
+    Route::post('/servicios/{id}/seguridad/reportes',    [ReporteSeguridadController::class, 'crear'])->where('id', '[0-9]+')->middleware('throttle:uploads');
+    Route::post('/servicios/{id}/seguridad/interrumpir', [ReporteSeguridadController::class, 'interrumpir'])->where('id', '[0-9]+')->middleware('throttle:uploads');
+    Route::get('/seguridad/reportes/{id}',               [ReporteSeguridadController::class, 'show'])->where('id', '[0-9]+');
+    Route::post('/seguridad/reportes/{id}/evidencias',   [ReporteSeguridadController::class, 'subirEvidencia'])->where('id', '[0-9]+')->middleware('throttle:uploads');
+    Route::get('/seguridad/reportes/{id}/evidencias/{evidenciaId}/descargar', [ReporteSeguridadController::class, 'descargarEvidencia'])->where(['id' => '[0-9]+', 'evidenciaId' => '[0-9]+']);
+
+    // ── Bolsa de materiales (solo proveedores; Sprint 9) ─────────────────────
+    Route::get('/materiales',        [PublicacionMaterialController::class, 'index']);
+    Route::get('/materiales/mias',   [PublicacionMaterialController::class, 'mias']);
+    Route::post('/materiales',       [PublicacionMaterialController::class, 'store'])->middleware('throttle:uploads');
+    Route::get('/materiales/{id}',   [PublicacionMaterialController::class, 'show'])->where('id', '[0-9]+');
+    Route::put('/materiales/{id}',   [PublicacionMaterialController::class, 'update'])->where('id', '[0-9]+')->middleware('throttle:uploads');
+    Route::post('/materiales/{id}/retirar', [PublicacionMaterialController::class, 'retirar'])->where('id', '[0-9]+');
+    Route::post('/materiales/{id}/vendido', [PublicacionMaterialController::class, 'vendido'])->where('id', '[0-9]+');
+    Route::post('/materiales/{id}/reservas', [ReservaMaterialController::class, 'solicitar'])->where('id', '[0-9]+')->middleware('throttle:messages');
+    Route::get('/materiales/{id}/reservas',  [ReservaMaterialController::class, 'delLote'])->where('id', '[0-9]+');
+    Route::get('/reservas-material',         [ReservaMaterialController::class, 'mias']);
+    Route::get('/reservas-material/{id}',    [ReservaMaterialController::class, 'show'])->where('id', '[0-9]+');
+    Route::post('/reservas-material/{id}/aceptar',  [ReservaMaterialController::class, 'aceptar'])->where('id', '[0-9]+');
+    Route::post('/reservas-material/{id}/rechazar', [ReservaMaterialController::class, 'rechazar'])->where('id', '[0-9]+');
+    Route::post('/reservas-material/{id}/cancelar', [ReservaMaterialController::class, 'cancelar'])->where('id', '[0-9]+');
+
     // ── Notificaciones ───────────────────────────────────────────────────────
-    Route::get('/notificaciones',                [NotificacionController::class, 'index']);
+    Route::get('/notificaciones',               [NotificacionController::class, 'index']);
     Route::put('/notificaciones/{id}/leer',      [NotificacionController::class, 'marcarLeida'])->where('id', '[0-9]+');
     Route::put('/notificaciones/leer-todas',     [NotificacionController::class, 'marcarTodasLeidas']);
 
@@ -156,6 +190,10 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/usuarios',    [AdminController::class, 'listUsers']);
         Route::get('/proveedores', [AdminController::class, 'listProviders']);
         Route::get('/creditos-premium', [AdminController::class, 'creditosPremium']);
+        // Centro de seguridad (Sprint 9): cola, detalle y cambio de estado auditado.
+        Route::get('/reportes-seguridad', [ReporteSeguridadAdminController::class, 'index']);
+        Route::get('/reportes-seguridad/{id}', [ReporteSeguridadAdminController::class, 'show'])->where('id', '[0-9]+');
+        Route::post('/reportes-seguridad/{id}/estado', [ReporteSeguridadAdminController::class, 'cambiarEstado'])->where('id', '[0-9]+');
         Route::post('/proveedores/{proveedorId}/creditos', [AdminController::class, 'recargarCreditos'])
             ->where('proveedorId', '[0-9]+');
     });

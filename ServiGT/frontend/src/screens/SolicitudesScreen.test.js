@@ -53,6 +53,28 @@ const renderScreen = (role = 'cliente') => render(
 );
 
 describe('SolicitudesScreen codigo de inicio', () => {
+  it('refresca al volver de seguridad y oculta acciones del servicio interrumpido', async () => {
+    const user = { id: 4, role: 'cliente' };
+    const navigation = { navigate: jest.fn() };
+    getSolicitudesCliente.mockResolvedValueOnce({ servicios: [{ ...servicio('aceptado'), codigo_inicio: '048614' }] });
+    const screen = render(<SolicitudesScreen user={user} navigation={navigation} isFocused />);
+    await screen.findByText('Codigo de inicio');
+    screen.rerender(<SolicitudesScreen user={user} navigation={navigation} isFocused={false} />);
+    expect(getSolicitudesCliente).toHaveBeenCalledTimes(1);
+    getSolicitudesCliente.mockResolvedValueOnce({ servicios: [servicio('interrumpido_seguridad')] });
+    screen.rerender(<SolicitudesScreen user={user} navigation={navigation} isFocused />);
+    await screen.findByText('Interrumpido por seguridad');
+    expect(getSolicitudesCliente).toHaveBeenCalledTimes(2);
+    for (const label of ['Codigo de inicio', 'Cancelar servicio', 'Centro de seguridad']) expect(screen.queryByText(label)).toBeNull();
+  });
+  it('el proveedor consulta sus trabajos sin llamar al endpoint exclusivo de clientes', async () => {
+    jest.clearAllMocks();
+    getSolicitudesProveedor.mockResolvedValue({ servicios: [servicio('aceptado')] });
+    const { findByText } = renderScreen('proveedor');
+    await findByText('Reparar una fuga de agua');
+    expect(getSolicitudesProveedor).toHaveBeenCalledTimes(1);
+    expect(getSolicitudesCliente).not.toHaveBeenCalled();
+  });
   beforeEach(() => {
     jest.clearAllMocks();
   });

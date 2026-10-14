@@ -2,10 +2,14 @@ import { Text, TouchableOpacity, View } from 'react-native';
 import styles from './providerStyles';
 import { StatusBadge } from './ProviderBadges';
 import { formatCurrency, formatDate } from './providerUtils';
+import { Button } from '../../components/ui';
+import { useRouter } from 'expo-router';
+import { canOpenSafety } from '../../utils/serviceSafety';
 
 /**
  * Tarjeta de un servicio contratado con las acciones que corresponden a su
- * estado: aceptar/rechazar, iniciar con codigo o finalizar.
+ * estado: aceptar/rechazar, avisar que va en camino, iniciar con codigo o
+ * finalizar.
  */
 export default function ServicioCard({
   servicio,
@@ -13,11 +17,18 @@ export default function ServicioCard({
   onReject,
   onIniciar,
   onFinalizar,
+  onEnCamino,
+  onMaterial,
   compact = false,
 }) {
+  const router = useRouter();
   const estado    = servicio.estado;
   const canAccept = estado === 'pendiente';
-  const canStart  = estado === 'aceptado';
+  // El backend acepta el codigo de inicio desde `aceptado` y desde
+  // `en_camino`. Si aqui solo se contemplara `aceptado`, un servicio marcado
+  // en camino se quedaria sin ninguna accion disponible.
+  const canStart  = estado === 'aceptado' || estado === 'en_camino';
+  const canMarkEnRoute = estado === 'aceptado';
   const canFinish = estado === 'en_progreso';
   const porConfirmar = estado === 'por_confirmar';
 
@@ -45,6 +56,11 @@ export default function ServicioCard({
           <Text style={styles.reasonText}>{servicio.motivo_cancelacion}</Text>
         </View>
       ) : null}
+      {onMaterial && servicio.publicacion_material_id ? (
+        <Button kind="secondary" icon="package" onPress={() => onMaterial('MaterialDetail', { id: servicio.publicacion_material_id })}>Ver lote de materiales</Button>
+      ) : onMaterial && servicio.puede_publicar_materiales === true ? (
+        <Button kind="secondary" icon="package" onPress={() => onMaterial('MaterialCreate', { servicioId: servicio.id })}>Publicar materiales</Button>
+      ) : null}
 
       {porConfirmar && servicio.codigo_fin ? (
         <View style={styles.codigoFinBox}>
@@ -67,6 +83,11 @@ export default function ServicioCard({
         </View>
       ) : canStart ? (
         <View style={styles.actionRow}>
+          {canMarkEnRoute && onEnCamino ? (
+            <TouchableOpacity style={styles.enRouteBtn} onPress={() => onEnCamino(servicio.id)}>
+              <Text style={styles.enRouteBtnText}>Voy en camino</Text>
+            </TouchableOpacity>
+          ) : null}
           <TouchableOpacity style={styles.advanceBtn} onPress={() => onIniciar(servicio)}>
             <Text style={styles.advanceBtnText}>Iniciar servicio</Text>
           </TouchableOpacity>
@@ -78,6 +99,7 @@ export default function ServicioCard({
           </TouchableOpacity>
         </View>
       ) : null}
+      {canOpenSafety(estado) ? <Button kind="secondary" icon="shield" onPress={() => router.push(`/seguridad/servicios/${servicio.id}`)}>Centro de seguridad</Button> : null}
     </View>
   );
 }

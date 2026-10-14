@@ -13,6 +13,7 @@ export default function AdminRoute() {
   const navigation = {
     navigate: (name) => {
       if (name?.toLowerCase() === 'home') { router.replace('/home'); return; }
+      if (name === 'ReportesSeguridad') { router.push('/admin/reportes-seguridad'); return; }
       router.push('/home');
     },
   };

@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import {
   aceptarServicio,
+  actualizarEstadoServicio,
   descargarDocumento,
   finalizarServicio,
   getCalificacionesProveedor,
@@ -49,7 +50,7 @@ import { buildDisponibilidad, TABS } from './provider/providerUtils';
  * son los mismos que antes de dividir el archivo.
  */
 export default function ProviderDashboardScreen({
-  navigation, user, providerProfile, setProviderProfile, onLogout,
+  navigation, user, providerProfile, setProviderProfile, onLogout, isFocused = true,
 }) {
   const toast = useToast();
 
@@ -101,7 +102,7 @@ export default function ProviderDashboardScreen({
     [solicitudes],
   );
   const historial = useMemo(
-    () => solicitudes.filter((i) => ['completado', 'rechazado', 'cancelado'].includes(i.estado)),
+    () => solicitudes.filter((i) => ['completado', 'rechazado', 'cancelado', 'interrumpido_seguridad'].includes(i.estado)),
     [solicitudes],
   );
 
@@ -116,9 +117,10 @@ export default function ProviderDashboardScreen({
   }, [providerProfile]);
 
   useEffect(() => {
+    if (!isFocused) return;
     if (!profile && user) { loadProfile(); return; }
     if (profile) loadDashboardData(profile);
-  }, [user, profile?.id]);
+  }, [user, profile?.id, isFocused]);
 
   useEffect(() => {
     if (activeTab === 'oportunidades') {
@@ -251,6 +253,16 @@ export default function ProviderDashboardScreen({
     finally { setMutatingServiceId(null); }
   };
 
+  // Aviso opcional de trayecto. El backend solo admite `aceptado -> en_camino`
+  // y el codigo de inicio sigue siendo obligatorio para arrancar: marcar el
+  // camino no adelanta ningun paso del handshake.
+  const handleEnCamino = async (id) => {
+    setMutatingServiceId(id);
+    try { await actualizarEstadoServicio(id, 'en_camino'); toast('Avisaste que vas en camino.', 'success'); await refreshSolicitudes(); }
+    catch (error) { toast(error.message, 'error'); }
+    finally { setMutatingServiceId(null); }
+  };
+
   const handleReject = async (id) => {
     setMutatingServiceId(id);
     try { await rechazarServicio(id); toast('Solicitud rechazada.', 'info'); await refreshSolicitudes(); }
@@ -378,12 +390,10 @@ export default function ProviderDashboardScreen({
           <MensajesPanel
             solicitudes={solicitudes}
             loading={loadingSolicitudes}
-            onAbrirChat={(cliente) =>
-              navigation.navigate('Chat', { chatWithUserId: cliente.userId, chatWithName: cliente.name })}
           />
         );
       case 'historial':
-        return <HistorialPanel historial={historial} loading={loadingSolicitudes} />;
+        return <HistorialPanel historial={historial} loading={loadingSolicitudes} onMaterial={(screen, params) => navigation.navigate(screen, params)} />;
       case 'calificaciones':
         return (
           <CalificacionesPanel
@@ -418,6 +428,7 @@ export default function ProviderDashboardScreen({
             onReject={handleReject}
             onIniciar={openIniciar}
             onFinalizar={openFinalizar}
+            onEnCamino={handleEnCamino}
           />
         );
     }

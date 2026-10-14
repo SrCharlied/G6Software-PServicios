@@ -8,7 +8,10 @@ class StorePedidoRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user() !== null;
+        // Solo un cliente publica pedidos (Task 1.1, Sprint 9). Se decide aqui y
+        // no en el controlador para que un rol incorrecto reciba 403 antes de la
+        // validacion, sin enterarse de las reglas del formulario.
+        return $this->user()?->role === 'cliente';
     }
 
     public function rules(): array

@@ -32,6 +32,14 @@ class CotizacionController extends Controller
      */
     public function store(Request $request, int $pedidoId): JsonResponse
     {
+        // Cotizar es exclusivo del rol proveedor (Task 1.1, Sprint 9). Tener
+        // perfil no basta: un cliente pudo crearse uno antes de que
+        // `POST /providers` exigiera el rol, y lo conserva. Va antes de validar
+        // para que un rol incorrecto no reciba los errores del formulario.
+        if ($request->user()->role !== 'proveedor') {
+            return $this->error('Solo un proveedor puede enviar cotizaciones.', 403);
+        }
+
         $validated = $request->validate([
             'monto'   => 'required|numeric|min:1|max:999999.99',
             'mensaje' => 'required|string|min:20|max:500',
@@ -42,6 +50,13 @@ class CotizacionController extends Controller
         $pedido = Pedido::where('estado', 'abierto')
             ->where('fecha_expiracion', '>', now())
             ->findOrFail($pedidoId);
+
+        // Cotizar un pedido propio es el primer paso de la auto-adjudicacion. Un
+        // proveedor solo puede tener pedidos legados, publicados antes de que
+        // `StorePedidoRequest` exigiera el rol cliente.
+        if ($pedido->cliente_id === $request->user()->id) {
+            return $this->error('No puedes cotizar un pedido propio.', 403);
+        }
 
         $existe = Cotizacion::where('pedido_id', $pedidoId)
             ->where('proveedor_id', $proveedor->id)
@@ -126,23 +141,40 @@ class CotizacionController extends Controller
 
         $proveedor = Proveedor::where('user_id', $request->user()->id)->firstOrFail();
 
-        $cotizacion = Cotizacion::where('id', $cotizacionId)
-            ->where('pedido_id', $pedidoId)
-            ->where('proveedor_id', $proveedor->id)
-            ->firstOrFail();
+        $resultado = DB::transaction(function () use ($proveedor, $pedidoId, $cotizacionId, $validated) {
+            // Mismo orden de locks que `aceptar` (pedido -> cotizacion) para que
+            // una edicion y una adjudicacion concurrentes se serialicen sin
+            // interbloqueo y dejen un unico resultado valido.
+            $pedido = Pedido::query()->lockForUpdate()->find($pedidoId);
 
-        $credito     = CreditoProveedor::where('proveedor_id', $proveedor->id)->first();
-        $saldoActual = $credito?->saldo ?? 0;
+            $cotizacion = $pedido
+                ? Cotizacion::query()
+                    ->where('id', $cotizacionId)
+                    ->where('pedido_id', $pedidoId)
+                    ->where('proveedor_id', $proveedor->id)
+                    ->lockForUpdate()
+                    ->first()
+                : null;
 
-        if ($saldoActual < 1) {
-            return $this->error('Saldo insuficiente. Recarga créditos para editar tu cotización.', 422);
-        }
+            if (!$cotizacion) {
+                return ['error' => 'Cotización no encontrada.', 'status' => 404];
+            }
 
-        $nuevoSaldo = null;
+            if ($cotizacion->estado !== 'enviada') {
+                return ['error' => 'Solo se pueden editar cotizaciones enviadas.', 'status' => 422];
+            }
 
-        DB::transaction(function () use ($proveedor, $pedidoId, $cotizacionId, $credito, $cotizacion, $validated, &$nuevoSaldo) {
+            if ($pedido->estado !== 'abierto' || $pedido->fecha_expiracion->isPast()) {
+                return ['error' => 'El pedido ya no admite cambios en las cotizaciones.', 'status' => 422];
+            }
+
+            $credito = CreditoProveedor::where('proveedor_id', $proveedor->id)->lockForUpdate()->first();
+
+            if (($credito?->saldo ?? 0) < 1) {
+                return ['error' => 'Saldo insuficiente. Recarga créditos para editar tu cotización.', 'status' => 422];
+            }
+
             $credito->decrement('saldo', 1);
-            $nuevoSaldo = $credito->fresh()->saldo;
 
             TransaccionCredito::create([
                 'proveedor_id'  => $proveedor->id,
@@ -156,12 +188,15 @@ class CotizacionController extends Controller
                 'monto'   => $validated['monto'],
                 'mensaje' => $validated['mensaje'],
             ]);
+
+            return ['cotizacion' => $cotizacion->fresh(), 'nuevo_saldo' => $credito->fresh()->saldo];
         });
 
-        return $this->success('Cotización actualizada correctamente.', [
-            'cotizacion'  => $cotizacion->fresh(),
-            'nuevo_saldo' => $nuevoSaldo,
-        ]);
+        if (isset($resultado['error'])) {
+            return $this->error($resultado['error'], $resultado['status']);
+        }
+
+        return $this->success('Cotización actualizada correctamente.', $resultado);
     }
 
     /**
@@ -170,6 +205,12 @@ class CotizacionController extends Controller
      */
     public function aceptar(Request $request, int $pedidoId, int $cotizacionId): JsonResponse
     {
+        // Adjudicar es una accion de cliente (Task 1.1, Sprint 9). Un proveedor
+        // que conserve un pedido legado no la ejerce.
+        if ($request->user()->role !== 'cliente') {
+            return $this->error('Solo un cliente puede adjudicar cotizaciones.', 403);
+        }
+
         $resultado = DB::transaction(function () use ($request, $pedidoId, $cotizacionId) {
             $pedido = Pedido::query()
                 ->lockForUpdate()
@@ -190,6 +231,15 @@ class CotizacionController extends Controller
 
             if (!$cotizacion) {
                 return ['error' => 'Cotización no encontrada para este pedido.', 'status' => 404];
+            }
+
+            // Ultima linea contra la auto-adjudicacion. Las guardas de creacion
+            // impiden armar la cadena desde hoy, pero no reparan datos legados:
+            // un cliente que se creo perfil de proveedor antes de Sprint 9 puede
+            // tener ya guardada una cotizacion a su propio pedido. Adjudicarla
+            // crearia un servicio con la misma persona en ambos lados.
+            if ((int) $cotizacion->proveedor()->value('user_id') === (int) $pedido->cliente_id) {
+                return ['error' => 'No puedes adjudicarte una cotizacion propia.', 'status' => 403];
             }
 
             if ($pedido->estado !== 'abierto') {

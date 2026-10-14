@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Resources\CalificacionResource;
 use App\Models\Calificacion;
 use App\Models\Proveedor;
 use App\Models\Servicio;
@@ -81,7 +82,11 @@ class CalificacionController extends Controller
         return $this->calificarServicio((int) $request->input('servicio_id'), $request);
     }
 
-    // Ver calificaciones de un proveedor
+    /**
+     * GET /api/providers/{id}/calificaciones  (publica)
+     * Resenas del proveedor, la mas reciente primero, serializadas con
+     * CalificacionResource: del autor solo viajan `id` y `name` (task 1.3).
+     */
     public function porProveedor(int $proveedorId): JsonResponse
     {
         $proveedor = Proveedor::find($proveedorId);
@@ -89,13 +94,15 @@ class CalificacionController extends Controller
             return response()->json(['message' => 'Proveedor no encontrado'], 404);
         }
 
-        $calificaciones = Calificacion::with('autor')
+        // Del autor se cargan solo id y name: el resto de columnas de `users`
+        // ni siquiera llega a memoria.
+        $calificaciones = Calificacion::with('autor:id,name')
             ->where('destinatario_id', $proveedor->user_id)
             ->orderBy('created_at', 'desc')
             ->get();
 
         return response()->json([
-            'calificaciones'        => $calificaciones,
+            'calificaciones'        => CalificacionResource::collection($calificaciones),
             'promedio'              => $proveedor->calificacion_promedio,
             'total_calificaciones'  => $proveedor->total_calificaciones,
         ]);

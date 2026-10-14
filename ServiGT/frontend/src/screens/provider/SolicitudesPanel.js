@@ -17,6 +17,7 @@ export default function SolicitudesPanel({
   onReject,
   onIniciar,
   onFinalizar,
+  onEnCamino,
 }) {
   if (loading && solicitudes.length === 0) {
     return <ActivityIndicator color={T.blue} style={styles.sectionLoader} />;
@@ -30,6 +31,7 @@ export default function SolicitudesPanel({
         onReject={onReject}
         onIniciar={onIniciar}
         onFinalizar={onFinalizar}
+        onEnCamino={onEnCamino}
       />
     </View>
   );

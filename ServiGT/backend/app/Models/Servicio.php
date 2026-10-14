@@ -26,6 +26,7 @@ class Servicio extends Model
         'codigo_inicio',
         'codigo_fin',
         'motivo_cancelacion',
+        'cancelado_desde',
     ];
 
     protected $casts = [
@@ -51,6 +52,16 @@ class Servicio extends Model
     public function publicacion()
     {
         return $this->belongsTo(PublicacionServicio::class, 'publicacion_id');
+    }
+
+    public function reportesSeguridad()
+    {
+        return $this->hasMany(ReporteSeguridad::class, 'servicio_id');
+    }
+
+    public function publicacionMaterial()
+    {
+        return $this->hasOne(PublicacionMaterial::class, 'servicio_id');
     }
 
     public function calificaciones()

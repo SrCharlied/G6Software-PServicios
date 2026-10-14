@@ -2,7 +2,10 @@
 // real de docker compose (frontend :8086, backend :8085). Usa un correo con
 // prefijo "smoke-" identificable para poder limpiarlo despues, tal como pide
 // AGENTS.md para datos de prueba en ambientes compartidos.
-const { test, expect } = require('@playwright/test');
+const { test, expect, request } = require('@playwright/test');
+const { requireLocalStack, cleanupAccounts, respectRetryAfter } = require('./helpers/local-smoke');
+const API_URL = process.env.E2E_API_URL || 'http://localhost:8085/api';
+test.use({ trace: 'off' });
 
 // Timestamp en el correo: cada corrida usa una cuenta nueva y no colisiona
 // con ejecuciones anteriores que no se hayan limpiado.
@@ -10,7 +13,24 @@ const stamp = Date.now();
 const emailLower = `smoke-e2e-${stamp}@servigt.test`;
 const emailMixedCase = `Smoke-E2E-${stamp}@ServiGT.test`;
 
-test.describe('Registro endurecido (task 4.1)', () => {
+test.describe.serial('Registro endurecido (task 4.1)', () => {
+  test.beforeAll(async () => {
+    test.setTimeout(90_000); // Fixture: esperar el limite real, no ampliar los tests de UI.
+    requireLocalStack(API_URL);
+    const api = await request.newContext({ extraHTTPHeaders: { Accept: 'application/json' } });
+    try {
+      // Una validacion sin datos no crea usuarios. Reservar dos intentos de UI
+      // evita que una corrida previa transforme el caso de duplicado en un 429.
+      for (let attempt = 0; attempt < 5; attempt++) {
+        const response = await api.post(`${API_URL}/register`, { data: {} });
+        if (await respectRetryAfter(response)) continue;
+        expect(response.status()).toBe(422);
+        if (Number(response.headers()['x-ratelimit-remaining']) >= 2) return;
+      }
+      throw new Error('No se libero la ventana de registro.');
+    } finally { await api.dispose(); }
+  });
+  test.afterAll(() => cleanupAccounts([emailLower]));
   test('registra una cuenta nueva y redirige a home', async ({ page }) => {
     await page.goto('/register');
 
@@ -37,7 +57,7 @@ test.describe('Registro endurecido (task 4.1)', () => {
     await page.getByText('Cliente', { exact: true }).click();
     await page.getByText('Crear cuenta', { exact: true }).last().click();
 
-    await expect(page.getByText(/correo electronico ya esta registrado/i)).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText(/correo electronico ya esta registrado/i).first()).toBeVisible({ timeout: 10_000 });
     // Se queda en /register: no hubo redireccion a home.
     await expect(page).toHaveURL(/\/register$/);
   });

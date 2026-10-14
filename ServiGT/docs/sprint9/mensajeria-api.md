@@ -29,6 +29,7 @@ Acceso: solo los dos participantes (cliente y proveedor del servicio; comprador 
 - Solo se marcan como leídos los mensajes recibidos **de ese hilo**.
 - Un mensaje histórico con `servicio_id` de un servicio donde esas dos personas no son parte no aparece en ese hilo.
 - Un servicio en `interrumpido_seguridad` (estado terminal de la Task 5.1) conserva la lectura y rechaza `POST` con `409`.
+- El envío tipado y el legacy bloquean el servicio dentro de una transacción y revalidan participantes y estado antes de guardar. Si la interrupción confirma primero, el envío concurrente responde `409` sin crear mensajes; si el envío confirma primero, su mensaje permanece en el historial de solo lectura.
 
 `POST` responde `201 { message, mensaje }`.
 

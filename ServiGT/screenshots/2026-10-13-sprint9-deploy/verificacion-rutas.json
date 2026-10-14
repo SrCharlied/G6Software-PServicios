@@ -1,0 +1,149 @@
+[
+  {
+    "width": 1440,
+    "route": "/",
+    "status": 200,
+    "finalUrl": "https://servigtdev.com/landing",
+    "unmatched": false
+  },
+  {
+    "width": 1440,
+    "route": "/login",
+    "status": 200,
+    "finalUrl": "https://servigtdev.com/login",
+    "unmatched": false
+  },
+  {
+    "width": 1440,
+    "route": "/bolsa-materiales",
+    "status": 200,
+    "finalUrl": "https://servigtdev.com/landing",
+    "unmatched": false
+  },
+  {
+    "width": 1440,
+    "route": "/bolsa-materiales/mias",
+    "status": 200,
+    "finalUrl": "https://servigtdev.com/landing",
+    "unmatched": false
+  },
+  {
+    "width": 1440,
+    "route": "/reservas-materiales",
+    "status": 200,
+    "finalUrl": "https://servigtdev.com/landing",
+    "unmatched": false
+  },
+  {
+    "width": 1440,
+    "route": "/admin/reportes-seguridad",
+    "status": 200,
+    "finalUrl": "https://servigtdev.com/landing",
+    "unmatched": false
+  },
+  {
+    "width": 1440,
+    "route": "/seguridad/servicios/1",
+    "status": 200,
+    "finalUrl": "https://servigtdev.com/landing",
+    "unmatched": false
+  },
+  {
+    "width": 1024,
+    "route": "/",
+    "status": 200,
+    "finalUrl": "https://servigtdev.com/landing",
+    "unmatched": false
+  },
+  {
+    "width": 1024,
+    "route": "/login",
+    "status": 200,
+    "finalUrl": "https://servigtdev.com/login",
+    "unmatched": false
+  },
+  {
+    "width": 1024,
+    "route": "/bolsa-materiales",
+    "status": 200,
+    "finalUrl": "https://servigtdev.com/landing",
+    "unmatched": false
+  },
+  {
+    "width": 1024,
+    "route": "/bolsa-materiales/mias",
+    "status": 200,
+    "finalUrl": "https://servigtdev.com/landing",
+    "unmatched": false
+  },
+  {
+    "width": 1024,
+    "route": "/reservas-materiales",
+    "status": 200,
+    "finalUrl": "https://servigtdev.com/landing",
+    "unmatched": false
+  },
+  {
+    "width": 1024,
+    "route": "/admin/reportes-seguridad",
+    "status": 200,
+    "finalUrl": "https://servigtdev.com/landing",
+    "unmatched": false
+  },
+  {
+    "width": 1024,
+    "route": "/seguridad/servicios/1",
+    "status": 200,
+    "finalUrl": "https://servigtdev.com/landing",
+    "unmatched": false
+  },
+  {
+    "width": 390,
+    "route": "/",
+    "status": 200,
+    "finalUrl": "https://servigtdev.com/landing",
+    "unmatched": false
+  },
+  {
+    "width": 390,
+    "route": "/login",
+    "status": 200,
+    "finalUrl": "https://servigtdev.com/login",
+    "unmatched": false
+  },
+  {
+    "width": 390,
+    "route": "/bolsa-materiales",
+    "status": 200,
+    "finalUrl": "https://servigtdev.com/landing",
+    "unmatched": false
+  },
+  {
+    "width": 390,
+    "route": "/bolsa-materiales/mias",
+    "status": 200,
+    "finalUrl": "https://servigtdev.com/landing",
+    "unmatched": false
+  },
+  {
+    "width": 390,
+    "route": "/reservas-materiales",
+    "status": 200,
+    "finalUrl": "https://servigtdev.com/landing",
+    "unmatched": false
+  },
+  {
+    "width": 390,
+    "route": "/admin/reportes-seguridad",
+    "status": 200,
+    "finalUrl": "https://servigtdev.com/landing",
+    "unmatched": false
+  },
+  {
+    "width": 390,
+    "route": "/seguridad/servicios/1",
+    "status": 200,
+    "finalUrl": "https://servigtdev.com/landing",
+    "unmatched": false
+  }
+]

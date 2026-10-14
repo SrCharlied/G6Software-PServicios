@@ -59,20 +59,9 @@ class MessageController extends Controller
             return $ctx;
         }
 
-        [$servicio, $yo, $contraparteId] = $ctx;
-
         $validated = $request->validate(['contenido' => 'required|string|max:2000']);
 
-        if ($servicio->estado === self::ESTADO_SERVICIO_SOLO_LECTURA) {
-            return $this->error('Este servicio fue interrumpido por seguridad: el chat es de solo lectura.', 409);
-        }
-
-        return $this->guardar([
-            'emisor_id'   => $yo,
-            'receptor_id' => $contraparteId,
-            'servicio_id' => $servicio->id,
-            'contenido'   => $validated['contenido'],
-        ]);
+        return $this->guardarServicio($servicioId, $request->user(), $validated['contenido']);
     }
 
     // ── Hilos tipados: reserva de material ───────────────────────────────────
@@ -241,22 +230,7 @@ class MessageController extends Controller
             $servicioId = (int) $comunes->first();
         }
 
-        if (Servicio::whereKey($servicioId)->value('estado') === self::ESTADO_SERVICIO_SOLO_LECTURA) {
-            return $this->error('Este servicio fue interrumpido por seguridad: el chat es de solo lectura.', 409);
-        }
-
-        $mensaje = Mensaje::create([
-            'emisor_id'   => $emisorId,
-            'receptor_id' => $receptorId,
-            'servicio_id' => $servicioId,
-            'contenido'   => $validated['contenido'],
-        ]);
-        $mensaje->load(['emisor:id,name,role,foto_perfil', 'receptor:id,name,role,foto_perfil']);
-
-        return response()->json([
-            'message' => 'Mensaje enviado',
-            'mensaje' => $mensaje,
-        ], 201);
+        return $this->guardarServicio($servicioId, $request->user(), $validated['contenido'], $receptorId);
     }
 
     /**
@@ -317,9 +291,13 @@ class MessageController extends Controller
     // ── Internos ─────────────────────────────────────────────────────────────
 
     /** @return array{0: Servicio, 1: int, 2: int}|JsonResponse [servicio, yo, contraparte] */
-    private function contextoServicio(int $servicioId, User $user): array|JsonResponse
+    private function contextoServicio(int $servicioId, User $user, bool $bloquear = false): array|JsonResponse
     {
-        $servicio = Servicio::with('proveedor')->find($servicioId);
+        $consulta = Servicio::with('proveedor');
+        if ($bloquear) {
+            $consulta->lockForUpdate();
+        }
+        $servicio = $consulta->find($servicioId);
 
         if (!$servicio) {
             return $this->error('Servicio no encontrado.', 404);
@@ -392,6 +370,34 @@ class MessageController extends Controller
         }
 
         return response()->json($respuesta);
+    }
+
+    /** Serializa ambos canales de envio con la interrupcion de seguridad. */
+    private function guardarServicio(int $servicioId, User $user, string $contenido, ?int $receptorEsperado = null): JsonResponse
+    {
+        return DB::transaction(function () use ($servicioId, $user, $contenido, $receptorEsperado) {
+            // Relee permisos y estado bajo el mismo lock que toma interrumpir.
+            // El lock se conserva hasta que el mensaje queda guardado o rechazado.
+            $ctx = $this->contextoServicio($servicioId, $user, bloquear: true);
+            if ($ctx instanceof JsonResponse) {
+                return $ctx;
+            }
+            [$servicio, $yo, $contraparteId] = $ctx;
+
+            if ($receptorEsperado !== null && $receptorEsperado !== $contraparteId) {
+                return $this->error('El servicio indicado no te vincula con ese usuario.', 403);
+            }
+            if ($servicio->estado === self::ESTADO_SERVICIO_SOLO_LECTURA) {
+                return $this->error('Este servicio fue interrumpido por seguridad: el chat es de solo lectura.', 409);
+            }
+
+            return $this->guardar([
+                'emisor_id' => $yo,
+                'receptor_id' => $contraparteId,
+                'servicio_id' => $servicio->id,
+                'contenido' => $contenido,
+            ]);
+        });
     }
 
     private function guardar(array $datos): JsonResponse

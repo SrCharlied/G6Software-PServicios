@@ -1,0 +1,170 @@
+[
+  {
+    "width": 1440,
+    "role": "proveedor",
+    "path": "/bolsa-materiales",
+    "screenshot": "1440-bolsa-materiales.png",
+    "contentVerified": "Azulejos para baño",
+    "apiErrors": []
+  },
+  {
+    "width": 1440,
+    "role": "proveedor",
+    "path": "/bolsa-materiales/mias",
+    "screenshot": "1440-mis-lotes.png",
+    "contentVerified": "Tubería PVC sobrante",
+    "apiErrors": []
+  },
+  {
+    "width": 1440,
+    "role": "proveedor",
+    "path": "/reservas-materiales",
+    "screenshot": "1440-mis-reservas.png",
+    "contentVerified": "SMOKE Confirmo mi interés",
+    "apiErrors": []
+  },
+  {
+    "width": 1440,
+    "role": "proveedor",
+    "path": "/bolsa-materiales/3",
+    "screenshot": "1440-detalle-lote.png",
+    "contentVerified": "Detalle del lote",
+    "apiErrors": []
+  },
+  {
+    "width": 1440,
+    "role": "proveedor",
+    "path": "/seguridad/servicios/1",
+    "screenshot": "1440-centro-seguridad.png",
+    "contentVerified": "Enviar reporte",
+    "apiErrors": []
+  },
+  {
+    "width": 1440,
+    "role": "admin",
+    "path": "/admin/reportes-seguridad",
+    "screenshot": "1440-admin-reportes-seguridad.png",
+    "contentVerified": "Ver detalle",
+    "apiErrors": []
+  },
+  {
+    "width": 1440,
+    "role": "admin",
+    "path": "/admin/reportes-seguridad",
+    "screenshot": "1440-admin-detalle-reporte.png",
+    "contentVerified": "Detalle del reporte",
+    "apiErrors": []
+  },
+  {
+    "width": 1024,
+    "role": "proveedor",
+    "path": "/bolsa-materiales",
+    "screenshot": "1024-bolsa-materiales.png",
+    "contentVerified": "Azulejos para baño",
+    "apiErrors": []
+  },
+  {
+    "width": 1024,
+    "role": "proveedor",
+    "path": "/bolsa-materiales/mias",
+    "screenshot": "1024-mis-lotes.png",
+    "contentVerified": "Tubería PVC sobrante",
+    "apiErrors": []
+  },
+  {
+    "width": 1024,
+    "role": "proveedor",
+    "path": "/reservas-materiales",
+    "screenshot": "1024-mis-reservas.png",
+    "contentVerified": "SMOKE Confirmo mi interés",
+    "apiErrors": []
+  },
+  {
+    "width": 1024,
+    "role": "proveedor",
+    "path": "/bolsa-materiales/3",
+    "screenshot": "1024-detalle-lote.png",
+    "contentVerified": "Detalle del lote",
+    "apiErrors": []
+  },
+  {
+    "width": 1024,
+    "role": "proveedor",
+    "path": "/seguridad/servicios/1",
+    "screenshot": "1024-centro-seguridad.png",
+    "contentVerified": "Enviar reporte",
+    "apiErrors": []
+  },
+  {
+    "width": 1024,
+    "role": "admin",
+    "path": "/admin/reportes-seguridad",
+    "screenshot": "1024-admin-reportes-seguridad.png",
+    "contentVerified": "Ver detalle",
+    "apiErrors": []
+  },
+  {
+    "width": 1024,
+    "role": "admin",
+    "path": "/admin/reportes-seguridad",
+    "screenshot": "1024-admin-detalle-reporte.png",
+    "contentVerified": "Detalle del reporte",
+    "apiErrors": []
+  },
+  {
+    "width": 390,
+    "role": "proveedor",
+    "path": "/bolsa-materiales",
+    "screenshot": "390-bolsa-materiales.png",
+    "contentVerified": "Azulejos para baño",
+    "apiErrors": []
+  },
+  {
+    "width": 390,
+    "role": "proveedor",
+    "path": "/bolsa-materiales/mias",
+    "screenshot": "390-mis-lotes.png",
+    "contentVerified": "Tubería PVC sobrante",
+    "apiErrors": []
+  },
+  {
+    "width": 390,
+    "role": "proveedor",
+    "path": "/reservas-materiales",
+    "screenshot": "390-mis-reservas.png",
+    "contentVerified": "SMOKE Confirmo mi interés",
+    "apiErrors": []
+  },
+  {
+    "width": 390,
+    "role": "proveedor",
+    "path": "/bolsa-materiales/3",
+    "screenshot": "390-detalle-lote.png",
+    "contentVerified": "Detalle del lote",
+    "apiErrors": []
+  },
+  {
+    "width": 390,
+    "role": "proveedor",
+    "path": "/seguridad/servicios/1",
+    "screenshot": "390-centro-seguridad.png",
+    "contentVerified": "Enviar reporte",
+    "apiErrors": []
+  },
+  {
+    "width": 390,
+    "role": "admin",
+    "path": "/admin/reportes-seguridad",
+    "screenshot": "390-admin-reportes-seguridad.png",
+    "contentVerified": "Ver detalle",
+    "apiErrors": []
+  },
+  {
+    "width": 390,
+    "role": "admin",
+    "path": "/admin/reportes-seguridad",
+    "screenshot": "390-admin-detalle-reporte.png",
+    "contentVerified": "Detalle del reporte",
+    "apiErrors": []
+  }
+]

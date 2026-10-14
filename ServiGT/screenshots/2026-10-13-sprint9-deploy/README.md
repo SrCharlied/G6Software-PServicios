@@ -1,5 +1,7 @@
 # Verificación de despliegue Sprint 9 — 13 de octubre de 2026
 
+**Las capturas de esta carpeta muestran acceso sin sesión. Para ver las pantallas internas autenticadas, consulta [sprint9-pantallas-autenticadas](../sprint9-pantallas-autenticadas/README.md).**
+
 ## Resultado
 
 El frontend público ya contiene las rutas del Sprint 9. La evidencia del bundle `entry-b046789ca1f8ffe3edaa63bac97d3f5f.js` y Last-Modified del 29 de septiembre corresponde al despliegue anterior, reemplazado en esta sesión.

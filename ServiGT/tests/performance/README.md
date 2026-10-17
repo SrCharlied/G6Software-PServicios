@@ -1,23 +1,26 @@
 # Pruebas de carga y estres (Task 5.1 / 5.2)
 
-Scripts k6 para medir el comportamiento del backend de ServiGT bajo carga y
-estres. Corren contra un servidor Laravel dedicado apuntando a la base de
-datos efimera `db_test` (perfil `test` de `docker-compose.yml`), nunca contra
-`servigt_db` (desarrollo) ni de forma concurrente con la suite de PHPUnit
-(`backend_test`), para no compartir la misma base entre ambas cargas.
+Scripts k6 para medir el backend de ServiGT bajo carga y estres. Corren contra
+un servidor Laravel dedicado apuntando a la base efimera `db_test` (perfil
+`test` de `docker-compose.yml`), nunca contra `servigt_db` ni al mismo tiempo
+que PHPUnit (`backend_test`).
 
 ## Version fijada
 
-Imagen `grafana/k6:latest` resuelta a `sha256:e66db15b860113878fa74670e31f5e274830b7b6e42c8bff28b2f2d86a257603`
-el 2026-09-27. Fijar ese digest explícitamente si se requiere reproducibilidad
-exacta entre corridas.
+Usar siempre esta imagen para reproducibilidad:
+
+```bash
+K6_IMAGE=grafana/k6@sha256:e66db15b860113878fa74670e31f5e274830b7b6e42c8bff28b2f2d86a257603
+```
+
+Ese digest corresponde a la imagen resuelta el 2026-09-27. No usar
+`grafana/k6:latest` en evidencia de sprint.
 
 ## 1. Levantar un backend dedicado sobre `db_test`
 
-`db_test` ya se declara en `docker-compose.yml` (perfil `test`, tmpfs, se
-destruye al bajarla). El servicio `backend_test` normalmente corre PHPUnit
-(su `entrypoint` está fijado a `php artisan test`), así que para servir HTTP
-hay que arrancar un contenedor aparte con la misma imagen pero sirviendo:
+`db_test` ya se declara en `docker-compose.yml` con tmpfs y volumen de
+`init.sql`. Para k6 se levanta un contenedor HTTP separado con la imagen de
+`backend_test`, porque el servicio `backend_test` normal ejecuta PHPUnit.
 
 ```bash
 # Desde ServiGT/
@@ -48,87 +51,86 @@ php artisan serve --host=0.0.0.0 --port=8000
 '
 ```
 
-Notas sobre por qué el comando es así de largo:
-
-- El `entrypoint` real del Dockerfile (`docker/entrypoint.sh`) sí generaría
-  este `.env`, pero también corre `sync_schema.php`, que espera el volumen
-  `./database:/app/database:ro` — ese volumen **no** está montado en el
-  servicio `backend_test` (solo en `backend`), así que fallaría con
-  `No se encontro el archivo de esquema`. `db_test` no lo necesita: Postgres
-  ya aplica `init.sql` solo, vía `docker-entrypoint-initdb.d`.
-- Sin escribir el `.env` a mano, el `php artisan serve` embebido de PHP no
-  hereda las variables de entorno del contenedor hacia `$_SERVER` de la
-  misma forma que el SAPI de CLI, así que Laravel cae al `DB_CONNECTION`
-  por defecto del esqueleto (`sqlite`) en vez de usar `pgsql`/`db_test`. Se
-  verificó con `/api/health`: sin este paso reportaba
-  `"driver":"sqlite","status":"unavailable"` pese a que `docker exec ... env`
-  sí mostraba `DB_CONNECTION=pgsql`.
-
-Verificar antes de generar tráfico:
+Verificar la base efectiva antes de generar trafico:
 
 ```bash
 curl -s http://localhost:18000/api/health
 # Debe responder "driver":"pgsql","status":"connected"
 ```
 
-## 2. Ejecutar los scripts
+Si responde `sqlite` o `unavailable`, no ejecutar k6: el servidor objetivo no
+esta usando la base dedicada.
 
-Ambos scripts leen `BASE_URL` (por defecto `http://localhost:18000/api`, útil
-si k6 corre en el host). Si k6 corre en un contenedor en la misma red de
-Docker que `k6_backend_target`, usar el nombre del contenedor como host:
+## 2. Ejecutar scripts
+
+Confirmar el nombre de la red antes de correr:
 
 ```bash
-# Carga (rampa 5→25 VUs, ~5 min)
+docker network ls | grep servigt
+```
+
+Comandos previstos:
+
+```bash
+# Carga: rampa 5 a 25 VUs, aproximadamente 5 minutos.
 docker run --rm --network servigt_servigt_net \
   -e BASE_URL=http://k6_backend_target:8000/api \
   -v "$(pwd)/tests/performance:/scripts" \
-  grafana/k6:latest run /scripts/carga.js
+  "$K6_IMAGE" run /scripts/carga.js
 
-# Estres (escalonado hasta el techo, ~10 min + 2 min de recuperacion)
+# Estres: escalonado hasta techo explicito y recuperacion.
 docker run --rm --network servigt_servigt_net \
   -e BASE_URL=http://k6_backend_target:8000/api \
   -e STRESS_MAX_VUS=100 \
   -v "$(pwd)/tests/performance:/scripts" \
-  grafana/k6:latest run /scripts/estres.js
+  "$K6_IMAGE" run /scripts/estres.js
 ```
 
-El nombre de la red (`servigt_servigt_net`) depende del nombre del proyecto
-Compose; confirmarlo con `docker network ls | grep servigt` antes de correr.
+`carga.js` crea usuarios `smoke-k6-carga-<timestamp>-<n>@servigt.test` en
+`setup()` y guarda los tokens solo en memoria de k6. No imprime tokens ni usa
+secretos reales. El pool por defecto es 3 para respetar el throttle de registro
+por IP; se puede ajustar con `AUTH_POOL_SIZE`.
 
-## 3. Smoke antes de la campaña completa
+## 3. Smoke del generador
 
-Antes de una corrida larga, validar que el script y el generador funcionan
-con una carga mínima y que el exit code refleja los checks:
+Antes de una corrida larga, comprobar que el generador, la red y los checks
+funcionan. `SMOKE=true` activa un escenario corto dentro del propio script; no
+usar `--vus` ni `--duration`, porque los scripts declaran `options.scenarios`.
 
 ```bash
 docker run --rm --network servigt_servigt_net \
   -e BASE_URL=http://k6_backend_target:8000/api \
+  -e SMOKE=true \
+  -e AUTH_POOL_SIZE=1 \
   -v "$(pwd)/tests/performance:/scripts" \
-  grafana/k6:latest run --vus 1 --duration 10s /scripts/carga.js
+  "$K6_IMAGE" run /scripts/carga.js
 echo "exit code: $?"
 ```
 
-Un exit code distinto de 0 indica que algún `threshold` falló — revisar antes
-de lanzar la campaña completa.
+Un exit code distinto de 0 indica que algun threshold o check fallo. Revisar
+antes de lanzar carga o estres completos.
 
 ## 4. Limpieza
 
-`setup()` en `carga.js` crea cuentas `smoke-k6-carga-<timestamp>-<n>@servigt.test`
-en la base **efímera** `db_test` (tmpfs): desaparecen solas al bajar el
-contenedor:
+La base `db_test` vive en tmpfs, asi que los fixtures desaparecen al bajar el
+entorno:
 
 ```bash
 docker rm -f k6_backend_target
 docker compose --profile test down db_test -v
 ```
 
-No se generan cuentas smoke en `servigt_db` (desarrollo): estos scripts nunca
-apuntan ahí.
+No borrar ni limpiar `servigt_db` como parte de estas pruebas.
 
-## 5. Umbrales
+## 5. Umbrales propuestos
 
-Los `thresholds` codificados en `carga.js` (p95 lecturas < 800 ms, p95
-autenticado < 1.5 s, tasa de error de negocio < 1%) son la **propuesta** de
-S8-05, no una capacidad ya ratificada por producto — ver
-`docs/sprint8/rendimiento.md` para el resultado real de la corrida y su
-interpretación.
+`carga.js` codifica los objetivos propuestos por S8-05:
+
+- p95 lecturas publicas menor a 800 ms.
+- p95 autenticado menor a 1.5 s.
+- errores de negocio menores al 1%.
+- `http_req_failed` menor al 5%.
+- checks con tasa mayor a 99%.
+
+Estos umbrales son propuesta de sprint, no una capacidad ratificada por
+producto. Los resultados reales se documentan en `docs/sprint8/rendimiento.md`.

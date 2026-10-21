@@ -505,7 +505,8 @@ export default function ProviderEditProfileScreen({
               </Text>
             </TouchableOpacity>
           </View>
-          <Text style={s.sectionHint}>
+          {/* sectionHint trae marginTop negativo: al envolverse los colores en pantallas angostas pisaba la fila. */}
+          <Text style={[s.sectionHint, { marginTop: 12 }]}>
             El color se guarda al presionar Guardar, junto al resto del perfil.
           </Text>
         </Card>

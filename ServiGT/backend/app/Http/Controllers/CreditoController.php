@@ -93,7 +93,11 @@ class CreditoController extends Controller
             ];
         })->values();
 
-        return $this->success('Paquetes obtenidos correctamente.', ['paquetes' => $data]);
+        return $this->success('Paquetes obtenidos correctamente.', [
+            'paquetes' => $data,
+            // 'simulated' | 'stripe': el frontend decide el flujo de checkout.
+            'pasarela' => config('services.payments.driver'),
+        ]);
     }
 
     /**
@@ -112,6 +116,11 @@ class CreditoController extends Controller
      */
     public function comprar(Request $request): JsonResponse
     {
+        // Con pasarela real activa la compra simulada acreditaria sin cobrar.
+        if (config('services.payments.driver') !== 'simulated') {
+            return $this->error('La compra simulada esta deshabilitada. Usa el pago con tarjeta.', 403);
+        }
+
         $proveedor = Proveedor::where('user_id', $request->user()->id)->first();
 
         if (!$proveedor) {
@@ -287,6 +296,14 @@ class CreditoController extends Controller
         $transacciones = TransaccionCredito::where('proveedor_id', $proveedor->id)
             ->orderByDesc('created_at')
             ->paginate($perPage);
+
+        // El motivo de los bonos Premium lleva la clave del ciclo (premium-<id>-<ciclo>)
+        // para que el bono sea idempotente. Es un detalle interno: no se muestra.
+        $transacciones->getCollection()->transform(function (TransaccionCredito $t) {
+            $t->motivo = preg_replace('/\s*\(premium-[^)]*\)\s*$/', '', (string) $t->motivo);
+
+            return $t;
+        });
 
         return $this->success('Historial obtenido correctamente.', [
             'transacciones' => $transacciones->items(),

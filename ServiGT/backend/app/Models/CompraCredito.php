@@ -19,6 +19,9 @@ class CompraCredito extends Model
         'estado',
         'referencia',
         'idempotency_key',
+        'metodo_pago',
+        'stripe_session_id',
+        'fallo_motivo',
         'completada_at',
     ];
 

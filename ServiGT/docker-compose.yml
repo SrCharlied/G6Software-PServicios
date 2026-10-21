@@ -65,6 +65,14 @@ services:
       # Datos demo: activos solo si el ambiente lo pide explicitamente.
       SEED_DEMO_DATA: ${SEED_DEMO_DATA:-false}
       PROVIDER_SEED_PASSWORD: ${PROVIDER_SEED_PASSWORD:-}
+      # Pagos. simulated = compra inmediata sin cobro; stripe = Checkout con
+      # webhook firmado. Las claves salen de ServiGT/.env, nunca del repositorio.
+      PAYMENTS_DRIVER: ${PAYMENTS_DRIVER:-simulated}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+      STRIPE_PUBLISHABLE_KEY: ${STRIPE_PUBLISHABLE_KEY:-}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+      STRIPE_CURRENCY: ${STRIPE_CURRENCY:-gtq}
+      STRIPE_RETURN_ORIGIN: ${STRIPE_RETURN_ORIGIN:-http://localhost:8086}
     volumes:
       # Persistir fotos publicas entre rebuilds
       - backend_storage:/app/storage/app/public

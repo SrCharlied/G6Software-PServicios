@@ -13,7 +13,11 @@ import {
 } from 'react-native';
 import {
   activarPremium,
+  cancelarSuscripcionPremium,
   comprarCreditos,
+  crearSesionPagoPremium,
+  crearSesionPagoStripe,
+  getCompraCredito,
   getCreditosPaquetes,
   getCreditosTransacciones,
   getMiCredito,
@@ -21,6 +25,7 @@ import {
 } from '../services/api';
 import { useToast } from '../context/ToastContext';
 import { Button, Card, StatusChip } from '../components/ui';
+import StripeCheckoutForm from '../components/StripeCheckoutForm';
 import { abrirIntento, cerrarIntento, INTENTO_VACIO } from '../utils/purchaseIntent';
 import { T } from '../theme';
 
@@ -83,7 +88,7 @@ function InfoLine({ label, value, accent }) {
   );
 }
 
-function PackageCard({ paquete, selected, onPress }) {
+function PackageCard({ paquete, selected, desktop, onPress }) {
   const total = paquete.total_creditos ?? (paquete.creditos_base + paquete.creditos_bonus);
   const popular = paquete.nombre === 'Impulso';
 
@@ -93,6 +98,7 @@ function PackageCard({ paquete, selected, onPress }) {
       onPress={onPress}
       style={[
         styles.packageCard,
+        desktop && styles.packageCardDesktop,
         selected && styles.packageCardSelected,
         popular && styles.packageCardPopular,
       ]}
@@ -135,6 +141,9 @@ function CheckoutModal({
   status,
   compra,
   error,
+  pasarela,
+  stripeSession,
+  onStripeError,
   onClose,
   onConfirm,
 }) {
@@ -146,15 +155,19 @@ function CheckoutModal({
   const done = status === 'completada';
   const failed = status === 'fallida';
   const cancelled = status === 'cancelada';
+  const conTarjeta = pasarela === 'stripe';
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <View style={styles.modalOverlay}>
-        <View style={styles.checkoutCard}>
+        {/* ScrollView: con el formulario de Stripe el contenido supera la altura de pantalla */}
+        <ScrollView style={styles.checkoutCard} contentContainerStyle={styles.checkoutCardContent} keyboardShouldPersistTaps="handled">
           <View style={styles.checkoutHeader}>
             <View style={styles.checkoutTitleBox}>
               <Text style={styles.checkoutTitle}>Confirmar compra</Text>
-              <Text style={styles.checkoutSubtitle}>Compra simulada con acreditacion inmediata.</Text>
+              <Text style={styles.checkoutSubtitle}>
+                {conTarjeta ? 'Pago con tarjeta procesado por Stripe.' : 'Compra simulada con acreditacion inmediata.'}
+              </Text>
             </View>
             {status !== 'confirmar' ? (
               <StatusChip
@@ -221,9 +234,19 @@ function CheckoutModal({
           <View style={styles.simNote}>
             <Feather name="shield" size={16} color={T.muted} />
             <Text style={styles.simNoteText}>
-              Sin datos bancarios reales. Sprint 6 usa compra simulada y referencia visible.
+              {conTarjeta
+                ? 'Los datos de tu tarjeta los recibe Stripe; ServiGT nunca los ve ni los guarda. Los creditos se acreditan al confirmarse el pago.'
+                : 'Sin datos bancarios reales. Sprint 6 usa compra simulada y referencia visible.'}
             </Text>
           </View>
+
+          {conTarjeta && stripeSession && !done ? (
+            <StripeCheckoutForm
+              clientSecret={stripeSession.clientSecret}
+              publishableKey={stripeSession.publishableKey}
+              onError={onStripeError}
+            />
+          ) : null}
 
           {compra?.referencia ? (
             <View style={styles.referenceBox}>
@@ -236,16 +259,79 @@ function CheckoutModal({
             <Button kind="ghost" onPress={onClose} disabled={status === 'pendiente'}>
               {done ? 'Cerrar' : 'Cancelar'}
             </Button>
-            {done ? null : (
+            {done || (conTarjeta && stripeSession) ? null : (
               <Button
                 icon="shield"
                 loading={status === 'pendiente'}
                 disabled={status === 'pendiente'}
                 onPress={onConfirm}
               >
-                Confirmar
+                {conTarjeta ? 'Continuar al pago' : 'Confirmar'}
               </Button>
             )}
+          </View>
+        </ScrollView>
+      </View>
+    </Modal>
+  );
+}
+
+function PremiumCheckoutModal({ visible, recurrente, session, onClose, onStripeError }) {
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <View style={styles.modalOverlay}>
+        <ScrollView style={styles.checkoutCard} contentContainerStyle={styles.checkoutCardContent} keyboardShouldPersistTaps="handled">
+          <View style={styles.checkoutHeader}>
+            <View style={styles.checkoutTitleBox}>
+              <Text style={styles.checkoutTitle}>
+                {recurrente ? 'Suscripcion Premium mensual' : 'Premium por 30 dias'}
+              </Text>
+              <Text style={styles.checkoutSubtitle}>
+                {recurrente
+                  ? 'Q115 cada mes hasta que canceles. Si cancelas, Premium sigue hasta el final del ciclo pagado.'
+                  : 'Pago unico de Q115. No se renueva solo.'}
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.simNote}>
+            <Feather name="shield" size={16} color={T.muted} />
+            <Text style={styles.simNoteText}>
+              Los datos de tu tarjeta los recibe Stripe; ServiGT nunca los ve ni los guarda. Incluye 10 creditos por ciclo.
+            </Text>
+          </View>
+
+          {session ? (
+            <StripeCheckoutForm
+              clientSecret={session.clientSecret}
+              publishableKey={session.publishableKey}
+              onError={onStripeError}
+            />
+          ) : null}
+
+          <View style={styles.checkoutActions}>
+            <Button kind="ghost" onPress={onClose}>Cancelar</Button>
+          </View>
+        </ScrollView>
+      </View>
+    </Modal>
+  );
+}
+
+function CancelarSuscripcionModal({ visible, venceAt, cancelando, onClose, onConfirm }) {
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <View style={styles.modalOverlay}>
+        <View style={[styles.checkoutCard, styles.checkoutCardContent]}>
+          <Text style={styles.checkoutTitle}>Cancelar suscripcion</Text>
+          <Text style={styles.checkoutSubtitle}>
+            Seguiras con Premium hasta el {formatDate(venceAt)}. Despues no se volvera a cobrar.
+          </Text>
+          <View style={styles.checkoutActions}>
+            <Button kind="ghost" onPress={onClose} disabled={cancelando}>Mantener suscripcion</Button>
+            <Button icon="x-circle" loading={cancelando} disabled={cancelando} onPress={onConfirm}>
+              Si, cancelar
+            </Button>
           </View>
         </View>
       </View>
@@ -275,11 +361,20 @@ export default function CreditosScreen() {
   const [checkoutError, setCheckoutError] = useState('');
   const [checkoutBaseSaldo, setCheckoutBaseSaldo] = useState(null);
   const [activatingPremium, setActivatingPremium] = useState(false);
+  const [pasarela, setPasarela] = useState('simulated');
+  const [stripeSession, setStripeSession] = useState(null);
+  const [premiumRecurrente, setPremiumRecurrente] = useState(false);
+  const [premiumSession, setPremiumSession] = useState(null);
+  const [premiumAbierto, setPremiumAbierto] = useState(false);
+  const [cancelarAbierto, setCancelarAbierto] = useState(false);
+  const [cancelando, setCancelando] = useState(false);
 
   // Clave de idempotencia de la compra en curso. Vive en un ref porque no se
   // muestra: solo tiene que sobrevivir a los reintentos. La regla de reuso esta
   // en src/utils/purchaseIntent.js, con sus pruebas.
   const intentoCompra = useRef(INTENTO_VACIO);
+  // Idem para Premium: una clave por modalidad (unico / mensual).
+  const intentoPremium = useRef(INTENTO_VACIO);
 
   // Numera las cargas para descartar respuestas que llegan tarde.
   const cargaActual = useRef(0);
@@ -312,6 +407,7 @@ export default function CreditosScreen() {
 
     const paquetesList = catalogo.status === 'fulfilled' ? catalogo.value?.paquetes || [] : [];
     setPaquetes(paquetesList);
+    if (catalogo.status === 'fulfilled') setPasarela(catalogo.value?.pasarela || 'simulated');
     setSelectedPackageId((current) => current ?? paquetesList[0]?.id ?? null);
 
     if (historial.status === 'fulfilled') {
@@ -365,6 +461,7 @@ export default function CreditosScreen() {
     setCheckoutCompra(null);
     setCheckoutError('');
     setCheckoutBaseSaldo(saldo);
+    setStripeSession(null);
     setCheckoutOpen(true);
   };
 
@@ -376,6 +473,12 @@ export default function CreditosScreen() {
 
     setCheckoutStatus('pendiente');
     setCheckoutError('');
+
+    if (pasarela === 'stripe') {
+      await iniciarPagoStripe();
+      return;
+    }
+
     try {
       const data = await comprarCreditos({
         paqueteId: selectedPackage.id,
@@ -396,6 +499,61 @@ export default function CreditosScreen() {
       setCheckoutStatus('fallida');
       toast(err.message, 'error');
     }
+  };
+
+  // Pide la sesion de Stripe. La clave de idempotencia se conserva hasta que la
+  // compra termine: reabrir el modal recupera la misma sesion abierta.
+  const iniciarPagoStripe = async () => {
+    try {
+      const data = await crearSesionPagoStripe({
+        paqueteId: selectedPackage.id,
+        idempotencyKey: intentoCompra.current.key,
+      });
+      setCheckoutCompra(data.compra);
+
+      if (data.client_secret) {
+        setStripeSession({ clientSecret: data.client_secret, publishableKey: data.publishable_key });
+        setCheckoutStatus('confirmar');
+        return;
+      }
+
+      // Sin client_secret la compra ya no admite pago: se consulta su estado real.
+      await esperarCompra(data.compra.id);
+    } catch (err) {
+      // 409: sesion expirada o clave ya cancelada. Una compra nueva necesita clave nueva.
+      if (err.status === 409) intentoCompra.current = cerrarIntento();
+      setCheckoutError(err.message);
+      setCheckoutStatus('fallida');
+      toast(err.message, 'error');
+    }
+  };
+
+  // Consulta la compra hasta un estado terminal. El backend la concilia con
+  // Stripe en cada consulta, asi el resultado no depende de que llegue el webhook.
+  const esperarCompra = async (compraId) => {
+    setCheckoutStatus('pendiente');
+    let ultima = null;
+    for (let intento = 0; intento < 10; intento += 1) {
+      ultima = await getCompraCredito(compraId);
+      const estado = ultima.compra?.estado;
+      if (estado && estado !== 'pendiente') break;
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+    }
+
+    const estado = ultima?.compra?.estado || 'pendiente';
+    setCheckoutCompra(ultima?.compra || null);
+    setStripeSession(null);
+    if (estado === 'completada') {
+      intentoCompra.current = cerrarIntento();
+      await loadData({ showLoader: false, targetPage: 1 });
+      toast('Compra completada correctamente.', 'success');
+    } else if (estado === 'pendiente') {
+      toast('Tu pago aun se esta confirmando. Revisa tu saldo en unos minutos.', 'info');
+    } else {
+      intentoCompra.current = cerrarIntento();
+      setCheckoutError(ultima?.compra?.fallo_motivo || 'El pago no se completo. No se acreditaron creditos.');
+    }
+    setCheckoutStatus(estado);
   };
 
   const closeCheckout = () => {
@@ -420,6 +578,51 @@ export default function CreditosScreen() {
       toast(err.message, 'error');
     } finally {
       setActivatingPremium(false);
+    }
+  };
+
+  // Premium con Stripe: abre el formulario de pago. La clave se conserva hasta
+  // que el pago termine, asi reabrir el modal recupera la misma sesion abierta.
+  const iniciarPagoPremium = async () => {
+    setActivatingPremium(true);
+    intentoPremium.current = abrirIntento(
+      intentoPremium.current,
+      premiumRecurrente ? 'premium-mensual' : 'premium-unico',
+    );
+    try {
+      const data = await crearSesionPagoPremium({
+        recurrente: premiumRecurrente,
+        idempotencyKey: intentoPremium.current.key,
+      });
+
+      if (data.client_secret) {
+        setPremiumSession({ clientSecret: data.client_secret, publishableKey: data.publishable_key });
+        setPremiumAbierto(true);
+      } else {
+        // Sin client_secret el pago ya no admite cobro: se muestra el estado real.
+        intentoPremium.current = cerrarIntento();
+        await loadData({ showLoader: false, targetPage: 1 });
+      }
+    } catch (err) {
+      // 409: ya activo, o pago cancelado. Un intento nuevo necesita clave nueva.
+      if (err.status === 409) intentoPremium.current = cerrarIntento();
+      toast(err.message, 'error');
+    } finally {
+      setActivatingPremium(false);
+    }
+  };
+
+  const confirmarCancelacion = async () => {
+    setCancelando(true);
+    try {
+      const data = await cancelarSuscripcionPremium();
+      setPremium(data);
+      setCancelarAbierto(false);
+      toast(data.message || 'Suscripcion cancelada.', 'success');
+    } catch (err) {
+      toast(err.message, 'error');
+    } finally {
+      setCancelando(false);
     }
   };
 
@@ -449,7 +652,9 @@ export default function CreditosScreen() {
         <View style={styles.headerCopy}>
           <Text style={styles.title}>Creditos</Text>
           <Text style={styles.subtitle}>
-            Compra paquetes simulados y revisa tus movimientos de credito.
+            {pasarela === 'stripe'
+              ? 'Compra paquetes con tarjeta y revisa tus movimientos de credito.'
+              : 'Compra paquetes simulados y revisa tus movimientos de credito.'}
           </Text>
         </View>
         <Button icon="refresh-cw" kind="ghost" onPress={() => loadData({ showLoader: false })}>
@@ -477,7 +682,7 @@ export default function CreditosScreen() {
       ) : null}
 
       <View style={[styles.heroGrid, isDesktop && styles.heroGridDesktop]}>
-        <Card padding={0} style={styles.balanceCard}>
+        <Card padding={0} style={[styles.balanceCard, isDesktop && styles.balanceCardDesktop]}>
           <View style={styles.balanceHero} testID="saldo-actual">
             <Text style={styles.balanceLabel}>Saldo disponible</Text>
             {saldo === null ? (
@@ -511,7 +716,7 @@ export default function CreditosScreen() {
           </View>
         </Card>
 
-        <Card style={styles.slotCard}>
+        <Card style={[styles.slotCard, isDesktop && styles.slotCardDesktop]}>
           <Text style={styles.cardEyebrow}>Medidor de slots</Text>
           <View style={styles.slotMeter}>
             {[1, 2, 3, 4, 5, 6].map((slot) => (
@@ -547,6 +752,7 @@ export default function CreditosScreen() {
               key={paquete.id}
               paquete={paquete}
               selected={selectedPackage?.id === paquete.id}
+              desktop={isDesktop}
               onPress={() => openCheckout(paquete)}
             />
           ))}
@@ -555,7 +761,9 @@ export default function CreditosScreen() {
 
       <View style={styles.assistedBox}>
         <View style={styles.assistedCopy}>
-          <Text style={styles.assistedTitle}>Compra simulada, sin datos bancarios</Text>
+          <Text style={styles.assistedTitle}>
+            {pasarela === 'stripe' ? 'Pago seguro con Stripe' : 'Compra simulada, sin datos bancarios'}
+          </Text>
           <Text style={styles.assistedText}>
             Las compras completadas acreditan una sola vez. Pagos por transferencia quedan como recarga manual de admin.
           </Text>
@@ -595,6 +803,16 @@ export default function CreditosScreen() {
             <InfoLine label="Dias restantes" value={`${premium.dias_restantes ?? 0}`} />
             <InfoLine label="Renovaciones" value={`${premium.renovaciones ?? 0}`} />
             <InfoLine label="Creditos incluidos" value={`${premium.creditos_por_ciclo ?? 10}`} accent={T.success} />
+            {pasarela === 'stripe' && premium.estado === 'activo' ? (
+              <InfoLine
+                label="Renovacion"
+                value={!premium.recurrente
+                  ? 'Pago unico (no se renueva)'
+                  : premium.cancela_al_final
+                    ? 'Cancelada: termina al final del ciclo'
+                    : `Automatica mensual (${formatDate(premium.proximo_cobro_at)})`}
+              />
+            ) : null}
           </View>
         ) : (
           <Text style={styles.premiumUnavailable}>
@@ -611,7 +829,46 @@ export default function CreditosScreen() {
           ))}
         </View>
 
-        {premium ? (
+        {premium && pasarela === 'stripe' && premium.estado !== 'activo' ? (
+          <View style={styles.premiumActions}>
+            <TouchableOpacity
+              accessibilityRole="checkbox"
+              accessibilityState={{ checked: premiumRecurrente }}
+              onPress={() => setPremiumRecurrente((actual) => !actual)}
+              style={styles.recurrenteRow}
+            >
+              <Feather name={premiumRecurrente ? 'check-square' : 'square'} size={20} color={T.blue} />
+              <Text style={styles.recurrenteText}>Renovar automaticamente cada mes (puedes cancelar cuando quieras)</Text>
+            </TouchableOpacity>
+            <Button
+              icon="star"
+              loading={activatingPremium}
+              disabled={activatingPremium}
+              onPress={iniciarPagoPremium}
+              style={styles.premiumButton}
+            >
+              {premiumRecurrente ? 'Suscribirme por Q115 al mes' : premium.estado === 'vencido' ? 'Reactivar Premium por Q115' : 'Activar Premium por Q115'}
+            </Button>
+          </View>
+        ) : null}
+
+        {premium && pasarela === 'stripe' && premium.estado === 'activo' && premium.recurrente && !premium.cancela_al_final ? (
+          <Button icon="x-circle" kind="secondary" onPress={() => setCancelarAbierto(true)} style={styles.premiumButton}>
+            Cancelar suscripcion
+          </Button>
+        ) : null}
+
+        {premium && pasarela === 'stripe' && premium.estado === 'activo' && premium.recurrente && premium.cancela_al_final ? (
+          <Text style={styles.premiumText}>
+            Suscripcion cancelada. Premium sigue activo hasta el {formatDate(premium.vence_at)} y no se volvera a cobrar.
+          </Text>
+        ) : null}
+
+        {premium && pasarela === 'stripe' && premium.estado === 'activo' && !premium.recurrente ? (
+          <Button icon="star" disabled style={styles.premiumButton}>Ciclo activo</Button>
+        ) : null}
+
+        {premium && pasarela !== 'stripe' ? (
           <Button
             icon="star"
             loading={activatingPremium}
@@ -684,6 +941,22 @@ export default function CreditosScreen() {
         </Button>
       </View>
 
+      <PremiumCheckoutModal
+        visible={premiumAbierto}
+        recurrente={premiumRecurrente}
+        session={premiumSession}
+        onClose={() => setPremiumAbierto(false)}
+        onStripeError={(mensaje) => toast(mensaje, 'error')}
+      />
+
+      <CancelarSuscripcionModal
+        visible={cancelarAbierto}
+        venceAt={premium?.vence_at}
+        cancelando={cancelando}
+        onClose={() => !cancelando && setCancelarAbierto(false)}
+        onConfirm={confirmarCancelacion}
+      />
+
       <CheckoutModal
         visible={checkoutOpen}
         paquete={selectedPackage}
@@ -691,6 +964,9 @@ export default function CreditosScreen() {
         status={checkoutStatus}
         compra={checkoutCompra}
         error={checkoutError}
+        pasarela={pasarela}
+        stripeSession={stripeSession}
+        onStripeError={(mensaje) => toast(mensaje, 'error')}
         onClose={closeCheckout}
         onConfirm={confirmCheckout}
       />
@@ -721,13 +997,15 @@ const styles = StyleSheet.create({
   unavailableCard: { marginBottom: T.s4 },
   heroGrid: { gap: T.s3, marginBottom: T.s5 },
   heroGridDesktop: { flexDirection: 'row' },
-  balanceCard: { overflow: 'hidden', flex: 1.1 },
+  balanceCard: { overflow: 'hidden' },
+  balanceCardDesktop: { flex: 1.1 },
   balanceHero: { backgroundColor: T.ink, padding: T.s5 },
   balanceLabel: { color: 'rgba(255,255,255,0.78)', fontSize: 12, fontWeight: '800', textTransform: 'uppercase' },
   balanceValue: { color: T.white, fontSize: 52, fontWeight: '900', lineHeight: 58, marginTop: 4 },
   balanceHint: { color: 'rgba(255,255,255,0.82)', fontSize: 13, marginTop: 6 },
   balanceActions: { flexDirection: 'row', gap: T.s2, flexWrap: 'wrap', padding: T.s4, backgroundColor: T.white },
-  slotCard: { flex: 1 },
+  slotCard: {},
+  slotCardDesktop: { flex: 1 },
   cardEyebrow: { color: T.faint, fontSize: 11, fontWeight: '900', textTransform: 'uppercase' },
   slotMeter: { flexDirection: 'row', gap: T.s2, marginVertical: T.s4 },
   slotStep: { flex: 1, minHeight: 42, borderRadius: T.rSm, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
@@ -749,9 +1027,9 @@ const styles = StyleSheet.create({
     ...T.card,
     ...T.sh1,
     padding: T.s4,
-    flexBasis: 210,
-    flexGrow: 1,
   },
+  // flexBasis/flexGrow solo en fila: en la columna movil flexBasis fijaria la ALTURA.
+  packageCardDesktop: { flexBasis: 210, flexGrow: 1 },
   packageCardSelected: { borderColor: T.blue, borderWidth: 2 },
   packageCardPopular: { backgroundColor: '#fbfdff' },
   packageTop: { minHeight: 24, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: T.s2 },
@@ -813,6 +1091,9 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   benefitText: { color: '#8a5a08', fontSize: 12, fontWeight: '800' },
+  premiumActions: { marginTop: T.s3, gap: T.s3 },
+  recurrenteRow: { flexDirection: 'row', alignItems: 'center', gap: T.s2 },
+  recurrenteText: { flex: 1, color: T.ink, fontSize: 13, lineHeight: 18 },
   premiumButton: { marginTop: T.s4, alignSelf: 'flex-start' },
   transactionsCard: { overflow: 'hidden' },
   emptyState: { padding: T.s6, alignItems: 'center' },
@@ -830,7 +1111,8 @@ const styles = StyleSheet.create({
   transactionAmountOut: { color: T.danger },
   pagination: { flexDirection: 'row', justifyContent: 'flex-end', gap: T.s2, marginTop: T.s3 },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(14,20,36,0.46)', justifyContent: 'center', alignItems: 'center', padding: T.s4 },
-  checkoutCard: { width: '100%', maxWidth: 620, backgroundColor: T.white, borderRadius: T.rMd, padding: T.s5, ...T.sh3 },
+  checkoutCard: { width: '100%', maxWidth: 620, maxHeight: '100%', flexGrow: 0, backgroundColor: T.white, borderRadius: T.rMd, ...T.sh3 },
+  checkoutCardContent: { padding: T.s5 },
   checkoutHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: T.s3 },
   checkoutTitleBox: { flex: 1, minWidth: 0 },
   checkoutTitle: { color: T.ink, fontSize: 20, fontWeight: '900' },

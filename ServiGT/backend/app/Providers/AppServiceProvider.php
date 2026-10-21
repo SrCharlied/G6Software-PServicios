@@ -35,6 +35,8 @@ class AppServiceProvider extends ServiceProvider
 
         RateLimiter::for('purchase', fn (Request $request) => Limit::perMinute(6)->by($this->rateKey($request)));
 
+        RateLimiter::for('stripe-webhook', fn (Request $request) => Limit::perMinute(120)->by('ip:'.$request->ip()));
+
         RateLimiter::for('premium', fn (Request $request) => Limit::perMinute(5)->by($this->rateKey($request)));
     }
 

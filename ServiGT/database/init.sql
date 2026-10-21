@@ -179,6 +179,61 @@ CREATE TABLE IF NOT EXISTS compras_creditos (
 );
 CREATE INDEX IF NOT EXISTS idx_compras_creditos_proveedor ON compras_creditos (proveedor_id, created_at DESC);
 
+-- Pasarela Stripe (Checkout Session). La compra nace 'pendiente' y solo el webhook
+-- firmado (o la reconciliacion server-side contra la API de Stripe) la completa.
+ALTER TABLE compras_creditos ADD COLUMN IF NOT EXISTS metodo_pago VARCHAR(20) NOT NULL DEFAULT 'simulado';
+ALTER TABLE compras_creditos ADD COLUMN IF NOT EXISTS stripe_session_id VARCHAR(255);
+ALTER TABLE compras_creditos ADD COLUMN IF NOT EXISTS fallo_motivo VARCHAR(255);
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint
+        WHERE conrelid = 'compras_creditos'::regclass
+          AND conname = 'compras_creditos_metodo_pago_chk'
+    ) THEN
+        ALTER TABLE compras_creditos ADD CONSTRAINT compras_creditos_metodo_pago_chk
+            CHECK (metodo_pago IN ('simulado','stripe'));
+    END IF;
+END $$;
+CREATE UNIQUE INDEX IF NOT EXISTS uk_compras_creditos_stripe_session
+    ON compras_creditos (stripe_session_id) WHERE stripe_session_id IS NOT NULL;
+
+-- Eventos de webhook ya procesados: la PK es el arbitro de la idempotencia.
+CREATE TABLE IF NOT EXISTS stripe_eventos (
+    event_id VARCHAR(255) PRIMARY KEY,
+    tipo VARCHAR(100) NOT NULL,
+    created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Premium con Stripe: pago unico de 30 dias o suscripcion mensual recurrente.
+-- La cancelacion es al final del ciclo: premium_vence_at no se toca, solo se
+-- apaga la renovacion (premium_cancela_al_final) y Stripe deja de cobrar.
+ALTER TABLE proveedores ADD COLUMN IF NOT EXISTS premium_recurrente BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE proveedores ADD COLUMN IF NOT EXISTS premium_cancela_al_final BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE proveedores ADD COLUMN IF NOT EXISTS stripe_customer_id VARCHAR(255);
+ALTER TABLE proveedores ADD COLUMN IF NOT EXISTS stripe_subscription_id VARCHAR(255);
+CREATE UNIQUE INDEX IF NOT EXISTS uk_proveedores_stripe_subscription
+    ON proveedores (stripe_subscription_id) WHERE stripe_subscription_id IS NOT NULL;
+
+CREATE TABLE IF NOT EXISTS pagos_premium (
+    id BIGSERIAL PRIMARY KEY,
+    proveedor_id BIGINT NOT NULL REFERENCES proveedores(id) ON DELETE CASCADE,
+    recurrente BOOLEAN NOT NULL DEFAULT FALSE,
+    estado VARCHAR(20) NOT NULL DEFAULT 'pendiente'
+        CHECK (estado IN ('pendiente','completada','fallida','cancelada')),
+    referencia VARCHAR(20) NOT NULL UNIQUE,
+    idempotency_key VARCHAR(100) NOT NULL,
+    stripe_session_id VARCHAR(255),
+    fallo_motivo VARCHAR(255),
+    completada_at TIMESTAMP WITHOUT TIME ZONE,
+    created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT pagos_premium_proveedor_idem_uk UNIQUE (proveedor_id, idempotency_key)
+);
+CREATE UNIQUE INDEX IF NOT EXISTS uk_pagos_premium_stripe_session
+    ON pagos_premium (stripe_session_id) WHERE stripe_session_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_pagos_premium_proveedor ON pagos_premium (proveedor_id, created_at DESC);
+
 -- Publicaciones de servicios ofrecidos por proveedores
 CREATE TABLE IF NOT EXISTS publicaciones_servicio (
     id BIGSERIAL PRIMARY KEY,

@@ -2,7 +2,11 @@ import { act, fireEvent, render, screen, within } from '@testing-library/react-n
 import CreditosScreen from './CreditosScreen';
 import {
   activarPremium,
+  cancelarSuscripcionPremium,
   comprarCreditos,
+  crearSesionPagoPremium,
+  crearSesionPagoStripe,
+  getCompraCredito,
   getCreditosPaquetes,
   getCreditosTransacciones,
   getMiCredito,
@@ -12,10 +16,18 @@ import {
 const mockToast = jest.fn();
 jest.mock('../context/ToastContext', () => ({ useToast: () => mockToast }));
 jest.mock('@expo/vector-icons', () => ({ Feather: () => null }));
+jest.mock('../components/StripeCheckoutForm', () => {
+  const { Text } = require('react-native');
+  return ({ clientSecret }) => <Text>{`form-stripe:${clientSecret}`}</Text>;
+});
 
 jest.mock('../services/api', () => ({
   activarPremium: jest.fn(),
+  cancelarSuscripcionPremium: jest.fn(),
   comprarCreditos: jest.fn(),
+  crearSesionPagoPremium: jest.fn(),
+  crearSesionPagoStripe: jest.fn(),
+  getCompraCredito: jest.fn(),
   getCreditosPaquetes: jest.fn(),
   getCreditosTransacciones: jest.fn(),
   getMiCredito: jest.fn(),
@@ -57,7 +69,7 @@ beforeEach(() => {
   // resetAllMocks tambien borraria los mocks nativos de jest-expo; solo se
   // reinician los de la API para que ningun "Once" pase de una prueba a otra.
   jest.clearAllMocks();
-  [activarPremium, comprarCreditos, getCreditosPaquetes, getCreditosTransacciones, getMiCredito, getPremiumMiEstado]
+  [activarPremium, cancelarSuscripcionPremium, crearSesionPagoPremium, comprarCreditos, crearSesionPagoStripe, getCompraCredito, getCreditosPaquetes, getCreditosTransacciones, getMiCredito, getPremiumMiEstado]
     .forEach((mock) => mock.mockReset());
   getMiCredito.mockResolvedValue({ saldo: 12 });
   getCreditosPaquetes.mockResolvedValue({ paquetes: [PAQUETE] });
@@ -192,5 +204,149 @@ describe('CreditosScreen — otras secciones ante error parcial', () => {
 
     fireEvent.press(screen.getByText('Comprar creditos'));
     expect(screen.queryByText('Confirmar compra')).toBeNull();
+  });
+});
+
+describe('CreditosScreen — pago con Stripe', () => {
+  const COMPRA_PENDIENTE = { id: 5, estado: 'pendiente', referencia: 'SGT-0000000005', creditos_otorgados: 8 };
+
+  beforeEach(() => {
+    getCreditosPaquetes.mockResolvedValue({ paquetes: [PAQUETE], pasarela: 'stripe' });
+  });
+
+  it('con pasarela stripe pide la sesion y muestra el formulario, sin usar la compra simulada', async () => {
+    crearSesionPagoStripe.mockResolvedValue({
+      compra: COMPRA_PENDIENTE, client_secret: 'cs_1_secret', publishable_key: 'pk_test_x',
+    });
+
+    render(<CreditosScreen />);
+    await screen.findByText('Equivale a 12 cotizaciones en slots pagados.');
+
+    fireEvent.press(screen.getByText('Comprar creditos'));
+    fireEvent.press(screen.getByText('Continuar al pago'));
+
+    expect(await screen.findByText('form-stripe:cs_1_secret')).toBeTruthy();
+    expect(crearSesionPagoStripe).toHaveBeenCalledWith({ paqueteId: 1, idempotencyKey: expect.any(String) });
+    expect(comprarCreditos).not.toHaveBeenCalled();
+    // El saldo no cambia hasta que el backend confirme el pago.
+    expect(getMiCredito).toHaveBeenCalledTimes(1);
+  });
+
+  it('reabrir el checkout tras cerrarlo reutiliza la misma clave de idempotencia', async () => {
+    crearSesionPagoStripe.mockResolvedValue({
+      compra: COMPRA_PENDIENTE, client_secret: 'cs_1_secret', publishable_key: 'pk_test_x',
+    });
+
+    render(<CreditosScreen />);
+    await screen.findByText('Equivale a 12 cotizaciones en slots pagados.');
+
+    fireEvent.press(screen.getByText('Comprar creditos'));
+    fireEvent.press(screen.getByText('Continuar al pago'));
+    await screen.findByText('form-stripe:cs_1_secret');
+    fireEvent.press(screen.getByText('Cancelar'));
+
+    fireEvent.press(screen.getByText('Comprar creditos'));
+    fireEvent.press(screen.getByText('Continuar al pago'));
+    await screen.findByText('form-stripe:cs_1_secret');
+
+    const [primera, segunda] = crearSesionPagoStripe.mock.calls.map(([arg]) => arg.idempotencyKey);
+    expect(primera).toBe(segunda);
+  });
+
+  it('un error al crear la sesion se muestra como fallo y no como compra', async () => {
+    crearSesionPagoStripe.mockRejectedValue(new Error('No se pudo iniciar el pago. Intenta de nuevo.'));
+
+    render(<CreditosScreen />);
+    await screen.findByText('Equivale a 12 cotizaciones en slots pagados.');
+
+    fireEvent.press(screen.getByText('Comprar creditos'));
+    fireEvent.press(screen.getByText('Continuar al pago'));
+
+    expect(await screen.findByText('No se pudo iniciar el pago. Intenta de nuevo.')).toBeTruthy();
+    expect(screen.queryByText(/form-stripe/)).toBeNull();
+  });
+});
+
+describe('CreditosScreen — Premium con Stripe', () => {
+  const SESION = { pago: { id: 9, estado: 'pendiente' }, client_secret: 'cs_p_secret', publishable_key: 'pk_test_x' };
+
+  beforeEach(() => {
+    getCreditosPaquetes.mockResolvedValue({ paquetes: [PAQUETE], pasarela: 'stripe' });
+  });
+
+  it('nunca activado: ofrece pago unico por defecto y abre el formulario sin usar la activacion gratuita', async () => {
+    getPremiumMiEstado.mockResolvedValue({ estado: 'nunca', vence_at: null, dias_restantes: 0, renovaciones: 0, creditos_por_ciclo: 10, beneficios: [] });
+    crearSesionPagoPremium.mockResolvedValue(SESION);
+
+    render(<CreditosScreen />);
+    fireEvent.press(await screen.findByText('Activar Premium por Q115'));
+
+    expect(await screen.findByText('form-stripe:cs_p_secret')).toBeTruthy();
+    expect(crearSesionPagoPremium).toHaveBeenCalledWith({ recurrente: false, idempotencyKey: expect.any(String) });
+    expect(activarPremium).not.toHaveBeenCalled();
+    expect(screen.getByText('Premium por 30 dias')).toBeTruthy();
+  });
+
+  it('con la opcion mensual marcada pide una suscripcion recurrente', async () => {
+    getPremiumMiEstado.mockResolvedValue({ estado: 'vencido', vence_at: '2026-09-01T00:00:00Z', dias_restantes: 0, renovaciones: 1, creditos_por_ciclo: 10, beneficios: [] });
+    crearSesionPagoPremium.mockResolvedValue(SESION);
+
+    render(<CreditosScreen />);
+    fireEvent.press(await screen.findByText(/Renovar automaticamente cada mes/));
+    fireEvent.press(screen.getByText('Suscribirme por Q115 al mes'));
+
+    expect(await screen.findByText('Suscripcion Premium mensual')).toBeTruthy();
+    expect(crearSesionPagoPremium).toHaveBeenCalledWith({ recurrente: true, idempotencyKey: expect.any(String) });
+  });
+
+  it('suscripcion activa: muestra la renovacion y permite cancelar con confirmacion', async () => {
+    const activo = {
+      estado: 'activo', recurrente: true, cancela_al_final: false, vence_at: '2026-11-19T20:11:00Z',
+      proximo_cobro_at: '2026-11-19T20:11:00Z', dias_restantes: 30, renovaciones: 1, creditos_por_ciclo: 10, beneficios: [],
+    };
+    getPremiumMiEstado.mockResolvedValue(activo);
+    cancelarSuscripcionPremium.mockResolvedValue({ ...activo, cancela_al_final: true, proximo_cobro_at: null, message: 'Suscripcion cancelada.' });
+
+    render(<CreditosScreen />);
+    fireEvent.press(await screen.findByText('Cancelar suscripcion'));
+
+    // Pide confirmacion y aclara que Premium sigue hasta el fin del ciclo.
+    expect(await screen.findByText(/Seguiras con Premium hasta el/)).toBeTruthy();
+    expect(cancelarSuscripcionPremium).not.toHaveBeenCalled();
+
+    fireEvent.press(screen.getByText('Si, cancelar'));
+
+    expect(await screen.findByText(/Suscripcion cancelada\. Premium sigue activo hasta el/)).toBeTruthy();
+    expect(cancelarSuscripcionPremium).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText('Si, cancelar')).toBeNull();
+  });
+
+  it('un error al cancelar no cambia el estado y se informa', async () => {
+    getPremiumMiEstado.mockResolvedValue({
+      estado: 'activo', recurrente: true, cancela_al_final: false, vence_at: '2026-11-19T20:11:00Z',
+      proximo_cobro_at: '2026-11-19T20:11:00Z', dias_restantes: 30, renovaciones: 1, creditos_por_ciclo: 10, beneficios: [],
+    });
+    cancelarSuscripcionPremium.mockRejectedValue(new Error('No se pudo cancelar la suscripcion. Intenta de nuevo.'));
+
+    render(<CreditosScreen />);
+    fireEvent.press(await screen.findByText('Cancelar suscripcion'));
+    fireEvent.press(await screen.findByText('Si, cancelar'));
+
+    await screen.findByText('Seguiras con Premium hasta el', { exact: false });
+    expect(mockToast).toHaveBeenCalledWith('No se pudo cancelar la suscripcion. Intenta de nuevo.', 'error');
+    expect(screen.queryByText(/Suscripcion cancelada\. Premium sigue activo/)).toBeNull();
+  });
+
+  it('pago unico activo no ofrece cancelar ni volver a pagar', async () => {
+    getPremiumMiEstado.mockResolvedValue({
+      estado: 'activo', recurrente: false, cancela_al_final: false, vence_at: '2026-11-19T20:11:00Z',
+      dias_restantes: 30, renovaciones: 1, creditos_por_ciclo: 10, beneficios: [],
+    });
+
+    render(<CreditosScreen />);
+
+    expect(await screen.findByText('Ciclo activo')).toBeTruthy();
+    expect(screen.queryByText('Cancelar suscripcion')).toBeNull();
+    expect(screen.queryByText(/Activar Premium por Q115/)).toBeNull();
   });
 });

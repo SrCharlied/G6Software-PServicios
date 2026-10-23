@@ -636,6 +636,31 @@ export const comprarCreditos = async ({ paqueteId, idempotencyKey }) => {
   }
 };
 
+// Stripe Checkout: el backend crea (o recupera, por idempotency_key) la sesion
+// y devuelve { compra, client_secret, publishable_key }. client_secret null
+// significa que la compra ya no admite pago: consultar getCompraCredito.
+export const crearSesionPagoStripe = async ({ paqueteId, idempotencyKey }) => {
+  try {
+    const response = await api.post('/creditos/pagos/sesion', {
+      paquete_id: paqueteId,
+      idempotency_key: idempotencyKey,
+    });
+    return response.data;
+  } catch (error) {
+    throwApiError(error, 'No se pudo iniciar el pago con tarjeta.');
+  }
+};
+
+// Estado de una compra propia; el backend la concilia con Stripe si sigue pendiente.
+export const getCompraCredito = async (compraId) => {
+  try {
+    const response = await api.get(`/creditos/compras/${compraId}`);
+    return response.data;
+  } catch (error) {
+    throwApiError(error, 'No se pudo consultar la compra.');
+  }
+};
+
 export const getCreditosTransacciones = async ({ page = 1, perPage = 15 } = {}) => {
   try {
     const response = await api.get('/creditos/transacciones', {
@@ -653,6 +678,40 @@ export const getPremiumMiEstado = async () => {
     return response.data;
   } catch (error) {
     throwApiError(error, 'No se pudo cargar el estado Premium.');
+  }
+};
+
+// Premium con Stripe. recurrente=false: pago unico de 30 dias; true: suscripcion
+// mensual. Devuelve { pago, client_secret, publishable_key }.
+export const crearSesionPagoPremium = async ({ recurrente, idempotencyKey }) => {
+  try {
+    const response = await api.post('/premium/pagos/sesion', {
+      recurrente,
+      idempotency_key: idempotencyKey,
+    });
+    return response.data;
+  } catch (error) {
+    throwApiError(error, 'No se pudo iniciar el pago de Premium.');
+  }
+};
+
+// Estado de un pago Premium propio; el backend lo concilia con Stripe si sigue pendiente.
+export const getPagoPremium = async (pagoId) => {
+  try {
+    const response = await api.get(`/premium/pagos/${pagoId}`);
+    return response.data;
+  } catch (error) {
+    throwApiError(error, 'No se pudo consultar el pago de Premium.');
+  }
+};
+
+// Cancela la renovacion al final del ciclo; Premium sigue activo hasta vence_at.
+export const cancelarSuscripcionPremium = async () => {
+  try {
+    const response = await api.post('/premium/suscripcion/cancelar');
+    return response.data;
+  } catch (error) {
+    throwApiError(error, 'No se pudo cancelar la suscripcion.');
   }
 };
 

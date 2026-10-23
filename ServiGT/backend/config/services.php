@@ -35,4 +35,24 @@ return [
         ],
     ],
 
+    // Pasarela de pago. 'simulated' conserva la compra inmediata sin cobro;
+    // 'stripe' exige Checkout Session y acredita solo por webhook firmado.
+    'payments' => [
+        'driver' => env('PAYMENTS_DRIVER', 'simulated'),
+    ],
+
+    'stripe' => [
+        'secret'         => env('STRIPE_SECRET_KEY'),
+        'publishable'    => env('STRIPE_PUBLISHABLE_KEY'),
+        'webhook_secret' => env('STRIPE_WEBHOOK_SECRET'),
+        'currency'       => env('STRIPE_CURRENCY', 'gtq'),
+        'base_url'       => env('STRIPE_API_BASE', 'https://api.stripe.com'),
+        // Checkout con ui_mode 'form' requiere Dahlia (2026-03-25) o posterior.
+        'api_version'    => env('STRIPE_API_VERSION', '2026-09-30.endive'),
+        // Origen del frontend al que Stripe devuelve al pagador tras confirmar.
+        'return_origin'  => env('STRIPE_RETURN_ORIGIN', 'http://localhost:8086'),
+        // Segundos de tolerancia entre la marca de la firma y el reloj local.
+        'webhook_tolerance' => 300,
+    ],
+
 ];

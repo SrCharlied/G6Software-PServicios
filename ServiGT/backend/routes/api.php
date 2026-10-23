@@ -17,6 +17,8 @@ use App\Http\Controllers\CalificacionController;
 use App\Http\Controllers\NotificacionController;
 use App\Http\Controllers\CotizacionController;
 use App\Http\Controllers\CreditoController;
+use App\Http\Controllers\PagoPremiumController;
+use App\Http\Controllers\PagoStripeController;
 use App\Http\Controllers\PedidoController;
 use App\Http\Controllers\PremiumController;
 use App\Http\Controllers\PublicacionServicioController;
@@ -34,6 +36,9 @@ use App\Http\Controllers\PublicacionServicioController;
 // ── Rutas publicas ─────────────────────────────────────────────────────────
 
 Route::get('/health', [HealthController::class, 'check']);
+
+// Webhook de Stripe: sin Sanctum, se autentica por la firma del cuerpo crudo.
+Route::post('/stripe/webhook', [PagoStripeController::class, 'webhook'])->middleware('throttle:stripe-webhook');
 
 // Autenticacion
 Route::post('/register', [AuthController::class, 'register'])->middleware('throttle:register');
@@ -141,12 +146,19 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/creditos/paquetes', [CreditoController::class, 'paquetes']);
     // Compra simulada e inmediata de un paquete
     Route::post('/creditos/comprar', [CreditoController::class, 'comprar'])->middleware('throttle:purchase');
+    // Compra con Stripe Checkout (formulario embebido) y consulta/conciliacion
+    Route::post('/creditos/pagos/sesion', [PagoStripeController::class, 'crearSesion'])->middleware('throttle:purchase');
+    Route::get('/creditos/compras/{id}', [PagoStripeController::class, 'estado'])->where('id', '[0-9]+');
     // Historial paginado de movimientos de creditos
     Route::get('/creditos/transacciones', [CreditoController::class, 'transacciones']);
 
     // ── Premium del proveedor ────────────────────────────────────────────────
     Route::post('/premium/activar',  [PremiumController::class, 'activar'])->middleware('throttle:premium');
     Route::get('/premium/mi-estado', [PremiumController::class, 'miEstado']);
+    // Premium con Stripe: pago unico o suscripcion mensual, y cancelacion al fin de ciclo
+    Route::post('/premium/pagos/sesion', [PagoPremiumController::class, 'crearSesion'])->middleware('throttle:purchase');
+    Route::get('/premium/pagos/{id}', [PagoPremiumController::class, 'estado'])->where('id', '[0-9]+');
+    Route::post('/premium/suscripcion/cancelar', [PagoPremiumController::class, 'cancelar'])->middleware('throttle:premium');
 
     // Publicaciones de servicios ofrecidos
     Route::get('/publicaciones/mias', [PublicacionServicioController::class, 'mias']);

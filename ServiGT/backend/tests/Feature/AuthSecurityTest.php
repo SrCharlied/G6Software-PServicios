@@ -20,12 +20,15 @@ class AuthSecurityTest extends TestCase
 
     private function payload(array $overrides = []): array
     {
-        return array_merge([
+        $datos = array_merge([
             'name'     => 'Usuaria de Prueba',
             'email'    => 'nueva@servigt.test',
             'password' => 'Password123!',
             'role'     => 'cliente',
         ], $overrides);
+
+        // La confirmacion sigue a la contrasena salvo que la prueba la fije.
+        return $datos + ['password_confirmation' => $datos['password']];
     }
 
     // ── Contrasenas ──────────────────────────────────────────────────────

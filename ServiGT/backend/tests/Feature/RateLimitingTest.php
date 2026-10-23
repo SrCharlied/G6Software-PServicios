@@ -63,6 +63,7 @@ class RateLimitingTest extends TestCase
             'name' => 'Registro Rate',
             'email' => 'rate-register@servigt.test',
             'password' => 'Password123!',
+            'password_confirmation' => 'Password123!',
             'role' => 'cliente',
         ];
 

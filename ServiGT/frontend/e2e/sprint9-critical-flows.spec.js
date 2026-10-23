@@ -7,7 +7,7 @@ const API = process.env.E2E_API_URL || 'http://localhost:8085/api';
 const stamp = `${Date.now()}-${randomBytes(4).toString('hex')}`;
 const password = `Smoke9-${randomBytes(12).toString('hex')}!`;
 const accounts = Object.fromEntries(['client', 'seller', 'buyer'].map((key) => [key, {
-  name: `Smoke S9 ${key} ${stamp}`, email: `smoke-s9-${stamp}-${key}@servigt.test`, password, role: key === 'client' ? 'cliente' : 'proveedor',
+  name: `Smoke S9 ${key} ${stamp}`, email: `smoke-s9-${stamp}-${key}@servigt.test`, password, password_confirmation: password, role: key === 'client' ? 'cliente' : 'proveedor',
 }]));
 const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=', 'base64');
 let api, serviceId, loteId, reservaId;

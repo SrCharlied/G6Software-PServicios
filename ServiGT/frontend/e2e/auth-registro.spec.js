@@ -36,7 +36,8 @@ test.describe.serial('Registro endurecido (task 4.1)', () => {
 
     await page.getByPlaceholder('Tu nombre').fill('Smoke E2E');
     await page.getByPlaceholder('correo@ejemplo.com').fill(emailLower);
-    await page.getByPlaceholder('Minimo 6 caracteres').fill('Password123!');
+    await page.getByPlaceholder('Mínimo 6 caracteres').fill('Password123!');
+    await page.getByPlaceholder('Repite tu contraseña').fill('Password123!');
     await page.getByText('Cliente', { exact: true }).click();
     // "Crear cuenta" tambien es el subtitulo de la pantalla; el boton de
     // envio es la segunda ocurrencia (mas abajo en el DOM).
@@ -53,11 +54,12 @@ test.describe.serial('Registro endurecido (task 4.1)', () => {
     // el backend debe normalizar y detectar la colision (no crear una
     // segunda cuenta).
     await page.getByPlaceholder('correo@ejemplo.com').fill(emailMixedCase);
-    await page.getByPlaceholder('Minimo 6 caracteres').fill('Password123!');
+    await page.getByPlaceholder('Mínimo 6 caracteres').fill('Password123!');
+    await page.getByPlaceholder('Repite tu contraseña').fill('Password123!');
     await page.getByText('Cliente', { exact: true }).click();
     await page.getByText('Crear cuenta', { exact: true }).last().click();
 
-    await expect(page.getByText(/correo electronico ya esta registrado/i).first()).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText(/correo electrónico ya está registrado/i).first()).toBeVisible({ timeout: 10_000 });
     // Se queda en /register: no hubo redireccion a home.
     await expect(page).toHaveURL(/\/register$/);
   });

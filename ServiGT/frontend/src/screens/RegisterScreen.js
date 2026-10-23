@@ -98,6 +98,7 @@ export default function RegisterScreen({ navigation, onRegisterSuccess }) {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [passwordConfirmation, setPasswordConfirmation] = useState('');
   const [role, setRole] = useState('cliente');
 
   // Paso 2
@@ -133,7 +134,7 @@ export default function RegisterScreen({ navigation, onRegisterSuccess }) {
       const cats = data.categorias || [];
       setCategorias(cats);
     } catch {
-      toast('No se pudieron cargar las categorias.', 'warning');
+      toast('No se pudieron cargar las categorías.', 'warning');
     } finally {
       setLoadingCats(false);
     }
@@ -145,19 +146,23 @@ export default function RegisterScreen({ navigation, onRegisterSuccess }) {
     if (!validateRequired(name)) errs.name = 'El nombre es requerido.';
     else if (name.trim().length > 255) errs.name = 'El nombre no debe superar 255 caracteres.';
     if (!validateRequired(email)) errs.email = 'El correo es requerido.';
-    else if (!validateEmail(email)) errs.email = 'El formato del correo no es valido.';
+    else if (!validateEmail(email)) errs.email = 'El formato del correo no es válido.';
     else if (email.trim().length > 255) errs.email = 'El correo no debe superar 255 caracteres.';
     if (!validatePassword(password)) {
       errs.password = password.length < 6
-        ? 'La contrasena debe tener al menos 6 caracteres.'
-        : 'La contrasena no debe superar los 72 bytes.';
+        ? 'La contraseña debe tener al menos 6 caracteres.'
+        : 'La contraseña no debe superar los 72 bytes.';
     }
+    if (!passwordConfirmation) errs.passwordConfirmation = 'Confirma tu contraseña.';
+    else if (passwordConfirmation !== password) errs.passwordConfirmation = 'Las contraseñas no coinciden.';
     if (Object.keys(errs).length) { setErrors(errs); return; }
     setErrors({});
 
     setLoading(true);
     try {
-      const data = await register(name.trim(), email.trim().toLowerCase(), password, role);
+      const data = await register(
+        name.trim(), email.trim().toLowerCase(), password, passwordConfirmation, role,
+      );
       setRegisteredUser(data.user);
       if (role === 'proveedor') {
         setStep(2);
@@ -183,10 +188,10 @@ export default function RegisterScreen({ navigation, onRegisterSuccess }) {
   // ── Paso 2: crear perfil de proveedor ────────────────────────────────
   const handleStep2 = async () => {
     const errs = {};
-    if (!validateRequired(telefono)) errs.telefono = 'El telefono es requerido.';
-    else if (!validatePhone(telefono)) errs.telefono = 'Ingresa un numero de telefono valido.';
+    if (!validateRequired(telefono)) errs.telefono = 'El teléfono es requerido.';
+    else if (!validatePhone(telefono)) errs.telefono = 'Ingresa un número de teléfono válido.';
     if (!validateRequired(descripcion)) errs.descripcion = 'Describe los servicios que ofreces.';
-    else if (descripcion.trim().length < 20) errs.descripcion = 'La descripcion debe tener al menos 20 caracteres.';
+    else if (descripcion.trim().length < 20) errs.descripcion = 'La descripción debe tener al menos 20 caracteres.';
     if (!departamento) errs.departamento = 'Selecciona tu departamento.';
     if (categoriaIds.length === 0) errs.categoriaIds = 'Selecciona al menos una categoría.';
     if (Object.keys(errs).length) { setErrors(errs); return; }
@@ -223,7 +228,7 @@ export default function RegisterScreen({ navigation, onRegisterSuccess }) {
     if (!providerProfile) return;
     const maxBytes = 5 * 1024 * 1024;
     if (file.size > maxBytes) {
-      toast('El archivo supera el limite de 5 MB.', 'warning');
+      toast('El archivo supera el límite de 5 MB.', 'warning');
       return;
     }
     setUploading(true);
@@ -286,7 +291,7 @@ export default function RegisterScreen({ navigation, onRegisterSuccess }) {
       />
       {errors.name ? <Text style={styles.fieldError}>{errors.name}</Text> : null}
 
-      <Text style={styles.inputLabel}>Correo electronico</Text>
+      <Text style={styles.inputLabel}>Correo electrónico</Text>
       <TextInput
         style={[styles.input, errors.email && styles.inputError]}
         placeholder="correo@ejemplo.com"
@@ -295,14 +300,24 @@ export default function RegisterScreen({ navigation, onRegisterSuccess }) {
       />
       {errors.email ? <Text style={styles.fieldError}>{errors.email}</Text> : null}
 
-      <Text style={styles.inputLabel}>Contrasena</Text>
+      <Text style={styles.inputLabel}>Contraseña</Text>
       <TextInput
         style={[styles.input, errors.password && styles.inputError]}
-        placeholder="Minimo 6 caracteres, maximo 72 bytes"
+        placeholder="Mínimo 6 caracteres, máximo 72 bytes"
         value={password} onChangeText={(v) => { setPassword(v); clearError('password'); }}
         secureTextEntry
       />
       {errors.password ? <Text style={styles.fieldError}>{errors.password}</Text> : null}
+
+      <Text style={styles.inputLabel}>Confirmar contraseña</Text>
+      <TextInput
+        style={[styles.input, errors.passwordConfirmation && styles.inputError]}
+        placeholder="Repite tu contraseña"
+        value={passwordConfirmation}
+        onChangeText={(v) => { setPasswordConfirmation(v); clearError('passwordConfirmation'); }}
+        secureTextEntry
+      />
+      {errors.passwordConfirmation ? <Text style={styles.fieldError}>{errors.passwordConfirmation}</Text> : null}
 
       <Text style={styles.inputLabel}>Tipo de cuenta</Text>
       <View style={styles.roleRow}>
@@ -336,7 +351,7 @@ export default function RegisterScreen({ navigation, onRegisterSuccess }) {
       </TouchableOpacity>
 
       <TouchableOpacity onPress={() => navigation?.navigate('Login')}>
-        <Text style={styles.linkText}>Ya tienes cuenta? Inicia sesion</Text>
+        <Text style={styles.linkText}>¿Ya tienes cuenta? Inicia sesión</Text>
       </TouchableOpacity>
     </View>
   );
@@ -349,7 +364,7 @@ export default function RegisterScreen({ navigation, onRegisterSuccess }) {
         Esta informacion aparecera en el listado publico de proveedores.
       </Text>
 
-      <Text style={styles.inputLabel}>Telefono *</Text>
+      <Text style={styles.inputLabel}>Teléfono *</Text>
       <TextInput
         style={[styles.input, errors.telefono && styles.inputError]}
         placeholder="Ej: 5555-1234"
@@ -358,10 +373,10 @@ export default function RegisterScreen({ navigation, onRegisterSuccess }) {
       />
       {errors.telefono ? <Text style={styles.fieldError}>{errors.telefono}</Text> : null}
 
-      <Text style={styles.inputLabel}>Descripcion de tus servicios *</Text>
+      <Text style={styles.inputLabel}>Descripción de tus servicios *</Text>
       <TextInput
         style={[styles.input, styles.textArea, errors.descripcion && styles.inputError]}
-        placeholder="Describe que servicios ofreces, tu experiencia y horarios..."
+        placeholder="Describe qué servicios ofreces, tu experiencia y horarios..."
         value={descripcion} onChangeText={(v) => { setDescripcion(v); clearError('descripcion'); }}
         multiline numberOfLines={4}
       />
@@ -472,7 +487,7 @@ export default function RegisterScreen({ navigation, onRegisterSuccess }) {
         </>
       ) : (
         <View style={styles.uploadNote}>
-          <Text style={styles.uploadNoteText}>La carga de archivos esta disponible en la version web.</Text>
+          <Text style={styles.uploadNoteText}>La carga de archivos está disponible en la versión web.</Text>
         </View>
       )}
 
@@ -509,7 +524,7 @@ export default function RegisterScreen({ navigation, onRegisterSuccess }) {
       <View style={styles.pageInner}>
         <View style={styles.logoWrap}><ServiGTLogo size={28} mode="dark" /></View>
         <Text style={styles.pageTitle}>Crear cuenta</Text>
-        <Text style={styles.appSubtitle}>Unete a la comunidad de ServiGT con datos reales de tu cuenta.</Text>
+        <Text style={styles.appSubtitle}>Únete a la comunidad de ServiGT con datos reales de tu cuenta.</Text>
 
         {/* Indicador de pasos solo para proveedor (o si ya paso del paso 1) */}
         {(role === 'proveedor' || step > 1) && <StepIndicator />}

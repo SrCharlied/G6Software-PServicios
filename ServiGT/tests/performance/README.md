@@ -28,6 +28,7 @@ docker compose --profile test run --rm -d --name k6_backend_target -p 18000:8000
 cat > /app/.env <<EOF
 APP_NAME=ServiGT
 APP_ENV=testing
+AUTH_REGISTRO_DOMINIOS_RESERVADOS=servigt.test
 APP_KEY=$APP_KEY
 APP_DEBUG=false
 APP_URL=http://localhost:8000

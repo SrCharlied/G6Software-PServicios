@@ -152,9 +152,11 @@ export const login = async (email, password) => {
   }
 };
 
-export const register = async (name, email, password, role) => {
+export const register = async (name, email, password, passwordConfirmation, role) => {
   try {
-    const response = await api.post('/register', { name, email, password, role });
+    const response = await api.post('/register', {
+      name, email, password, password_confirmation: passwordConfirmation, role,
+    });
     const { user, token } = response.data;
     await saveSession(token, user);
     return response.data;

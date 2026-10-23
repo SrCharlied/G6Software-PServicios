@@ -27,12 +27,17 @@ const completarFormulario = (screen, {
   name = 'Pablo Toledo',
   email = ' Pablo@ServiGT.test ',
   password = '123456',
+  passwordConfirmation = password,
 } = {}) => {
   fireEvent.changeText(screen.getByPlaceholderText('Tu nombre'), name);
   fireEvent.changeText(screen.getByPlaceholderText('correo@ejemplo.com'), email);
   fireEvent.changeText(
-    screen.getByPlaceholderText('Minimo 6 caracteres, maximo 72 bytes'),
+    screen.getByPlaceholderText('Mínimo 6 caracteres, máximo 72 bytes'),
     password,
+  );
+  fireEvent.changeText(
+    screen.getByPlaceholderText('Repite tu contraseña'),
+    passwordConfirmation,
   );
 };
 
@@ -47,7 +52,20 @@ describe('RegisterScreen politica de registro', () => {
 
     fireEvent.press(screen.getByLabelText('Crear cuenta'));
 
-    expect(screen.getByText('La contrasena debe tener al menos 6 caracteres.')).toBeTruthy();
+    expect(screen.getByText('La contraseña debe tener al menos 6 caracteres.')).toBeTruthy();
+    expect(register).not.toHaveBeenCalled();
+  });
+
+  it('rechaza localmente una confirmacion distinta o vacia', () => {
+    const screen = render(<RegisterScreen navigation={{ navigate: jest.fn() }} />);
+    completarFormulario(screen, { password: '123456', passwordConfirmation: '654321' });
+
+    fireEvent.press(screen.getByLabelText('Crear cuenta'));
+    expect(screen.getByText('Las contraseñas no coinciden.')).toBeTruthy();
+
+    fireEvent.changeText(screen.getByPlaceholderText('Repite tu contraseña'), '');
+    fireEvent.press(screen.getByLabelText('Crear cuenta'));
+    expect(screen.getByText('Confirma tu contraseña.')).toBeTruthy();
     expect(register).not.toHaveBeenCalled();
   });
 
@@ -57,7 +75,7 @@ describe('RegisterScreen politica de registro', () => {
 
     fireEvent.press(screen.getByLabelText('Crear cuenta'));
 
-    expect(screen.getByText('La contrasena no debe superar los 72 bytes.')).toBeTruthy();
+    expect(screen.getByText('La contraseña no debe superar los 72 bytes.')).toBeTruthy();
     expect(register).not.toHaveBeenCalled();
   });
 
@@ -76,6 +94,7 @@ describe('RegisterScreen politica de registro', () => {
       'Pablo Toledo',
       'pablo@servigt.test',
       'a'.repeat(72),
+      'a'.repeat(72),
       'cliente',
     ));
     expect(onRegisterSuccess).toHaveBeenCalledWith(user, null);
@@ -83,15 +102,15 @@ describe('RegisterScreen politica de registro', () => {
 
   it('muestra junto al campo el error backend de correo duplicado por caja', async () => {
     register.mockRejectedValue({
-      message: 'El correo electronico ya esta registrado.',
-      data: { errors: { email: ['El correo electronico ya esta registrado.'] } },
+      message: 'El correo electrónico ya está registrado.',
+      data: { errors: { email: ['El correo electrónico ya está registrado.'] } },
     });
     const screen = render(<RegisterScreen navigation={{ navigate: jest.fn() }} />);
     completarFormulario(screen, { email: 'Existente@ServiGT.test' });
 
     fireEvent.press(screen.getByLabelText('Crear cuenta'));
 
-    expect(await screen.findByText('El correo electronico ya esta registrado.')).toBeTruthy();
-    expect(mockToast).toHaveBeenCalledWith('El correo electronico ya esta registrado.', 'error');
+    expect(await screen.findByText('El correo electrónico ya está registrado.')).toBeTruthy();
+    expect(mockToast).toHaveBeenCalledWith('El correo electrónico ya está registrado.', 'error');
   });
 });

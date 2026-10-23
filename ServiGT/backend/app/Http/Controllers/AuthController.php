@@ -3,9 +3,11 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
+use App\Rules\DominioCorreoValido;
 use App\Traits\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
 
@@ -28,13 +30,15 @@ class AuthController extends Controller
 
         $validated = $request->validate([
             'name'     => 'required|string|max:255',
-            'email'    => 'required|string|email|max:255',
-            'password' => ['required', 'string', 'min:6', function ($attribute, $value, $fail) {
+            'email'    => ['required', 'string', 'email', 'max:255', new DominioCorreoValido()],
+            'password' => ['required', 'string', 'confirmed', 'min:6', function ($attribute, $value, $fail) {
                 if (strlen($value) > self::BCRYPT_MAX_BYTES) {
-                    $fail('La contrasena no debe superar los 72 bytes.');
+                    $fail('La contraseña no debe superar los 72 bytes.');
                 }
             }],
             'role'     => 'required|in:cliente,proveedor',
+        ], [
+            'password.confirmed' => 'Las contraseñas no coinciden.',
         ]);
 
         $email = mb_strtolower($validated['email'], 'UTF-8');
@@ -46,14 +50,14 @@ class AuthController extends Controller
         $existe = User::whereRaw('LOWER(email) = ?', [$email])->exists();
         if ($existe) {
             throw ValidationException::withMessages([
-                'email' => ['El correo electronico ya esta registrado.'],
+                'email' => ['El correo electrónico ya está registrado.'],
             ]);
         }
 
         $validated['email'] = $email;
         $validated['name']  = trim($validated['name']);
 
-        $user  = User::create($validated);
+        $user  = User::create(Arr::except($validated, ['password_confirmation']));
         $token = $user->createToken('auth-token')->plainTextToken;
 
         return $this->success('Usuario registrado exitosamente', [

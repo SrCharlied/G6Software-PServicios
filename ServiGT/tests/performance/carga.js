@@ -60,6 +60,7 @@ export function setup() {
       name: `Smoke K6 Carga ${i}`,
       email,
       password: 'Password123!',
+      password_confirmation: 'Password123!',
       role: 'cliente',
     });
 

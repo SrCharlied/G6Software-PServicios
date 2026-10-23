@@ -11,12 +11,14 @@ const accounts = {
     name: `Smoke Responsive Cliente ${stamp}`,
     email: `smoke-responsive-client-${stamp}@servigt.test`,
     password: 'Password123!',
+    password_confirmation: 'Password123!',
     role: 'cliente',
   },
   provider: {
     name: `Smoke Responsive Proveedor ${stamp}`,
     email: `smoke-responsive-provider-${stamp}@servigt.test`,
     password: 'Password123!',
+    password_confirmation: 'Password123!',
     role: 'proveedor',
   },
 };

@@ -17,6 +17,7 @@ class Proveedor extends Model
         'email',
         'telefono',
         'descripcion',
+        'experiencia_resumen',
         'departamento',
         'municipio',
         'categoria_id',

@@ -1,7 +1,9 @@
+import { useState } from 'react';
 import { Text, TouchableOpacity, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { PremiumBadge } from '../../components/ui';
 import styles from './providerStyles';
+import ConfirmActionModal from '../../components/ConfirmActionModal';
 import { getAvailabilityText, getGreeting, isAvailableNow } from './providerUtils';
 
 /**
@@ -22,7 +24,20 @@ export default function ProviderHeader({
   onVerCreditos,
   onLogout,
 }) {
+  const [logoutConfirmVisible, setLogoutConfirmVisible] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
   const availableNow = isAvailableNow(disponibilidad);
+
+  const confirmLogout = async () => {
+    if (loggingOut) return;
+    setLoggingOut(true);
+    try {
+      await onLogout?.();
+      setLogoutConfirmVisible(false);
+    } finally {
+      setLoggingOut(false);
+    }
+  };
 
   // saldo es null mientras carga y 0 es un saldo legitimo, asi que la guarda
   // compara contra null en vez de confiar en el valor falsy.
@@ -72,11 +87,21 @@ export default function ProviderHeader({
               <Text style={styles.headerGhostBtnText}>Editar perfil</Text>
             </TouchableOpacity>
           ) : null}
-          <TouchableOpacity style={styles.logoutBtn} onPress={onLogout}>
+          <TouchableOpacity style={styles.logoutBtn} onPress={() => setLogoutConfirmVisible(true)}>
             <Text style={styles.logoutBtnText}>Salir</Text>
           </TouchableOpacity>
         </View>
       </View>
+      <ConfirmActionModal
+        visible={logoutConfirmVisible}
+        title="Cerrar sesion"
+        message="Tu sesion se cerrara en este dispositivo. ¿Deseas continuar?"
+        confirmLabel="Cerrar sesion"
+        confirmKind="danger"
+        processing={loggingOut}
+        onCancel={() => setLogoutConfirmVisible(false)}
+        onConfirm={confirmLogout}
+      />
     </LinearGradient>
   );
 }

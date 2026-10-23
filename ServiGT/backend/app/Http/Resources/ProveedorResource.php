@@ -83,6 +83,7 @@ class ProveedorResource extends JsonResource
 
         $data += [
             'nivel'                => $this->nivel,
+            'experiencia_resumen'  => $this->experiencia_resumen,
             'total_calificaciones' => (int) ($this->total_calificaciones ?? 0),
             'portada'              => $marcaActiva ? $this->portada : null,
             'color_acento'         => $marcaActiva ? $this->color_acento : null,

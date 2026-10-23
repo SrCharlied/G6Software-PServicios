@@ -38,7 +38,7 @@ function Linea({ label, value, accent }) {
  * @param {() => void} onVerCreditos navega a /creditos
  * @param {() => void} onContinuar navega al panel de oportunidades
  */
-export default function PagoExitosoScreen({ compraId, tipo = 'creditos', onVerCreditos, onContinuar }) {
+export default function PagoExitosoScreen({ compraId, tipo = 'creditos', onVerCreditos, onContinuar, onVerComprobante }) {
   const esPremium = tipo === 'premium';
   const [fase, setFase] = useState('verificando'); // verificando | completada | pendiente | cancelada | fallida | error
   const [datos, setDatos] = useState(null);
@@ -137,7 +137,10 @@ export default function PagoExitosoScreen({ compraId, tipo = 'creditos', onVerCr
             </View>
 
             <View style={styles.acciones}>
-              <Button icon="credit-card" onPress={onVerCreditos}>{esPremium ? 'Ver mi Premium' : 'Ver mis creditos'}</Button>
+              {!esPremium && compra.comprobante_disponible && onVerComprobante ? (
+                <Button icon="file-text" onPress={() => onVerComprobante(compra.id)}>Ver comprobante</Button>
+              ) : null}
+              <Button kind={!esPremium && compra.comprobante_disponible && onVerComprobante ? 'secondary' : undefined} icon="credit-card" onPress={onVerCreditos}>{esPremium ? 'Ver mi Premium' : 'Ver mis creditos'}</Button>
               <Button kind="secondary" icon="search" onPress={onContinuar}>Buscar oportunidades</Button>
             </View>
           </View>

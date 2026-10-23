@@ -339,7 +339,7 @@ function CancelarSuscripcionModal({ visible, venceAt, cancelando, onClose, onCon
   );
 }
 
-export default function CreditosScreen() {
+export default function CreditosScreen({ onVerComprobante }) {
   const toast = useToast();
   const { width } = useWindowDimensions();
   const isDesktop = width >= 900;
@@ -916,6 +916,16 @@ export default function CreditosScreen() {
               <View style={styles.transactionBody}>
                 <Text style={styles.transactionReason}>{tx.motivo}</Text>
                 <Text style={styles.transactionDate}>{formatDate(tx.created_at)}</Text>
+                {tx.comprobante_disponible && onVerComprobante ? (
+                  <TouchableOpacity
+                    onPress={() => onVerComprobante(tx.referencia_id)}
+                    accessibilityRole="link"
+                    accessibilityLabel={`Ver comprobante de ${tx.motivo}`}
+                    style={styles.comprobanteLink}
+                  >
+                    <Text style={styles.comprobanteLinkText}>Ver comprobante</Text>
+                  </TouchableOpacity>
+                ) : null}
               </View>
               <View style={styles.transactionSide}>
                 <Text style={[styles.transactionAmount, tx.tipo === 'gasto' ? styles.transactionAmountOut : styles.transactionAmountIn]}>
@@ -1103,6 +1113,8 @@ const styles = StyleSheet.create({
   transactionRowLast: { borderBottomWidth: 0 },
   transactionIcon: { width: 36, height: 36, borderRadius: T.rSm, backgroundColor: T.paper, alignItems: 'center', justifyContent: 'center' },
   transactionBody: { flex: 1, minWidth: 0 },
+  comprobanteLink: { marginTop: 4, alignSelf: 'flex-start' },
+  comprobanteLinkText: { color: T.blue, fontSize: 12, fontWeight: '700' },
   transactionReason: { color: T.ink, fontSize: 13, fontWeight: '700', lineHeight: 18 },
   transactionDate: { color: T.faint, fontSize: 11, marginTop: 3 },
   transactionSide: { alignItems: 'flex-end', gap: 5 },

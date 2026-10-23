@@ -238,6 +238,40 @@ class PagoStripeTest extends TestCase
         $this->assertSame(2, DB::table('stripe_eventos')->whereIn('event_id', ['evt_1', 'evt_2'])->count());
     }
 
+    public function test_webhook_que_completa_la_compra_guarda_snapshot_y_el_reintento_no_lo_cambia(): void
+    {
+        $proveedor = $this->crearProveedor();
+        $compra = $this->crearCompraStripe($proveedor, 'Impulso', 'cs_snap');
+        $this->assertNull($compra->fresh()->comprobante_snapshot);
+        $evento = $this->evento('evt_s1', 'checkout.session.completed', $this->sesion('cs_snap', $this->pagada($compra)));
+
+        $this->enviarWebhook($evento)->assertOk();
+        $primero = $compra->fresh();
+        $this->enviarWebhook($this->evento('evt_s2', 'checkout.session.async_payment_succeeded', $this->sesion('cs_snap', $this->pagada($compra))))->assertOk();
+        $segundo = $compra->fresh();
+
+        $this->assertSame($compra->referencia, $primero->comprobante_snapshot['folio']);
+        $this->assertSame('stripe', $primero->comprobante_snapshot['metodo_pago']);
+        $this->assertSame(30, $primero->comprobante_snapshot['creditos_otorgados']);
+        $this->assertSame($primero->comprobante_snapshot, $segundo->comprobante_snapshot);
+        $this->assertEquals($primero->comprobante_emitido_at, $segundo->comprobante_emitido_at);
+
+        Sanctum::actingAs($proveedor->user);
+        $this->getJson("/api/creditos/compras/{$compra->id}/comprobante")
+            ->assertOk()
+            ->assertJsonPath('comprobante.metodo_pago', 'stripe');
+    }
+
+    public function test_compra_stripe_no_completada_no_genera_snapshot(): void
+    {
+        $proveedor = $this->crearProveedor();
+        $compra = $this->crearCompraStripe($proveedor, 'Inicial', 'cs_nosnap');
+
+        $this->enviarWebhook($this->evento('evt_n1', 'checkout.session.completed', $this->sesion('cs_nosnap')))->assertOk();
+
+        $this->assertNull($compra->fresh()->comprobante_snapshot);
+    }
+
     public function test_webhook_con_firma_invalida_o_ausente_se_rechaza_sin_acreditar(): void
     {
         $proveedor = $this->crearProveedor();

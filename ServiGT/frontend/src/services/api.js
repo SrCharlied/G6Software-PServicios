@@ -663,6 +663,17 @@ export const getCompraCredito = async (compraId) => {
   }
 };
 
+// Comprobante informativo (snapshot guardado) de una compra propia completada.
+// 404 si la compra es ajena o histórica sin comprobante; 409 si aún no se completa.
+export const getComprobanteCompra = async (compraId) => {
+  try {
+    const response = await api.get(`/creditos/compras/${compraId}/comprobante`);
+    return response.data;
+  } catch (error) {
+    throwApiError(error, 'No se pudo cargar el comprobante.');
+  }
+};
+
 export const getCreditosTransacciones = async ({ page = 1, perPage = 15 } = {}) => {
   try {
     const response = await api.get('/creditos/transacciones', {

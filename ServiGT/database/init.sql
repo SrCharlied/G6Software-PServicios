@@ -198,6 +198,62 @@ END $$;
 CREATE UNIQUE INDEX IF NOT EXISTS uk_compras_creditos_stripe_session
     ON compras_creditos (stripe_session_id) WHERE stripe_session_id IS NOT NULL;
 
+-- Comprobante informativo (HU 4.1). Solo las compras que se completan despues de
+-- esta version guardan snapshot; el folio es `referencia`. Las compras historicas
+-- ya completadas conservan NULL y no reciben comprobante completo. No es un
+-- documento fiscal (sin FEL ni PDF).
+ALTER TABLE compras_creditos ADD COLUMN IF NOT EXISTS comprobante_snapshot JSONB;
+ALTER TABLE compras_creditos ADD COLUMN IF NOT EXISTS comprobante_emitido_at TIMESTAMP WITHOUT TIME ZONE;
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint
+        WHERE conrelid = 'compras_creditos'::regclass
+          AND conname = 'compras_creditos_comprobante_chk'
+    ) THEN
+        ALTER TABLE compras_creditos ADD CONSTRAINT compras_creditos_comprobante_chk
+            CHECK (
+                (comprobante_snapshot IS NULL AND comprobante_emitido_at IS NULL)
+                OR (comprobante_snapshot IS NOT NULL AND comprobante_emitido_at IS NOT NULL
+                    AND estado = 'completada')
+            );
+    END IF;
+END $$;
+
+-- El snapshot es inmutable: una vez escrito no cambia, ni tampoco los datos de la
+-- compra que respalda. Y solo puede nacer en el mismo momento en que la compra se
+-- completa: una compra ya completada sin snapshot (historica) no puede recibirlo.
+CREATE OR REPLACE FUNCTION compras_creditos_comprobante_inmutable() RETURNS trigger AS $fn$
+BEGIN
+    IF OLD.comprobante_snapshot IS NOT NULL THEN
+        IF NEW.comprobante_snapshot IS DISTINCT FROM OLD.comprobante_snapshot
+           OR NEW.comprobante_emitido_at IS DISTINCT FROM OLD.comprobante_emitido_at
+           OR NEW.referencia IS DISTINCT FROM OLD.referencia
+           OR NEW.proveedor_id IS DISTINCT FROM OLD.proveedor_id
+           OR NEW.paquete_id IS DISTINCT FROM OLD.paquete_id
+           OR NEW.monto_gtq IS DISTINCT FROM OLD.monto_gtq
+           OR NEW.creditos_otorgados IS DISTINCT FROM OLD.creditos_otorgados
+           OR NEW.estado IS DISTINCT FROM OLD.estado
+           OR NEW.completada_at IS DISTINCT FROM OLD.completada_at THEN
+            RAISE EXCEPTION 'El comprobante de la compra % es inmutable', OLD.referencia;
+        END IF;
+    ELSIF NEW.comprobante_snapshot IS NOT NULL AND OLD.estado = 'completada' THEN
+        RAISE EXCEPTION 'La compra % ya estaba completada: no admite comprobante', OLD.referencia;
+    END IF;
+
+    RETURN NEW;
+END;
+$fn$ LANGUAGE plpgsql;
+
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'trg_compras_creditos_comprobante_inmutable') THEN
+        CREATE TRIGGER trg_compras_creditos_comprobante_inmutable
+            BEFORE UPDATE ON compras_creditos
+            FOR EACH ROW EXECUTE FUNCTION compras_creditos_comprobante_inmutable();
+    END IF;
+END $$;
+
 -- Eventos de webhook ya procesados: la PK es el arbitro de la idempotencia.
 CREATE TABLE IF NOT EXISTS stripe_eventos (
     event_id VARCHAR(255) PRIMARY KEY,

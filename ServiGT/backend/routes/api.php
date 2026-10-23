@@ -149,6 +149,8 @@ Route::middleware('auth:sanctum')->group(function () {
     // Compra con Stripe Checkout (formulario embebido) y consulta/conciliacion
     Route::post('/creditos/pagos/sesion', [PagoStripeController::class, 'crearSesion'])->middleware('throttle:purchase');
     Route::get('/creditos/compras/{id}', [PagoStripeController::class, 'estado'])->where('id', '[0-9]+');
+    // Comprobante informativo (snapshot inmutable) de una compra completada propia
+    Route::get('/creditos/compras/{id}/comprobante', [CreditoController::class, 'comprobante'])->where('id', '[0-9]+');
     // Historial paginado de movimientos de creditos
     Route::get('/creditos/transacciones', [CreditoController::class, 'transacciones']);
 

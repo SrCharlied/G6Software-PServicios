@@ -7,6 +7,7 @@ use App\Models\CreditoProveedor;
 use App\Models\PaqueteCredito;
 use App\Models\Proveedor;
 use App\Models\TransaccionCredito;
+use App\Services\ComprobanteCompraService;
 use App\Traits\ApiResponse;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
@@ -143,6 +144,10 @@ class CreditoController extends Controller
         $existente = $this->buscarCompraPorClave($proveedor->id, $clave);
 
         if ($existente) {
+            if ((int) $existente->paquete_id !== (int) $validated['paquete_id']) {
+                return $this->conflictoDeClave();
+            }
+
             return $this->respuestaIdempotente($proveedor->id, $existente);
         }
 
@@ -176,6 +181,10 @@ class CreditoController extends Controller
                 $ganadora = $this->buscarCompraPorClave($proveedor->id, $clave);
 
                 if ($ganadora) {
+                    if ((int) $ganadora->paquete_id !== (int) $paquete->id) {
+                        return $this->conflictoDeClave();
+                    }
+
                     return $this->respuestaIdempotente($proveedor->id, $ganadora);
                 }
 
@@ -214,15 +223,30 @@ class CreditoController extends Controller
 
         $totalCreditos = $paquete->creditos_base + $paquete->creditos_bonus;
 
+        $referencia   = $this->generarReferenciaUnica();
+        $completadaAt = now();
+
+        // El snapshot nace junto con la compra completada y ya no cambia.
         $compra = CompraCredito::create([
-            'proveedor_id'       => $proveedorLock->id,
-            'paquete_id'         => $paquete->id,
-            'monto_gtq'          => $paquete->precio_gtq,
-            'creditos_otorgados' => $totalCreditos,
-            'estado'             => 'completada',
-            'referencia'         => $this->generarReferenciaUnica(),
-            'idempotency_key'    => $clave,
-            'completada_at'      => now(),
+            'proveedor_id'           => $proveedorLock->id,
+            'paquete_id'             => $paquete->id,
+            'monto_gtq'              => $paquete->precio_gtq,
+            'creditos_otorgados'     => $totalCreditos,
+            'estado'                 => 'completada',
+            'metodo_pago'            => 'simulado',
+            'referencia'             => $referencia,
+            'idempotency_key'        => $clave,
+            'completada_at'          => $completadaAt,
+            'comprobante_snapshot'   => app(ComprobanteCompraService::class)->construir(
+                $proveedorLock,
+                $paquete,
+                $referencia,
+                'simulado',
+                $paquete->precio_gtq,
+                $totalCreditos,
+                $completadaAt,
+            ),
+            'comprobante_emitido_at' => $completadaAt,
         ]);
 
         $credito->saldo += $totalCreditos;
@@ -252,6 +276,12 @@ class CreditoController extends Controller
         return CompraCredito::where('proveedor_id', $proveedorId)
             ->where('idempotency_key', $clave)
             ->first();
+    }
+
+    /** La misma clave no puede reutilizarse para comprar otro paquete. */
+    private function conflictoDeClave(): JsonResponse
+    {
+        return $this->error('La clave de idempotencia ya se uso con otro paquete.', 409);
     }
 
     /**
@@ -299,8 +329,20 @@ class CreditoController extends Controller
 
         // El motivo de los bonos Premium lleva la clave del ciclo (premium-<id>-<ciclo>)
         // para que el bono sea idempotente. Es un detalle interno: no se muestra.
-        $transacciones->getCollection()->transform(function (TransaccionCredito $t) {
+        // Compras de esta pagina que ya tienen comprobante (HU 4.1): una sola
+        // consulta, no una por fila. Las historicas no aparecen aqui.
+        $conComprobante = CompraCredito::where('proveedor_id', $proveedor->id)
+            ->whereIn('id', $transacciones->getCollection()->where('tipo', 'compra')->pluck('referencia_id')->filter()->all())
+            ->whereNotNull('comprobante_snapshot')
+            ->pluck('id')
+            ->all();
+
+        $transacciones->getCollection()->transform(function (TransaccionCredito $t) use ($conComprobante) {
             $t->motivo = preg_replace('/\s*\(premium-[^)]*\)\s*$/', '', (string) $t->motivo);
+            $t->setAttribute(
+                'comprobante_disponible',
+                $t->tipo === 'compra' && in_array((int) $t->referencia_id, array_map('intval', $conComprobante), true)
+            );
 
             return $t;
         });
@@ -310,6 +352,48 @@ class CreditoController extends Controller
             'pagina_actual' => $transacciones->currentPage(),
             'ultima_pagina' => $transacciones->lastPage(),
             'total'         => $transacciones->total(),
+        ]);
+    }
+
+    /**
+     * GET /api/creditos/compras/{id}/comprobante
+     * Auth: Sanctum, rol proveedor, solo compras propias.
+     * Response 200: { comprobante: { version, folio, proveedor, paquete,
+     * creditos_otorgados, monto_gtq, moneda, metodo_pago, completada_at,
+     * emitido_at, sin_validez_fiscal, leyenda } }
+     * 403: el usuario no es proveedor. 404: compra inexistente o ajena, o compra
+     * historica sin comprobante. 409: la compra aun no esta completada.
+     * Se sirve siempre el snapshot guardado, nunca datos recalculados: consultar
+     * o imprimir varias veces devuelve lo mismo y no escribe nada.
+     */
+    public function comprobante(Request $request, int $id): JsonResponse
+    {
+        $proveedor = Proveedor::where('user_id', $request->user()->id)->first();
+
+        if (!$proveedor) {
+            return $this->error('Solo los proveedores pueden consultar comprobantes de creditos.', 403);
+        }
+
+        $compra = CompraCredito::where('proveedor_id', $proveedor->id)->find($id);
+
+        if (!$compra) {
+            return $this->error('Compra no encontrada.', 404);
+        }
+
+        if ($compra->estado !== 'completada') {
+            return $this->error('La compra aun no esta completada: no tiene comprobante.', 409);
+        }
+
+        if ($compra->comprobante_snapshot === null) {
+            return $this->error('Esta compra no tiene comprobante disponible.', 404);
+        }
+
+        return $this->success('Comprobante obtenido correctamente.', [
+            'comprobante' => $compra->comprobante_snapshot + [
+                'emitido_at'         => $compra->comprobante_emitido_at,
+                'sin_validez_fiscal' => true,
+                'leyenda'            => 'Comprobante informativo de compra de créditos. No tiene validez fiscal.',
+            ],
         ]);
     }
 
@@ -323,6 +407,8 @@ class CreditoController extends Controller
             'estado'             => $compra->estado,
             'referencia'         => $compra->referencia,
             'completada_at'      => $compra->completada_at,
+            // Solo las compras completadas despues de HU 4.1 tienen comprobante.
+            'comprobante_disponible' => $compra->comprobante_snapshot !== null,
         ];
     }
 

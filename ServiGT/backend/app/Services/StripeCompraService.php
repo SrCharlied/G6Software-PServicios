@@ -106,11 +106,15 @@ class StripeCompraService
             ]);
         }
 
+        $completadaAt = now();
+
+        // El snapshot del comprobante se escribe en el mismo UPDATE que completa
+        // la compra: es la unica via por la que nace y despues no cambia.
         $compra->forceFill([
             'estado'        => 'completada',
-            'completada_at' => now(),
+            'completada_at' => $completadaAt,
             'fallo_motivo'  => null,
-        ])->save();
+        ] + app(ComprobanteCompraService::class)->atributosAlCompletar($compra, $completadaAt))->save();
 
         $credito->saldo += $compra->creditos_otorgados;
         $credito->updated_at = now();

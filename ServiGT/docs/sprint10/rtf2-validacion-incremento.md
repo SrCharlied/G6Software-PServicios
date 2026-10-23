@@ -1,9 +1,13 @@
 # Sprint 10 — trazabilidad RTF2 y validación del incremento
 
-**Responsable:** Antony Saz (AS)  
-**Reviewer:** Juan Salguero (JA)  
-**HU:** 8.2 — Documentar RTF2 y validación del incremento con usuarios  
-**Última actualización técnica:** 2026-10-22  
+**Responsable:** Antony Saz (AS)
+
+**Reviewer:** Juan Salguero (JA)
+
+**HU:** 8.2 — Documentar RTF2 y validación del incremento con usuarios
+
+**Última actualización técnica:** 2026-10-22
+
 **Estado del documento:** borrador operativo; faltan revisión, integración y sesiones reales.
 
 ## Regla de evidencia

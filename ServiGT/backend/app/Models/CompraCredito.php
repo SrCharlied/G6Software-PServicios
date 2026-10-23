@@ -23,12 +23,16 @@ class CompraCredito extends Model
         'stripe_session_id',
         'fallo_motivo',
         'completada_at',
+        'comprobante_snapshot',
+        'comprobante_emitido_at',
     ];
 
     protected $casts = [
         'monto_gtq'          => 'decimal:2',
         'creditos_otorgados' => 'integer',
         'completada_at'      => 'datetime',
+        'comprobante_snapshot'   => 'array',
+        'comprobante_emitido_at' => 'datetime',
     ];
 
     public function proveedor()

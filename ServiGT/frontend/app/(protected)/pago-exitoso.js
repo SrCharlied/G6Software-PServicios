@@ -23,6 +23,7 @@ export default function PagoExitosoRoute() {
         tipo={esPremium ? 'premium' : 'creditos'}
         onVerCreditos={() => router.replace('/creditos')}
         onContinuar={() => router.replace('/pedidos/abiertos')}
+        onVerComprobante={(id) => router.replace(`/comprobante?compra_id=${id}`)}
       />
     </InternalLayout>
   );

@@ -65,6 +65,25 @@ describe('PagoExitosoScreen', () => {
     expect(onContinuar).toHaveBeenCalledTimes(1);
   });
 
+  it('ofrece el comprobante solo si la compra lo tiene', async () => {
+    const onVerComprobante = jest.fn();
+    getCompraCredito.mockResolvedValue({ compra: { ...COMPRA, comprobante_disponible: true }, saldo: 38 });
+
+    renderizar({ onVerComprobante });
+    fireEvent.press(await screen.findByText('Ver comprobante'));
+
+    expect(onVerComprobante).toHaveBeenCalledWith(5);
+  });
+
+  it('sin comprobante disponible no muestra el botón', async () => {
+    getCompraCredito.mockResolvedValue({ compra: { ...COMPRA, comprobante_disponible: false }, saldo: 38 });
+
+    renderizar({ onVerComprobante: jest.fn() });
+    await screen.findByText('Pago realizado con exito');
+
+    expect(screen.queryByText('Ver comprobante')).toBeNull();
+  });
+
   it('una compra cancelada nunca se presenta como exito', async () => {
     getCompraCredito.mockResolvedValue({ compra: { ...COMPRA, estado: 'cancelada' }, saldo: 8 });
 

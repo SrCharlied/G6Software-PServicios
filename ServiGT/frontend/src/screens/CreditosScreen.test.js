@@ -77,6 +77,28 @@ beforeEach(() => {
   getPremiumMiEstado.mockResolvedValue(PREMIUM_ACTIVO);
 });
 
+describe('CreditosScreen — comprobantes (HU 4.1)', () => {
+  it('ofrece ver el comprobante solo en compras que lo tienen', async () => {
+    getCreditosTransacciones.mockResolvedValue({
+      transacciones: [
+        { ...MOVIMIENTO, id: 1, referencia_id: 11, motivo: 'Compra nueva', comprobante_disponible: true },
+        { ...MOVIMIENTO, id: 2, referencia_id: 12, motivo: 'Compra histórica', comprobante_disponible: false },
+      ],
+      pagina_actual: 1,
+      ultima_pagina: 1,
+    });
+    const onVerComprobante = jest.fn();
+
+    render(<CreditosScreen onVerComprobante={onVerComprobante} />);
+
+    expect(await screen.findByText('Compra histórica', {}, { timeout: 4000 })).toBeTruthy();
+    expect(screen.getAllByText('Ver comprobante')).toHaveLength(1);
+
+    fireEvent.press(screen.getByLabelText('Ver comprobante de Compra nueva'));
+    expect(onVerComprobante).toHaveBeenCalledWith(11);
+  });
+});
+
 describe('CreditosScreen — saldo', () => {
   it('muestra loading mientras carga', () => {
     getMiCredito.mockReturnValue(new Promise(() => {}));

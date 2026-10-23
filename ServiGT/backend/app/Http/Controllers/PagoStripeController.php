@@ -371,6 +371,7 @@ class PagoStripeController extends Controller
             'referencia'         => $compra->referencia,
             'fallo_motivo'       => $compra->fallo_motivo,
             'completada_at'      => $compra->completada_at,
+            'comprobante_disponible' => $compra->comprobante_snapshot !== null,
         ];
     }
 }

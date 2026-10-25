@@ -134,12 +134,28 @@ class CotizacionController extends Controller
      */
     public function update(Request $request, int $pedidoId, int $cotizacionId): JsonResponse
     {
+        // Autorizar antes de validar (HU 5.1, Sprint 10): quien no puede editar
+        // esta cotizacion no recibe los errores del formulario. Rol incorrecto
+        // es 403; una cotizacion ajena o inexistente es 404, sin revelarla.
+        if ($request->user()->role !== 'proveedor') {
+            return $this->error('Solo un proveedor puede editar cotizaciones.', 403);
+        }
+
+        $proveedor = Proveedor::where('user_id', $request->user()->id)->firstOrFail();
+
+        $esSuya = Cotizacion::where('id', $cotizacionId)
+            ->where('pedido_id', $pedidoId)
+            ->where('proveedor_id', $proveedor->id)
+            ->exists();
+
+        if (!$esSuya) {
+            return $this->error('Cotización no encontrada.', 404);
+        }
+
         $validated = $request->validate([
             'monto'   => 'required|numeric|min:1|max:999999.99',
             'mensaje' => 'required|string|min:20|max:500',
         ]);
-
-        $proveedor = Proveedor::where('user_id', $request->user()->id)->firstOrFail();
 
         $resultado = DB::transaction(function () use ($proveedor, $pedidoId, $cotizacionId, $validated) {
             // Mismo orden de locks que `aceptar` (pedido -> cotizacion) para que

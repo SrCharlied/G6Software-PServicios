@@ -15,7 +15,11 @@ class NotificacionController extends Controller
             ->limit(50)
             ->get();
 
-        $noLeidas = $notificaciones->where('leida', false)->count();
+        // Conteo exacto en SQL (HU 1.5.a, Sprint 10): la lista se corta en 50,
+        // el total de no leidas no.
+        $noLeidas = Notificacion::where('destinatario_id', $request->user()->id)
+            ->where('leida', false)
+            ->count();
 
         return response()->json([
             'notificaciones' => $notificaciones,

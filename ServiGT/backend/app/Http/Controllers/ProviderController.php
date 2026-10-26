@@ -102,8 +102,8 @@ class ProviderController extends Controller
         $validated = $request->validate([
             'nombre'            => 'required|string|max:255',
             'email'             => 'required|email|unique:proveedores,email',
-            'telefono'          => 'nullable|string|max:20',
-            'descripcion'       => 'nullable|string',
+            'telefono'          => ['required', 'string', 'regex:/^[0-9]{8}$/'],
+            'descripcion'       => 'required|string|min:20|max:500',
             'departamento'      => 'required|string|max:100',
             'municipio'         => 'nullable|string|max:100',
             'categoria_id'      => 'nullable|exists:categorias,id',
@@ -166,8 +166,8 @@ class ProviderController extends Controller
 
         $validated = $request->validate([
             'nombre'            => 'sometimes|required|string|max:255',
-            'telefono'          => 'nullable|string|max:20',
-            'descripcion'       => 'nullable|string',
+            'telefono'          => ['sometimes', 'required', 'string', 'regex:/^[0-9]{8}$/'],
+            'descripcion'       => 'sometimes|required|string|min:20|max:500',
             'departamento'      => 'sometimes|required|string|max:100',
             'municipio'         => 'nullable|string|max:100',
             'categoria_id'      => 'sometimes|nullable|exists:categorias,id',

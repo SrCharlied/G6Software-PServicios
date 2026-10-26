@@ -100,10 +100,10 @@ class PremiumPersonalizacionTest extends TestCase
         $proveedor = $this->proveedorConPremium(null);
         $this->actuarComoDuenno($proveedor);
 
-        $this->putJson("/api/providers/{$proveedor->id}", ['descripcion' => 'Nueva descripcion'])
+        $this->putJson("/api/providers/{$proveedor->id}", ['descripcion' => 'Nueva descripcion profesional'])
             ->assertStatus(200);
 
-        $this->assertSame('Nueva descripcion', $proveedor->fresh()->descripcion);
+        $this->assertSame('Nueva descripcion profesional', $proveedor->fresh()->descripcion);
     }
 
     public function test_subir_portada_exige_premium_activo(): void

@@ -41,6 +41,7 @@ async function registrar(key, categoriaId) {
   sessions[key] = body;
   const perfil = await call('POST', '/providers', key, {
     nombre: accounts[key].name,
+    telefono: '55550101',
     email: accounts[key].email,
     departamento: 'Guatemala',
     categoria_id: categoriaId,

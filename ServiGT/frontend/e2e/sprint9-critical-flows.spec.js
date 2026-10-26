@@ -78,7 +78,7 @@ test.describe.serial('Sprint 9 materiales con API real', () => {
       createdEmails.push(account.email);
       sessions[key] = registered.body;
       if (account.role === 'proveedor') {
-        const profile = await call('POST', '/providers', key, { nombre: account.name, email: account.email, departamento: 'Guatemala', categoria_id: categoryId, nivel: 'experto', descripcion: 'Perfil temporal Smoke S9 para pruebas de integracion.' });
+        const profile = await call('POST', '/providers', key, { nombre: account.name, email: account.email, telefono: '55550101', departamento: 'Guatemala', categoria_id: categoryId, nivel: 'experto', descripcion: 'Perfil temporal Smoke S9 para pruebas de integracion.' });
         expect(profile.status).toBe(201);
         sessions[key].proveedor = profile.body.proveedor;
       }

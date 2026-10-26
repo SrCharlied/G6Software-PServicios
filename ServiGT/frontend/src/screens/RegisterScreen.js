@@ -189,9 +189,10 @@ export default function RegisterScreen({ navigation, onRegisterSuccess }) {
   const handleStep2 = async () => {
     const errs = {};
     if (!validateRequired(telefono)) errs.telefono = 'El teléfono es requerido.';
-    else if (!validatePhone(telefono)) errs.telefono = 'Ingresa un número de teléfono válido.';
+    else if (!validatePhone(telefono)) errs.telefono = 'Ingresa un teléfono local de 8 dígitos.';
     if (!validateRequired(descripcion)) errs.descripcion = 'Describe los servicios que ofreces.';
     else if (descripcion.trim().length < 20) errs.descripcion = 'La descripción debe tener al menos 20 caracteres.';
+    else if (descripcion.trim().length > 500) errs.descripcion = 'La descripción no debe superar 500 caracteres.';
     if (!departamento) errs.departamento = 'Selecciona tu departamento.';
     if (categoriaIds.length === 0) errs.categoriaIds = 'Selecciona al menos una categoría.';
     if (Object.keys(errs).length) { setErrors(errs); return; }
@@ -367,7 +368,7 @@ export default function RegisterScreen({ navigation, onRegisterSuccess }) {
       <Text style={styles.inputLabel}>Teléfono *</Text>
       <TextInput
         style={[styles.input, errors.telefono && styles.inputError]}
-        placeholder="Ej: 5555-1234"
+        placeholder="Ej: 55551234"
         value={telefono} onChangeText={(v) => { setTelefono(v); clearError('telefono'); }}
         keyboardType="phone-pad"
       />
@@ -378,9 +379,10 @@ export default function RegisterScreen({ navigation, onRegisterSuccess }) {
         style={[styles.input, styles.textArea, errors.descripcion && styles.inputError]}
         placeholder="Describe qué servicios ofreces, tu experiencia y horarios..."
         value={descripcion} onChangeText={(v) => { setDescripcion(v); clearError('descripcion'); }}
-        multiline numberOfLines={4}
+        multiline numberOfLines={4} maxLength={500}
       />
       {errors.descripcion ? <Text style={styles.fieldError}>{errors.descripcion}</Text> : null}
+      <Text style={styles.inputLabel}>{`${descripcion.length}/500 caracteres`}</Text>
 
       <Dropdown
         label="Departamento *"

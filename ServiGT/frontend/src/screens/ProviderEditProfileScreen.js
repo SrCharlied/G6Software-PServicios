@@ -158,9 +158,10 @@ export default function ProviderEditProfileScreen({
   const handleSave = async () => {
     const errs = {};
     if (!validateRequired(nombre)) errs.nombre = 'El nombre es requerido.';
-    if (telefono && !validatePhone(telefono)) errs.telefono = 'Ingresa un numero de telefono valido.';
+    if (!validatePhone(telefono)) errs.telefono = 'Ingresa un telefono local de 8 digitos.';
     if (!validateRequired(descripcion)) errs.descripcion = 'La descripcion es requerida.';
     else if (descripcion.trim().length < 20) errs.descripcion = 'La descripcion debe tener al menos 20 caracteres.';
+    else if (descripcion.trim().length > 500) errs.descripcion = 'La descripcion no debe superar 500 caracteres.';
     if (!departamento) errs.departamento = 'Selecciona tu departamento.';
     if (categoriaIds.length === 0) errs.categoriaIds = 'Selecciona al menos una categoria.';
     if (tarifaHora && !validateNumeric(tarifaHora)) errs.tarifaHora = 'Ingresa una tarifa valida.';
@@ -172,7 +173,7 @@ export default function ProviderEditProfileScreen({
     try {
       const payload = {
         nombre: nombre.trim(),
-        telefono: telefono.trim() || null,
+        telefono: telefono.trim(),
         descripcion: descripcion.trim(),
         departamento,
         municipio: municipio.trim() || null,
@@ -181,8 +182,8 @@ export default function ProviderEditProfileScreen({
         tarifa_hora: tarifaHora ? parseFloat(tarifaHora) : null,
         tarifa_proyecto: tarifaProyecto ? parseFloat(tarifaProyecto) : null,
         nivel,
-        color_acento: colorAcento,
       };
+      if (colorAcento !== (providerProfile?.color_acento || null)) payload.color_acento = colorAcento;
 
       const data = isEditing
         ? await updateProvider(providerProfile.id, payload)
@@ -265,10 +266,10 @@ export default function ProviderEditProfileScreen({
           style={s.field}
         />
 
-        <Text style={s.label}>Telefono</Text>
+        <Text style={s.label}>Telefono *</Text>
         <Input
           icon="phone"
-          placeholder="Ej: 5555-1234"
+          placeholder="Ej: 55551234"
           value={telefono}
           onChangeText={(v) => { setTelefono(v); clearError('telefono'); }}
           keyboardType="phone-pad"
@@ -283,9 +284,12 @@ export default function ProviderEditProfileScreen({
           onChangeText={(v) => { setDescripcion(v); clearError('descripcion'); }}
           multiline
           numberOfLines={5}
+          maxLength={500}
           error={errors.descripcion}
           style={s.field}
         />
+
+        <Text style={s.photoHint}>{`${descripcion.length}/500 caracteres`}</Text>
 
         <Text style={s.label}>Departamento *</Text>
         <TouchableOpacity

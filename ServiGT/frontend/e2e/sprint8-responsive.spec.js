@@ -93,6 +93,7 @@ test.describe.serial('Checklist responsive Sprint 8', () => {
       token: providerToken,
       data: {
         nombre: accounts.provider.name,
+        telefono: '55550101',
         email: accounts.provider.email,
         departamento: 'Guatemala',
         categoria_id: categoryId,

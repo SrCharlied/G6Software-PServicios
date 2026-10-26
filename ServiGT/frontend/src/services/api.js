@@ -183,6 +183,11 @@ export const getMe = async (config = {}) => {
   }
 };
 
+export const getDocumentosLegales = async () => {
+  try { return (await api.get('/legal/documentos/vigentes')).data; }
+  catch (error) { throwApiError(error, 'No se pudieron cargar los documentos legales.'); }
+};
+
 // ── Categorias ────────────────────────────────────────────────────────────
 
 export const getCategorias = async () => {

@@ -534,6 +534,10 @@ export default function RegisterScreen({ navigation, onRegisterSuccess }) {
         {step === 1 && renderStep1()}
         {step === 2 && renderStep2()}
         {step === 3 && renderStep3()}
+        <View style={styles.roleRow}>
+          <TouchableOpacity accessibilityRole="link" onPress={() => navigation?.navigate('Terminos')}><Text style={styles.linkText}>Terminos y condiciones</Text></TouchableOpacity>
+          <TouchableOpacity accessibilityRole="link" onPress={() => navigation?.navigate('Privacidad')}><Text style={styles.linkText}>Privacidad</Text></TouchableOpacity>
+        </View>
       </View>
     </ScrollView>
   );

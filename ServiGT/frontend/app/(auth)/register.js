@@ -8,7 +8,7 @@ export default function RegisterRoute() {
 
   const navigation = {
     navigate: (name) => {
-      const map = { login: '/login', home: '/home' };
+      const map = { login: '/login', home: '/home', terminos: '/terminos', privacidad: '/privacidad' };
       router.push(map[name.toLowerCase()] ?? '/home');
     },
   };

@@ -3,12 +3,16 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
+use App\Models\DocumentoLegal;
+use App\Models\AceptacionLegal;
 use App\Rules\DominioCorreoValido;
 use App\Traits\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
@@ -37,6 +41,10 @@ class AuthController extends Controller
                 }
             }],
             'role'     => 'required|in:cliente,proveedor',
+            'aceptaciones_legales' => 'required|array|size:2',
+            'aceptaciones_legales.*.documento_legal_id' => 'required|integer|distinct',
+            'aceptaciones_legales.*.version' => 'required|string|max:40',
+            'aceptaciones_legales.*.aceptado' => 'required|accepted',
         ], [
             'password.confirmed' => 'Las contraseñas no coinciden.',
         ]);
@@ -57,7 +65,19 @@ class AuthController extends Controller
         $validated['email'] = $email;
         $validated['name']  = trim($validated['name']);
 
-        $user  = User::create(Arr::except($validated, ['password_confirmation']));
+        $user = DB::transaction(function () use ($validated) {
+            $documentos = DocumentoLegal::vigentes();
+            if ($documentos->count() !== 2) throw new HttpResponseException($this->error('No hay terminos y privacidad aprobados y vigentes disponibles.', 503));
+            foreach ($documentos as $documento) {
+                $aceptacion = collect($validated['aceptaciones_legales'])->first(fn ($item) => (int) $item['documento_legal_id'] === $documento->id);
+                if (!$aceptacion || $aceptacion['version'] !== $documento->version) {
+                    throw new HttpResponseException($this->error('Los documentos legales cambiaron. Revisa y acepta las versiones vigentes.', 409));
+                }
+            }
+            $user = User::create(Arr::except($validated, ['password_confirmation', 'aceptaciones_legales']));
+            foreach ($documentos as $documento) AceptacionLegal::create(['user_id' => $user->id, 'documento_legal_id' => $documento->id]);
+            return $user;
+        });
         $token = $user->createToken('auth-token')->plainTextToken;
 
         return $this->success('Usuario registrado exitosamente', [

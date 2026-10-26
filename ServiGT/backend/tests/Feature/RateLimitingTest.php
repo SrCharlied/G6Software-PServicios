@@ -15,6 +15,7 @@ use Tests\TestCase;
 class RateLimitingTest extends TestCase
 {
     use DatabaseTransactions;
+    use \Tests\Feature\Concerns\AceptaDocumentosDePrueba;
 
     protected function setUp(): void
     {
@@ -62,6 +63,7 @@ class RateLimitingTest extends TestCase
         $payload = [
             'name' => 'Registro Rate',
             'email' => 'rate-register@servigt.test',
+            'aceptaciones_legales' => $this->aceptacionesDePrueba(),
             'password' => 'Password123!',
             'password_confirmation' => 'Password123!',
             'role' => 'cliente',

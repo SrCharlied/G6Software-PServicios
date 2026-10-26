@@ -93,6 +93,12 @@ CREATE INDEX IF NOT EXISTS idx_proveedores_user_id ON proveedores (user_id);
 CREATE INDEX IF NOT EXISTS idx_proveedores_categoria_id ON proveedores (categoria_id);
 CREATE INDEX IF NOT EXISTS idx_proveedores_departamento ON proveedores (departamento);
 
+-- Normalizar solo el formato historico conocido; no reinterpretar prefijos.
+UPDATE users SET telefono = REPLACE(telefono, '-', '')
+WHERE telefono ~ '^[0-9]{4}-[0-9]{4}$';
+UPDATE proveedores SET telefono = REPLACE(telefono, '-', '')
+WHERE telefono ~ '^[0-9]{4}-[0-9]{4}$';
+
 -- Documentos de identidad del proveedor
 CREATE TABLE IF NOT EXISTS documentos_proveedores (
     id BIGSERIAL PRIMARY KEY,

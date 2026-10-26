@@ -296,7 +296,7 @@ foreach ($sampleProviders as $i => $p) {
         'email'    => $email,
         'password' => $providerHash,
         'role'     => 'proveedor',
-        'telefono' => $telefono,
+        'telefono' => str_replace('-', '', $telefono),
     ]);
     $userId = $insertUser->fetchColumn();
 
@@ -304,7 +304,7 @@ foreach ($sampleProviders as $i => $p) {
         'user_id'      => $userId,
         'nombre'       => $name,
         'email'        => $email,
-        'telefono'     => $telefono,
+        'telefono'     => str_replace('-', '', $telefono),
         'descripcion'  => $descripcion,
         'departamento' => $departamento,
         'municipio'    => $municipio,

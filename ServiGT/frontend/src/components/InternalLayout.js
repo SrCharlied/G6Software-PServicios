@@ -3,6 +3,7 @@ import { usePathname, useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { Pressable, SafeAreaView, StyleSheet, Text, TouchableOpacity, useWindowDimensions, View } from 'react-native';
 import NotificationBell from './NotificationBell';
+import LogoutButton from './LogoutButton';
 import { useSession } from '../context/SessionContext';
 import { T } from '../theme';
 
@@ -163,9 +164,7 @@ export default function InternalLayout({ children, section }) {
                 ))}
               </View>
 
-              <TouchableOpacity style={styles.mobileLogoutBtn} onPress={handleLogout} activeOpacity={0.75}>
-                <Text style={styles.mobileLogoutText}>Cerrar sesion</Text>
-              </TouchableOpacity>
+              <LogoutButton style={styles.mobileLogoutBtn} textStyle={styles.mobileLogoutText} onLogout={handleLogout} />
             </View>
           </View>
         ) : null}
@@ -221,9 +220,7 @@ export default function InternalLayout({ children, section }) {
           ))}
         </View>
 
-        <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout} activeOpacity={0.75}>
-          <Text style={styles.logoutText}>Cerrar sesion</Text>
-        </TouchableOpacity>
+        <LogoutButton style={styles.logoutBtn} textStyle={styles.logoutText} onLogout={handleLogout} />
       </View>
 
       <View style={styles.content}>

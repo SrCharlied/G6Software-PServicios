@@ -69,6 +69,7 @@ try {
 
 // ── Seed admin por defecto ─────────────────────────────────────────────────
 $requiredSchemaChecks = [
+    "SELECT to_regclass('documentos_legales') IS NOT NULL AND to_regclass('aceptaciones_legales') IS NOT NULL",
     "SELECT to_regclass('publicaciones_servicio') IS NOT NULL",
     "SELECT to_regclass('publicaciones_material') IS NOT NULL
         AND to_regclass('publicaciones_material_imagenes') IS NOT NULL

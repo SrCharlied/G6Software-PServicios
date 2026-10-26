@@ -54,6 +54,40 @@ CREATE TABLE IF NOT EXISTS users (
 );
 
 -- Categorias de servicio
+-- Sin seed legal: el texto y la aprobacion deben ser proporcionados por el equipo.
+CREATE TABLE IF NOT EXISTS documentos_legales (
+    id BIGSERIAL PRIMARY KEY,
+    tipo VARCHAR(20) NOT NULL CHECK (tipo IN ('terminos', 'privacidad')),
+    version VARCHAR(40) NOT NULL CHECK (LENGTH(BTRIM(version)) > 0),
+    titulo VARCHAR(255) NOT NULL,
+    contenido TEXT NOT NULL CHECK (LENGTH(BTRIM(contenido)) > 0),
+    hash CHAR(64) NOT NULL CHECK (hash = encode(sha256(convert_to(contenido, 'UTF8')), 'hex')),
+    aprobado_por VARCHAR(255) NOT NULL CHECK (LENGTH(BTRIM(aprobado_por)) > 0),
+    aprobado_at TIMESTAMPTZ NOT NULL,
+    vigente_desde TIMESTAMPTZ NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (tipo, version)
+);
+CREATE TABLE IF NOT EXISTS aceptaciones_legales (
+    id BIGSERIAL PRIMARY KEY,
+    user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+    documento_legal_id BIGINT NOT NULL REFERENCES documentos_legales(id) ON DELETE RESTRICT,
+    aceptado_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (user_id, documento_legal_id)
+);
+CREATE OR REPLACE FUNCTION proteger_documento_legal() RETURNS TRIGGER AS $$
+BEGIN
+    RAISE EXCEPTION 'Los documentos legales publicados son inmutables';
+END;
+$$ LANGUAGE plpgsql;
+DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'documentos_legales_inmutables' AND tgrelid = 'documentos_legales'::regclass) THEN
+        CREATE TRIGGER documentos_legales_inmutables BEFORE UPDATE OR DELETE ON documentos_legales
+        FOR EACH ROW EXECUTE FUNCTION proteger_documento_legal();
+    END IF;
+END $$;
+
+-- Categorias de servicio
 CREATE TABLE IF NOT EXISTS categorias (
     id BIGSERIAL PRIMARY KEY,
     nombre VARCHAR(255) NOT NULL UNIQUE,

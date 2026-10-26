@@ -36,6 +36,7 @@ use App\Http\Controllers\PublicacionServicioController;
 // ── Rutas publicas ─────────────────────────────────────────────────────────
 
 Route::get('/health', [HealthController::class, 'check']);
+Route::get('/legal/documentos/vigentes', [\App\Http\Controllers\DocumentoLegalController::class, 'vigentes']);
 
 // Webhook de Stripe: sin Sanctum, se autentica por la firma del cuerpo crudo.
 Route::post('/stripe/webhook', [PagoStripeController::class, 'webhook'])->middleware('throttle:stripe-webhook');

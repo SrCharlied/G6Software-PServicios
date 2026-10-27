@@ -20,6 +20,7 @@ class ProviderController extends Controller
     public function index(): JsonResponse
     {
         $proveedores = Proveedor::with('categoria')
+            ->visibleEnCatalogo()
             ->orderBy('calificacion_promedio', 'desc')
             ->get();
 
@@ -31,7 +32,9 @@ class ProviderController extends Controller
     public function show(int $id): JsonResponse
     {
         // Sin `documentos`: son privados y ya tienen su propia ruta autorizada.
+        // Una cuenta anonimizada responde 404, igual que un id inexistente.
         $proveedor = Proveedor::with(['categoria', 'categorias', 'disponibilidad'])
+            ->visibleEnCatalogo()
             ->find($id);
 
         if (!$proveedor) {

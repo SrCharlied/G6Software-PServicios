@@ -127,11 +127,6 @@ CREATE INDEX IF NOT EXISTS idx_proveedores_user_id ON proveedores (user_id);
 CREATE INDEX IF NOT EXISTS idx_proveedores_categoria_id ON proveedores (categoria_id);
 CREATE INDEX IF NOT EXISTS idx_proveedores_departamento ON proveedores (departamento);
 
--- Normalizar solo el formato historico conocido; no reinterpretar prefijos.
-UPDATE users SET telefono = REPLACE(telefono, '-', '')
-WHERE telefono ~ '^[0-9]{4}-[0-9]{4}$';
-UPDATE proveedores SET telefono = REPLACE(telefono, '-', '')
-WHERE telefono ~ '^[0-9]{4}-[0-9]{4}$';
 
 -- Documentos de identidad del proveedor
 CREATE TABLE IF NOT EXISTS documentos_proveedores (
@@ -478,6 +473,13 @@ CREATE INDEX IF NOT EXISTS idx_notif_destinatario ON notificaciones (destinatari
 
 ALTER TABLE users ADD COLUMN IF NOT EXISTS role VARCHAR(20) NOT NULL DEFAULT 'cliente';
 ALTER TABLE users ADD COLUMN IF NOT EXISTS telefono VARCHAR(20);
+
+-- Ejecutar despues de agregar telefono a usuarios de esquemas anteriores.
+-- Normalizar solo el formato historico conocido; no reinterpretar prefijos.
+UPDATE users SET telefono = REPLACE(telefono, '-', '')
+WHERE telefono ~ '^[0-9]{4}-[0-9]{4}$';
+UPDATE proveedores SET telefono = REPLACE(telefono, '-', '')
+WHERE telefono ~ '^[0-9]{4}-[0-9]{4}$';
 ALTER TABLE users ADD COLUMN IF NOT EXISTS foto_perfil VARCHAR(500);
 ALTER TABLE users ADD COLUMN IF NOT EXISTS documento_verificado BOOLEAN NOT NULL DEFAULT FALSE;
 

@@ -12,6 +12,15 @@ class TelefonoBackfillTest extends TestCase
 {
     use DatabaseTransactions;
 
+    public function test_base_anterior_sin_columna_telefono_converge(): void
+    {
+        // Solo db_test y dentro de la transaccion que se revierte al terminar.
+        $this->assertSame('testing', app()->environment());
+        DB::statement('ALTER TABLE users DROP COLUMN telefono');
+        DB::unprepared(file_get_contents('/app/database/init.sql'));
+        $this->assertTrue(\Illuminate\Support\Facades\Schema::hasColumn('users', 'telefono'));
+    }
+
     public function test_backfill_es_idempotente_y_preserva_valores_no_reconocidos(): void
     {
         $records = [];

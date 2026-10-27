@@ -1021,6 +1021,21 @@ CREATE INDEX IF NOT EXISTS idx_solicitudes_eliminacion_limpieza
     WHERE estado = 'limpieza_pendiente';
 
 -- ============================================================
+-- Sprint 10: telefono local de 8 digitos (HU 1.2)
+-- ============================================================
+-- El formato canonico es de 8 digitos sin separador. Solo se normaliza el
+-- formato heredado exacto ####-####; cualquier otro valor se deja intacto
+-- para revisarlo a mano en lugar de adivinar. Tras el primer arranque el
+-- patron ya no coincide, asi que el UPDATE no vuelve a tocar filas.
+UPDATE users
+   SET telefono = REPLACE(telefono, '-', '')
+ WHERE telefono ~ '^[0-9]{4}-[0-9]{4}$';
+
+UPDATE proveedores
+   SET telefono = REPLACE(telefono, '-', '')
+ WHERE telefono ~ '^[0-9]{4}-[0-9]{4}$';
+
+-- ============================================================
 -- 3. Seed de catalogo
 -- ============================================================
 INSERT INTO categorias (nombre, descripcion, icono) VALUES

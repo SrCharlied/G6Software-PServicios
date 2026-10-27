@@ -96,6 +96,8 @@ $requiredSchemaChecks = [
         SELECT 1 FROM information_schema.columns
         WHERE table_name = 'servicios' AND column_name = 'publicacion_id'
     )",
+    "SELECT to_regclass('documentos_legales') IS NOT NULL
+        AND to_regclass('aceptaciones_legales') IS NOT NULL",
 ];
 
 foreach ($requiredSchemaChecks as $checkSql) {

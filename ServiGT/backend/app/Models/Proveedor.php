@@ -108,6 +108,20 @@ class Proveedor extends Model
     }
 
     /**
+     * Excluye perfiles cuya cuenta fue anonimizada (HU 3.1). Un proveedor
+     * heredado sin user_id sigue visible: no hay cuenta que eliminar.
+     */
+    public function scopeVisibleEnCatalogo($query)
+    {
+        return $query->whereNotExists(function ($sub) {
+            $sub->selectRaw('1')
+                ->from('users')
+                ->whereColumn('users.id', 'proveedores.user_id')
+                ->where('users.estado_cuenta', 'anonimizada');
+        });
+    }
+
+    /**
      * Estado Premium derivado de premium_vence_at: no se guarda por separado
      * para evitar que ambos campos se desincronicen.
      */

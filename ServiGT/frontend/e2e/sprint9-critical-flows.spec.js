@@ -1,6 +1,7 @@
 const { test, expect, request } = require('@playwright/test');
 const { execFileSync } = require('node:child_process');
 const { randomBytes } = require('node:crypto');
+const { legalAcceptance } = require('./helpers/legal');
 test.use({ trace: 'off' }); // La suite usa sesiones reales y evidencia privada.
 
 const API = process.env.E2E_API_URL || 'http://localhost:8085/api';
@@ -64,10 +65,12 @@ test.describe.serial('Sprint 9 materiales con API real', () => {
     // La limpieza dirigida usa el backend Docker local; no ejecutarla en un servidor remoto.
     if (!['localhost', '127.0.0.1'].includes(new URL(API).hostname)) throw new Error('Esta suite requiere el stack local de ServiGT.');
     api = await request.newContext({ extraHTTPHeaders: { Accept: 'application/json' } });
+    const legal = await legalAcceptance(api, API);
     const categories = await call('GET', '/categorias');
     expect(categories.status).toBe(200);
     const categoryId = categories.body.categorias[0].id;
     for (const [key, account] of Object.entries(accounts)) {
+      account.aceptaciones_legales = legal;
       let registered = await call('POST', '/register', null, account);
       if (registered.status === 429) {
         console.log(`Registro smoke: respetando Retry-After (${registered.retryAfter}s).`);
@@ -78,7 +81,7 @@ test.describe.serial('Sprint 9 materiales con API real', () => {
       createdEmails.push(account.email);
       sessions[key] = registered.body;
       if (account.role === 'proveedor') {
-        const profile = await call('POST', '/providers', key, { nombre: account.name, email: account.email, departamento: 'Guatemala', categoria_id: categoryId, nivel: 'experto', descripcion: 'Perfil temporal Smoke S9 para pruebas de integracion.' });
+        const profile = await call('POST', '/providers', key, { nombre: account.name, email: account.email, telefono: '55550101', departamento: 'Guatemala', categoria_id: categoryId, nivel: 'experto', descripcion: 'Perfil temporal Smoke S9 para pruebas de integracion.' });
         expect(profile.status).toBe(201);
         sessions[key].proveedor = profile.body.proveedor;
       }

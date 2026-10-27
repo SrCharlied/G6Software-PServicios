@@ -105,7 +105,10 @@ $requiredSchemaChecks = [
           AND conname = 'proveedores_experiencia_resumen_check'
     )",
     "SELECT to_regclass('documentos_legales') IS NOT NULL
-        AND to_regclass('aceptaciones_legales') IS NOT NULL",
+        AND to_regclass('aceptaciones_legales') IS NOT NULL
+        AND (SELECT COUNT(*) = 3 FROM information_schema.columns
+            WHERE table_schema = 'public' AND table_name = 'documentos_legales'
+            AND column_name IN ('hash_sha256', 'aprobado_por', 'aprobado_at'))",
     "SELECT to_regclass('solicitudes_eliminacion_cuenta') IS NOT NULL
         AND EXISTS (
             SELECT 1 FROM information_schema.columns
@@ -331,7 +334,7 @@ foreach ($sampleProviders as $i => $p) {
         'email'    => $email,
         'password' => $providerHash,
         'role'     => 'proveedor',
-        'telefono' => $telefono,
+        'telefono' => str_replace('-', '', $telefono),
     ]);
     $userId = $insertUser->fetchColumn();
 
@@ -339,7 +342,7 @@ foreach ($sampleProviders as $i => $p) {
         'user_id'      => $userId,
         'nombre'       => $name,
         'email'        => $email,
-        'telefono'     => $telefono,
+        'telefono'     => str_replace('-', '', $telefono),
         'descripcion'  => $descripcion,
         'departamento' => $departamento,
         'municipio'    => $municipio,

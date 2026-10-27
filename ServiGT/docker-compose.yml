@@ -189,6 +189,7 @@ services:
       SESSION_DRIVER: array
     volumes:
       - ./backend/tests:/app/tests:ro
+      - ./database/init.sql:/app/database/init.sql:ro
     depends_on:
       db_test:
         condition: service_healthy

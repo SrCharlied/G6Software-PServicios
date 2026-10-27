@@ -1,5 +1,6 @@
 const { test, expect, request } = require('@playwright/test');
 const { requireLocalStack, cleanupAccounts, respectRetryAfter } = require('./helpers/local-smoke');
+const { legalAcceptance } = require('./helpers/legal');
 test.use({ trace: 'off' });
 
 const API_URL = process.env.E2E_API_URL || 'http://localhost:8085/api';
@@ -40,6 +41,7 @@ async function apiCall(method, path, { token, data } = {}) {
 }
 
 async function register(account) {
+  account = { ...account, aceptaciones_legales: await legalAcceptance(api, API_URL) };
   let { response, body } = await apiCall('POST', '/register', { data: account });
   if (await respectRetryAfter(response)) ({ response, body } = await apiCall('POST', '/register', { data: account }));
   expect(response.status(), JSON.stringify(body)).toBe(201);
@@ -93,6 +95,7 @@ test.describe.serial('Checklist responsive Sprint 8', () => {
       token: providerToken,
       data: {
         nombre: accounts.provider.name,
+        telefono: '55550101',
         email: accounts.provider.email,
         departamento: 'Guatemala',
         categoria_id: categoryId,

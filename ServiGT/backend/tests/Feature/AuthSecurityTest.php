@@ -17,6 +17,7 @@ use Tests\TestCase;
 class AuthSecurityTest extends TestCase
 {
     use DatabaseTransactions;
+    use \Tests\Feature\Concerns\AceptaDocumentosDePrueba;
 
     private function payload(array $overrides = []): array
     {
@@ -25,6 +26,7 @@ class AuthSecurityTest extends TestCase
             'email'    => 'nueva@servigt.test',
             'password' => 'Password123!',
             'role'     => 'cliente',
+            'aceptaciones_legales' => $this->aceptacionesDePrueba(),
         ], $overrides);
 
         // La confirmacion sigue a la contrasena salvo que la prueba la fije.

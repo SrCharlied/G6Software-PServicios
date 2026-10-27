@@ -152,10 +152,11 @@ export const login = async (email, password) => {
   }
 };
 
-export const register = async (name, email, password, passwordConfirmation, role) => {
+export const register = async (name, email, password, passwordConfirmation, role, aceptacionesLegales) => {
   try {
     const response = await api.post('/register', {
       name, email, password, password_confirmation: passwordConfirmation, role,
+      aceptaciones_legales: aceptacionesLegales,
     });
     const { user, token } = response.data;
     await saveSession(token, user);
@@ -181,6 +182,11 @@ export const getMe = async (config = {}) => {
   } catch (error) {
     throwApiError(error, 'No se pudo obtener el usuario.');
   }
+};
+
+export const getDocumentosLegales = async () => {
+  try { return (await api.get('/legal/documentos/vigentes')).data; }
+  catch (error) { throwApiError(error, 'No se pudieron cargar los documentos legales.'); }
 };
 
 // ── Categorias ────────────────────────────────────────────────────────────

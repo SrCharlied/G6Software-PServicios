@@ -98,6 +98,7 @@ CREATE INDEX IF NOT EXISTS idx_proveedores_user_id ON proveedores (user_id);
 CREATE INDEX IF NOT EXISTS idx_proveedores_categoria_id ON proveedores (categoria_id);
 CREATE INDEX IF NOT EXISTS idx_proveedores_departamento ON proveedores (departamento);
 
+
 -- Documentos de identidad del proveedor
 CREATE TABLE IF NOT EXISTS documentos_proveedores (
     id BIGSERIAL PRIMARY KEY,
@@ -443,6 +444,13 @@ CREATE INDEX IF NOT EXISTS idx_notif_destinatario ON notificaciones (destinatari
 
 ALTER TABLE users ADD COLUMN IF NOT EXISTS role VARCHAR(20) NOT NULL DEFAULT 'cliente';
 ALTER TABLE users ADD COLUMN IF NOT EXISTS telefono VARCHAR(20);
+
+-- Ejecutar despues de agregar telefono a usuarios de esquemas anteriores.
+-- Normalizar solo el formato historico conocido; no reinterpretar prefijos.
+UPDATE users SET telefono = REPLACE(telefono, '-', '')
+WHERE telefono ~ '^[0-9]{4}-[0-9]{4}$';
+UPDATE proveedores SET telefono = REPLACE(telefono, '-', '')
+WHERE telefono ~ '^[0-9]{4}-[0-9]{4}$';
 ALTER TABLE users ADD COLUMN IF NOT EXISTS foto_perfil VARCHAR(500);
 ALTER TABLE users ADD COLUMN IF NOT EXISTS documento_verificado BOOLEAN NOT NULL DEFAULT FALSE;
 
@@ -894,19 +902,42 @@ END $$;
 -- una version nueva es un INSERT; nunca se edita ni se borra una anterior, y
 -- no exige reaceptacion a quien acepto una version previa.
 
+-- Converge desde la primera version de Pablo sin reescribir textos ni evidencia.
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public'
+        AND table_name = 'documentos_legales' AND column_name = 'hash')
+        AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public'
+        AND table_name = 'documentos_legales' AND column_name = 'hash_sha256') THEN
+        ALTER TABLE documentos_legales RENAME COLUMN hash TO hash_sha256;
+    END IF;
+END $$;
+
 CREATE TABLE IF NOT EXISTS documentos_legales (
     id BIGSERIAL PRIMARY KEY,
     tipo VARCHAR(20) NOT NULL CHECK (tipo IN ('terminos','privacidad')),
-    version VARCHAR(20) NOT NULL CHECK (LENGTH(BTRIM(version)) > 0),
+    version VARCHAR(40) NOT NULL CHECK (LENGTH(BTRIM(version)) > 0),
     titulo VARCHAR(255) NOT NULL CHECK (LENGTH(BTRIM(titulo)) > 0),
     contenido TEXT NOT NULL CHECK (LENGTH(BTRIM(contenido)) > 0),
     -- SHA-256 hex del contenido. Lo calcula el trigger; el valor enviado se ignora.
     hash_sha256 CHAR(64) NOT NULL,
+    aprobado_por VARCHAR(255) CHECK (LENGTH(BTRIM(aprobado_por)) > 0),
+    aprobado_at TIMESTAMPTZ,
     vigente_desde TIMESTAMP WITHOUT TIME ZONE NOT NULL,
     created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
     UNIQUE (tipo, version),
     UNIQUE (tipo, vigente_desde)
 );
+-- Sin seed ni aprobacion implicita: las versiones anteriores de dev quedan sin
+-- aprobar hasta contar con evidencia real. El API publico exige aprobacion.
+ALTER TABLE documentos_legales ADD COLUMN IF NOT EXISTS aprobado_por VARCHAR(255)
+    CHECK (LENGTH(BTRIM(aprobado_por)) > 0);
+ALTER TABLE documentos_legales ADD COLUMN IF NOT EXISTS aprobado_at TIMESTAMPTZ;
+ALTER TABLE documentos_legales ALTER COLUMN aprobado_por DROP NOT NULL;
+ALTER TABLE documentos_legales ALTER COLUMN aprobado_at DROP NOT NULL;
+ALTER TABLE documentos_legales ALTER COLUMN version TYPE VARCHAR(40);
+CREATE UNIQUE INDEX IF NOT EXISTS documentos_legales_tipo_vigente_desde_key
+    ON documentos_legales (tipo, vigente_desde);
 CREATE INDEX IF NOT EXISTS idx_documentos_legales_vigencia
     ON documentos_legales (tipo, vigente_desde DESC);
 

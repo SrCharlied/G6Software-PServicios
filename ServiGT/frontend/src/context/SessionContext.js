@@ -58,7 +58,7 @@ export function SessionProvider({ children }) {
 
   const signOut = useCallback(async () => {
     await apiLogout();
-    clearLocalSession();
+    await clearLocalSession();
   }, [clearLocalSession]);
 
   return (
@@ -69,6 +69,7 @@ export function SessionProvider({ children }) {
       sessionLoading,
       signIn,
       signOut,
+      endSession: clearLocalSession,
       selectedProvider,
       setSelectedProvider,
       chatParams,

@@ -90,3 +90,53 @@ describe('ProviderEditProfileScreen personalizacion y experiencia', () => {
     expect(updateProvider.mock.calls[0][1]).toEqual(expect.objectContaining({ color_acento: '#0f766e' }));
   });
 });
+
+describe('ProviderEditProfileScreen telefono y descripcion', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    getCategorias.mockResolvedValue({ categorias: profile.categorias });
+    updateProvider.mockResolvedValue({ proveedor: profile });
+  });
+
+  it('guarda perfil ordinario sin enviar un color que no cambio', async () => {
+    const screen = renderScreen({ color_acento: null });
+    await screen.findByText(/Electricidad$/);
+    fireEvent.press(screen.getByText('Guardar cambios'));
+    await waitFor(() => expect(updateProvider).toHaveBeenCalledWith(profile.id,
+      expect.objectContaining({ telefono: profile.telefono, descripcion: profile.descripcion })));
+    expect(updateProvider.mock.calls[0][1]).not.toHaveProperty('color_acento');
+  });
+
+  it.each(['', '5555-0101', '+50255550101', '1234567', '123456789'])('rechaza telefono %s sin enviar API', async (phone) => {
+    const screen = renderScreen();
+    await screen.findByText(/Electricidad$/);
+    fireEvent.changeText(screen.getByPlaceholderText('Ej: 55551234'), phone);
+    fireEvent.press(screen.getByText('Guardar cambios'));
+    expect(screen.getByText('Ingresa un telefono local de 8 digitos.')).toBeTruthy();
+    expect(updateProvider).not.toHaveBeenCalled();
+  });
+
+  it.each([19, 20, 500, 501])('valida descripcion de %s y muestra contador', async (length) => {
+    const screen = renderScreen();
+    await screen.findByText(/Electricidad$/);
+    fireEvent.changeText(screen.getByPlaceholderText('Describe los servicios que ofreces, tu experiencia, horarios...'), 'a'.repeat(length));
+    expect(screen.getByText(`${length}/500 caracteres`)).toBeTruthy();
+    fireEvent.press(screen.getByText('Guardar cambios'));
+    if (length === 20 || length === 500) await waitFor(() => expect(updateProvider).toHaveBeenCalledTimes(1));
+    else expect(updateProvider).not.toHaveBeenCalled();
+  });
+
+  it.each([1000, 1001])('conserva el limite de experiencia de %s caracteres', async (length) => {
+    const screen = renderScreen();
+    await screen.findByText(/Electricidad$/);
+    fireEvent.changeText(screen.getByPlaceholderText('Resume tu trayectoria, especialidades y logros relevantes (opcional)'), 'a'.repeat(length));
+    expect(screen.getByText(`${length}/1000`)).toBeTruthy();
+    fireEvent.press(screen.getByText('Guardar cambios'));
+    if (length === 1000) await waitFor(() => expect(updateProvider).toHaveBeenCalledWith(profile.id,
+      expect.objectContaining({ experiencia_resumen: 'a'.repeat(length) })));
+    else {
+      expect(screen.getByText('El resumen no puede superar 1000 caracteres.')).toBeTruthy();
+      expect(updateProvider).not.toHaveBeenCalled();
+    }
+  });
+});

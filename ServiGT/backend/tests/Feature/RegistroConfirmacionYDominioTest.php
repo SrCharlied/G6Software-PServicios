@@ -15,6 +15,7 @@ use Tests\TestCase;
 class RegistroConfirmacionYDominioTest extends TestCase
 {
     use DatabaseTransactions;
+    use \Tests\Feature\Concerns\AceptaDocumentosDePrueba;
 
     private function payload(array $overrides = []): array
     {
@@ -24,6 +25,7 @@ class RegistroConfirmacionYDominioTest extends TestCase
             'password'              => 'Password123!',
             'password_confirmation' => 'Password123!',
             'role'                  => 'cliente',
+            'aceptaciones_legales'   => $this->aceptacionesDePrueba(),
         ], $overrides);
     }
 

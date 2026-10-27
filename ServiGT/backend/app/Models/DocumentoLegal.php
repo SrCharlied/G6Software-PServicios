@@ -26,11 +26,23 @@ class DocumentoLegal extends Model
         'titulo',
         'contenido',
         'vigente_desde',
+        'aprobado_por',
+        'aprobado_at',
     ];
 
+    protected $hidden = ['aprobado_por'];
+    protected $appends = ['hash'];
+
     protected $casts = [
+        'aprobado_at' => 'datetime',
         'vigente_desde' => 'datetime',
     ];
+
+    // Conserva el contrato publico sin duplicar la columna persistida.
+    public function getHashAttribute(): string
+    {
+        return $this->hash_sha256 ?? hash('sha256', $this->contenido);
+    }
 
     public function aceptaciones(): HasMany
     {
@@ -48,7 +60,8 @@ class DocumentoLegal extends Model
                 ->from('documentos_legales')
                 ->where('vigente_desde', '<=', now())
                 ->orderBy('tipo')
-                ->orderByDesc('vigente_desde');
+                ->orderByDesc('vigente_desde')
+                ->orderByDesc('id');
         });
     }
 
@@ -59,5 +72,13 @@ class DocumentoLegal extends Model
     public static function vigentesPorTipo(): Collection
     {
         return static::query()->vigentes()->get()->keyBy('tipo');
+    }
+
+    /** Publicar una fila no inventa su aprobacion: el registro exige ambas. */
+    public static function aprobadosVigentes(): Collection
+    {
+        return static::whereNotNull('aprobado_por')->where('aprobado_at', '<=', now())
+            ->where('vigente_desde', '<=', now())
+            ->orderByDesc('vigente_desde')->orderByDesc('id')->get()->unique('tipo')->values();
     }
 }

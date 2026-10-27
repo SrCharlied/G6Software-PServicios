@@ -3,7 +3,7 @@ import { usePathname, useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { Pressable, SafeAreaView, StyleSheet, Text, TouchableOpacity, useWindowDimensions, View } from 'react-native';
 import NotificationBell from './NotificationBell';
-import ConfirmActionModal from './ConfirmActionModal';
+import LogoutButton from './LogoutButton';
 import { useSession } from '../context/SessionContext';
 import { T } from '../theme';
 
@@ -104,42 +104,16 @@ export default function InternalLayout({ children, section }) {
   const { user, signOut } = useSession();
   const { width } = useWindowDimensions();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [logoutConfirmVisible, setLogoutConfirmVisible] = useState(false);
-  const [loggingOut, setLoggingOut] = useState(false);
 
   const role = section ?? user?.role ?? 'cliente';
   const items = NAV_BY_ROLE[role] ?? NAV_BY_ROLE.cliente;
   const activePath = resolveActivePath(items, pathname ?? '');
 
-  const requestLogout = () => {
-    setMobileMenuOpen(false);
-    setLogoutConfirmVisible(true);
-  };
-
   const handleLogout = async () => {
-    if (loggingOut) return;
-    setLoggingOut(true);
-    try {
-      await signOut();
-      setLogoutConfirmVisible(false);
-      router.replace('/home');
-    } finally {
-      setLoggingOut(false);
-    }
+    await signOut();
+    setMobileMenuOpen(false);
+    router.replace('/home');
   };
-
-  const logoutModal = (
-    <ConfirmActionModal
-      visible={logoutConfirmVisible}
-      title="Cerrar sesion"
-      message="Tu sesion se cerrara en este dispositivo. ¿Deseas continuar?"
-      confirmLabel="Cerrar sesion"
-      confirmKind="danger"
-      processing={loggingOut}
-      onCancel={() => setLogoutConfirmVisible(false)}
-      onConfirm={handleLogout}
-    />
-  );
 
   const handleNavigate = (path) => {
     setMobileMenuOpen(false);
@@ -190,9 +164,7 @@ export default function InternalLayout({ children, section }) {
                 ))}
               </View>
 
-              <TouchableOpacity style={styles.mobileLogoutBtn} onPress={requestLogout} activeOpacity={0.75}>
-                <Text style={styles.mobileLogoutText}>Cerrar sesion</Text>
-              </TouchableOpacity>
+              <LogoutButton style={styles.mobileLogoutBtn} textStyle={styles.mobileLogoutText} onLogout={handleLogout} />
             </View>
           </View>
         ) : null}
@@ -214,7 +186,6 @@ export default function InternalLayout({ children, section }) {
             />
           ))}
         </View>
-        {logoutModal}
       </SafeAreaView>
     );
   }
@@ -249,9 +220,7 @@ export default function InternalLayout({ children, section }) {
           ))}
         </View>
 
-        <TouchableOpacity style={styles.logoutBtn} onPress={requestLogout} activeOpacity={0.75}>
-          <Text style={styles.logoutText}>Cerrar sesion</Text>
-        </TouchableOpacity>
+        <LogoutButton style={styles.logoutBtn} textStyle={styles.logoutText} onLogout={handleLogout} />
       </View>
 
       <View style={styles.content}>
@@ -259,7 +228,6 @@ export default function InternalLayout({ children, section }) {
           {children}
         </View>
       </View>
-      {logoutModal}
     </View>
   );
 }

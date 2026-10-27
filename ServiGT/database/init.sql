@@ -49,6 +49,8 @@ CREATE TABLE IF NOT EXISTS users (
     telefono VARCHAR(20),
     foto_perfil VARCHAR(500),
     documento_verificado BOOLEAN NOT NULL DEFAULT FALSE,
+    estado_cuenta VARCHAR(20) NOT NULL DEFAULT 'activa',
+    anonimizada_at TIMESTAMP WITHOUT TIME ZONE,
     created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
@@ -936,6 +938,68 @@ BEGIN
             FOR EACH ROW EXECUTE FUNCTION legal_inmutable();
     END IF;
 END $$;
+
+-- ============================================================
+-- Sprint 10: estado de cuenta y solicitud de eliminacion (HU 3.1)
+-- ============================================================
+-- Eliminar una cuenta es anonimizarla y revocar su acceso: la fila de users
+-- nunca se borra, para no arrastrar en cascada servicios, compras, reportes ni
+-- aceptaciones legales. Todas las cuentas existentes convergen a 'activa'.
+
+ALTER TABLE users ADD COLUMN IF NOT EXISTS estado_cuenta VARCHAR(20) NOT NULL DEFAULT 'activa';
+ALTER TABLE users ADD COLUMN IF NOT EXISTS anonimizada_at TIMESTAMP WITHOUT TIME ZONE;
+
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint
+        WHERE conrelid = 'users'::regclass
+          AND conname = 'users_estado_cuenta_check'
+    ) THEN
+        ALTER TABLE users ADD CONSTRAINT users_estado_cuenta_check
+            CHECK (
+                (estado_cuenta = 'activa' AND anonimizada_at IS NULL)
+                OR (estado_cuenta = 'anonimizada' AND anonimizada_at IS NOT NULL)
+            );
+    END IF;
+END $$;
+
+-- Una solicitud por intento. `idempotency_key` repite el mismo intento sin
+-- duplicarlo; el indice parcial deja una sola solicitud en curso o completada
+-- por usuario (una rechazada por operaciones activas no impide reintentar).
+-- `manifiesto_archivos` se captura ANTES de anonimizar: despues ya no quedan
+-- rutas en el perfil para saber que limpiar.
+CREATE TABLE IF NOT EXISTS solicitudes_eliminacion_cuenta (
+    id BIGSERIAL PRIMARY KEY,
+    user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+    idempotency_key VARCHAR(80) NOT NULL CHECK (LENGTH(BTRIM(idempotency_key)) > 0),
+    estado VARCHAR(20) NOT NULL DEFAULT 'pendiente'
+        CHECK (estado IN ('pendiente','rechazada','limpieza_pendiente','completada')),
+    motivo_rechazo VARCHAR(255),
+    manifiesto_archivos JSONB NOT NULL DEFAULT '[]'::jsonb
+        CHECK (jsonb_typeof(manifiesto_archivos) = 'array'),
+    intentos_limpieza INT NOT NULL DEFAULT 0 CHECK (intentos_limpieza >= 0),
+    ultimo_error_limpieza TEXT,
+    anonimizada_at TIMESTAMP WITHOUT TIME ZONE,
+    completada_at TIMESTAMP WITHOUT TIME ZONE,
+    created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (user_id, idempotency_key),
+    CONSTRAINT solicitudes_eliminacion_estado_fechas_check CHECK (
+        (estado IN ('pendiente','rechazada') AND anonimizada_at IS NULL AND completada_at IS NULL)
+        OR (estado = 'limpieza_pendiente' AND anonimizada_at IS NOT NULL AND completada_at IS NULL)
+        OR (estado = 'completada' AND anonimizada_at IS NOT NULL AND completada_at IS NOT NULL)
+    ),
+    CONSTRAINT solicitudes_eliminacion_rechazo_check CHECK (
+        (estado = 'rechazada') = (motivo_rechazo IS NOT NULL)
+    )
+);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_solicitud_eliminacion_vigente
+    ON solicitudes_eliminacion_cuenta (user_id)
+    WHERE estado IN ('pendiente','limpieza_pendiente','completada');
+CREATE INDEX IF NOT EXISTS idx_solicitudes_eliminacion_limpieza
+    ON solicitudes_eliminacion_cuenta (estado, updated_at)
+    WHERE estado = 'limpieza_pendiente';
 
 -- ============================================================
 -- 3. Seed de catalogo

@@ -98,6 +98,11 @@ $requiredSchemaChecks = [
     )",
     "SELECT to_regclass('documentos_legales') IS NOT NULL
         AND to_regclass('aceptaciones_legales') IS NOT NULL",
+    "SELECT to_regclass('solicitudes_eliminacion_cuenta') IS NOT NULL
+        AND EXISTS (
+            SELECT 1 FROM information_schema.columns
+            WHERE table_name = 'users' AND column_name = 'estado_cuenta'
+        )",
 ];
 
 foreach ($requiredSchemaChecks as $checkSql) {

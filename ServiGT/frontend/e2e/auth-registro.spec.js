@@ -5,6 +5,7 @@
 const { test, expect, request } = require('@playwright/test');
 const { requireLocalStack, cleanupAccounts, respectRetryAfter } = require('./helpers/local-smoke');
 const API_URL = process.env.E2E_API_URL || 'http://localhost:8085/api';
+const { legalAcceptance } = require('./helpers/legal');
 test.use({ trace: 'off' });
 
 // Timestamp en el correo: cada corrida usa una cuenta nueva y no colisiona
@@ -19,6 +20,7 @@ test.describe.serial('Registro endurecido (task 4.1)', () => {
     requireLocalStack(API_URL);
     const api = await request.newContext({ extraHTTPHeaders: { Accept: 'application/json' } });
     try {
+      await legalAcceptance(api, API_URL);
       // Una validacion sin datos no crea usuarios. Reservar dos intentos de UI
       // evita que una corrida previa transforme el caso de duplicado en un 429.
       for (let attempt = 0; attempt < 5; attempt++) {
@@ -38,6 +40,8 @@ test.describe.serial('Registro endurecido (task 4.1)', () => {
     await page.getByPlaceholder('correo@ejemplo.com').fill(emailLower);
     await page.getByPlaceholder('Mínimo 6 caracteres').fill('Password123!');
     await page.getByPlaceholder('Repite tu contraseña').fill('Password123!');
+    await page.getByRole('checkbox', { name: 'Acepto terminos' }).click();
+    await page.getByRole('checkbox', { name: 'Acepto privacidad' }).click();
     await page.getByText('Cliente', { exact: true }).click();
     // "Crear cuenta" tambien es el subtitulo de la pantalla; el boton de
     // envio es la segunda ocurrencia (mas abajo en el DOM).
@@ -56,6 +60,8 @@ test.describe.serial('Registro endurecido (task 4.1)', () => {
     await page.getByPlaceholder('correo@ejemplo.com').fill(emailMixedCase);
     await page.getByPlaceholder('Mínimo 6 caracteres').fill('Password123!');
     await page.getByPlaceholder('Repite tu contraseña').fill('Password123!');
+    await page.getByRole('checkbox', { name: 'Acepto terminos' }).click();
+    await page.getByRole('checkbox', { name: 'Acepto privacidad' }).click();
     await page.getByText('Cliente', { exact: true }).click();
     await page.getByText('Crear cuenta', { exact: true }).last().click();
 

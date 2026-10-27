@@ -9,7 +9,8 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { register, createProvider, getCategorias, uploadDocumento } from '../services/api';
+import { register, createProvider, getCategorias, uploadDocumento, getDocumentosLegales } from '../services/api';
+import { Feather } from '@expo/vector-icons';
 import { useToast } from '../context/ToastContext';
 import { validateEmail, validatePhone, validatePassword, validateRequired } from '../utils/validation';
 import ServiGTLogo from '../components/ServiGTLogo';
@@ -120,6 +121,24 @@ export default function RegisterScreen({ navigation, onRegisterSuccess }) {
   const [registeredUser, setRegisteredUser] = useState(null);
   const [providerProfile, setProviderProfile] = useState(null);
   const fileInputRef = useRef(null);
+  const registerLock = useRef(false);
+  const legalRequest = useRef(0);
+  const [documentosLegales, setDocumentosLegales] = useState([]);
+  const [aceptaciones, setAceptaciones] = useState({});
+  const [loadingLegal, setLoadingLegal] = useState(true);
+  const [legalError, setLegalError] = useState('');
+
+  const loadLegal = async () => {
+    const attempt = ++legalRequest.current;
+    setLoadingLegal(true); setLegalError(''); setAceptaciones({}); setDocumentosLegales([]);
+    try {
+      const data = await getDocumentosLegales();
+      if (data.documentos?.length !== 2 || !['terminos', 'privacidad'].every((tipo) => data.documentos.some((d) => d.tipo === tipo && d.id && d.version))) throw new Error('Los documentos legales no estan disponibles.');
+      if (attempt === legalRequest.current) setDocumentosLegales(data.documentos);
+    } catch (err) { if (attempt === legalRequest.current) setLegalError(err.message); }
+    finally { if (attempt === legalRequest.current) setLoadingLegal(false); }
+  };
+  useEffect(() => { loadLegal(); return () => { legalRequest.current += 1; }; }, []);
 
   const clearError = (field) => setErrors((e) => ({ ...e, [field]: null }));
 
@@ -142,6 +161,7 @@ export default function RegisterScreen({ navigation, onRegisterSuccess }) {
 
   // ── Paso 1: registrar usuario ─────────────────────────────────────────
   const handleStep1 = async () => {
+    if (registerLock.current) return;
     const errs = {};
     if (!validateRequired(name)) errs.name = 'El nombre es requerido.';
     else if (name.trim().length > 255) errs.name = 'El nombre no debe superar 255 caracteres.';
@@ -155,13 +175,16 @@ export default function RegisterScreen({ navigation, onRegisterSuccess }) {
     }
     if (!passwordConfirmation) errs.passwordConfirmation = 'Confirma tu contraseña.';
     else if (passwordConfirmation !== password) errs.passwordConfirmation = 'Las contraseñas no coinciden.';
+    if (documentosLegales.length !== 2 || !documentosLegales.every((doc) => aceptaciones[doc.id])) errs.legal = 'Debes revisar y aceptar terminos y privacidad vigentes.';
     if (Object.keys(errs).length) { setErrors(errs); return; }
     setErrors({});
 
+    registerLock.current = true;
     setLoading(true);
     try {
       const data = await register(
         name.trim(), email.trim().toLowerCase(), password, passwordConfirmation, role,
+        documentosLegales.map((doc) => ({ documento_legal_id: doc.id, version: doc.version, aceptado: true })),
       );
       setRegisteredUser(data.user);
       if (role === 'proveedor') {
@@ -170,6 +193,7 @@ export default function RegisterScreen({ navigation, onRegisterSuccess }) {
         onRegisterSuccess && onRegisterSuccess(data.user, null);
       }
     } catch (error) {
+      if (error.status === 409) await loadLegal();
       const backendErrors = error.data?.errors;
       if (backendErrors && typeof backendErrors === 'object') {
         setErrors(Object.fromEntries(
@@ -181,6 +205,7 @@ export default function RegisterScreen({ navigation, onRegisterSuccess }) {
       }
       toast(error.message, 'error');
     } finally {
+      registerLock.current = false;
       setLoading(false);
     }
   };
@@ -319,6 +344,14 @@ export default function RegisterScreen({ navigation, onRegisterSuccess }) {
         secureTextEntry
       />
       {errors.passwordConfirmation ? <Text style={styles.fieldError}>{errors.passwordConfirmation}</Text> : null}
+      {loadingLegal ? <Text style={styles.inputLabel}>Cargando documentos legales...</Text> : null}
+      {legalError ? <View><Text style={styles.fieldError}>{legalError}</Text><TouchableOpacity onPress={loadLegal}><Text style={styles.linkText}>Reintentar documentos</Text></TouchableOpacity></View> : null}
+      {documentosLegales.map((doc) => <TouchableOpacity key={doc.id} accessibilityRole="checkbox" accessibilityLabel={`Acepto ${doc.tipo}`} aria-checked={!!aceptaciones[doc.id]} accessibilityState={{ checked: !!aceptaciones[doc.id], disabled: loading }} disabled={loading}
+        style={styles.legalCheck} onPress={() => { setAceptaciones((prev) => ({ ...prev, [doc.id]: !prev[doc.id] })); clearError('legal'); }}>
+        <Feather name={aceptaciones[doc.id] ? 'check-square' : 'square'} size={22} color={T.blue} />
+        <Text style={styles.legalText}>{`Acepto ${doc.tipo === 'terminos' ? 'terminos y condiciones' : 'privacidad'} (version ${doc.version})`}</Text>
+      </TouchableOpacity>)}
+      {errors.legal ? <Text style={styles.fieldError}>{errors.legal}</Text> : null}
 
       <Text style={styles.inputLabel}>Tipo de cuenta</Text>
       <View style={styles.roleRow}>
@@ -545,6 +578,8 @@ export default function RegisterScreen({ navigation, onRegisterSuccess }) {
 
 // ── Estilos ────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
+  legalCheck: { flexDirection: 'row', gap: 10, alignItems: 'center', marginVertical: 8 },
+  legalText: { flex: 1, color: T.text, fontSize: 13, lineHeight: 19 },
   container: {
     flexGrow: 1,
     padding: 24,

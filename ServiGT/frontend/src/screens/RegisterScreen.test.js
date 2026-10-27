@@ -1,13 +1,17 @@
 import React from 'react';
 import { fireEvent, render, waitFor } from '@testing-library/react-native';
 import RegisterScreen from './RegisterScreen';
-import { register } from '../services/api';
+import { register, getDocumentosLegales } from '../services/api';
+jest.mock('@expo/vector-icons', () => ({ Feather: () => null }));
+const legalDocuments = ['terminos', 'privacidad'].map((tipo, id) => ({ id: id + 1, tipo, version: 'fixture-1' }));
+const aceptar = async (screen) => { await screen.findByLabelText('Acepto terminos'); fireEvent.press(screen.getByLabelText('Acepto terminos')); fireEvent.press(screen.getByLabelText('Acepto privacidad')); };
 
 jest.mock('../services/api', () => ({
   register: jest.fn(),
   createProvider: jest.fn(),
   getCategorias: jest.fn(),
   uploadDocumento: jest.fn(),
+  getDocumentosLegales: jest.fn(),
 }));
 
 const mockToast = jest.fn();
@@ -44,6 +48,7 @@ const completarFormulario = (screen, {
 describe('RegisterScreen politica de registro', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    getDocumentosLegales.mockResolvedValue({ documentos: legalDocuments });
   });
 
   it('rechaza localmente contrasenas menores a 6 caracteres', () => {
@@ -87,6 +92,7 @@ describe('RegisterScreen politica de registro', () => {
       <RegisterScreen navigation={{ navigate: jest.fn() }} onRegisterSuccess={onRegisterSuccess} />,
     );
     completarFormulario(screen, { password: 'a'.repeat(72) });
+    await aceptar(screen);
 
     fireEvent.press(screen.getByLabelText('Crear cuenta'));
 
@@ -96,6 +102,7 @@ describe('RegisterScreen politica de registro', () => {
       'a'.repeat(72),
       'a'.repeat(72),
       'cliente',
+      legalDocuments.map((doc) => ({ documento_legal_id: doc.id, version: doc.version, aceptado: true })),
     ));
     expect(onRegisterSuccess).toHaveBeenCalledWith(user, null);
   });
@@ -107,10 +114,34 @@ describe('RegisterScreen politica de registro', () => {
     });
     const screen = render(<RegisterScreen navigation={{ navigate: jest.fn() }} />);
     completarFormulario(screen, { email: 'Existente@ServiGT.test' });
+    await aceptar(screen);
 
     fireEvent.press(screen.getByLabelText('Crear cuenta'));
 
     expect(await screen.findByText('El correo electrónico ya está registrado.')).toBeTruthy();
     expect(mockToast).toHaveBeenCalledWith('El correo electrónico ya está registrado.', 'error');
   });
+});
+
+it('no premarca aceptaciones ni registra si no estan marcadas', async () => {
+  jest.clearAllMocks(); getDocumentosLegales.mockResolvedValue({ documentos: legalDocuments });
+  const screen = render(<RegisterScreen />); completarFormulario(screen);
+  await screen.findByLabelText('Acepto terminos');
+  expect(screen.getByLabelText('Acepto terminos').props.accessibilityState.checked).toBe(false);
+  fireEvent.press(screen.getByLabelText('Crear cuenta'));
+  expect(register).not.toHaveBeenCalled();
+  expect(screen.getByText('Debes revisar y aceptar terminos y privacidad vigentes.')).toBeTruthy();
+});
+
+it('409 recarga versiones y limpia ambas aceptaciones conservando formulario', async () => {
+  jest.clearAllMocks();
+  getDocumentosLegales.mockResolvedValueOnce({ documentos: legalDocuments }).mockResolvedValue({ documentos: legalDocuments.map((d) => ({ ...d, version: 'fixture-2' })) });
+  register.mockRejectedValue({ status: 409, message: 'Version obsoleta' });
+  const screen = render(<RegisterScreen />); completarFormulario(screen); await aceptar(screen);
+  fireEvent.press(screen.getByLabelText('Crear cuenta'));
+  await waitFor(() => expect(getDocumentosLegales).toHaveBeenCalledTimes(2));
+  await screen.findByText('Acepto terminos y condiciones (version fixture-2)');
+  expect(screen.getByLabelText('Acepto terminos').props.accessibilityState.checked).toBe(false);
+  expect(screen.getByLabelText('Acepto privacidad').props.accessibilityState.checked).toBe(false);
+  expect(screen.getByPlaceholderText('Tu nombre').props.value).toBe('Pablo Toledo');
 });

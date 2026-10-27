@@ -51,6 +51,9 @@ export const options = {
 // Crea POOL_SIZE cuentas smoke-* dedicadas a esta corrida y devuelve sus
 // tokens ya emitidos. Se ejecuta una sola vez para todo el test.
 export function setup() {
+  const legalResponse = http.get(`${BASE_URL}/legal/documentos/vigentes`);
+  if (legalResponse.status !== 200) throw new Error('Faltan documentos legales aprobados; no ejecutar registros sin aceptacion.');
+  const aceptaciones = legalResponse.json('documentos').map((doc) => ({ documento_legal_id: doc.id, version: doc.version, aceptado: true }));
   const stamp = Date.now();
   const tokens = [];
 
@@ -61,6 +64,7 @@ export function setup() {
       email,
       password: 'Password123!',
       password_confirmation: 'Password123!',
+      aceptaciones_legales: aceptaciones,
       role: 'cliente',
     });
 

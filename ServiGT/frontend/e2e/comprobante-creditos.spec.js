@@ -5,6 +5,7 @@
 const { test, expect, request } = require('@playwright/test');
 const { execFileSync } = require('node:child_process');
 const { requireLocalStack, cleanupAccounts, respectRetryAfter } = require('./helpers/local-smoke');
+const { legalAcceptance } = require('./helpers/legal');
 
 const API_URL = process.env.E2E_API_URL || 'http://localhost:8085/api';
 test.use({ trace: 'off' });
@@ -35,6 +36,7 @@ async function call(method, path, key, data) {
 }
 
 async function registrar(key, categoriaId) {
+  accounts[key].aceptaciones_legales = await legalAcceptance(api, API_URL);
   let { response, body } = await call('POST', '/register', null, accounts[key]);
   if (await respectRetryAfter(response)) ({ response, body } = await call('POST', '/register', null, accounts[key]));
   expect(response.status(), JSON.stringify(body)).toBe(201);

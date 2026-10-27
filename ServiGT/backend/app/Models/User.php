@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Laravel\Sanctum\HasApiTokens;
 
@@ -30,5 +31,10 @@ class User extends Authenticatable
     public function proveedor(): HasOne
     {
         return $this->hasOne(Proveedor::class);
+    }
+
+    public function aceptacionesLegales(): HasMany
+    {
+        return $this->hasMany(AceptacionLegal::class);
     }
 }

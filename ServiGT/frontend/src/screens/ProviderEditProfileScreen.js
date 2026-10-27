@@ -57,10 +57,13 @@ export default function ProviderEditProfileScreen({
   const fileInputRef = useRef(null);
   const portadaInputRef = useRef(null);
   const isEditing = !!providerProfile;
+  const premiumActivo = providerProfile?.premium_estado === 'activo';
+  const colorAcentoInicial = providerProfile?.color_acento || null;
 
   const [nombre, setNombre] = useState(providerProfile?.nombre || user?.name || '');
   const [telefono, setTelefono] = useState(providerProfile?.telefono || '');
   const [descripcion, setDescripcion] = useState(providerProfile?.descripcion || '');
+  const [experienciaResumen, setExperienciaResumen] = useState(providerProfile?.experiencia_resumen || '');
   const [departamento, setDepartamento] = useState(providerProfile?.departamento || '');
   const [municipio, setMunicipio] = useState(providerProfile?.municipio || '');
   const [tarifaHora, setTarifaHora] = useState(providerProfile?.tarifa_hora ? String(providerProfile.tarifa_hora) : '');
@@ -120,7 +123,7 @@ export default function ProviderEditProfileScreen({
 
   const handlePortadaSelect = async (event) => {
     const file = event.target?.files?.[0];
-    if (!file || !providerProfile?.id) return;
+    if (!file || !providerProfile?.id || !premiumActivo) return;
 
     const previewUrl = URL.createObjectURL(file);
     setLocalPortadaUri(previewUrl);
@@ -161,6 +164,7 @@ export default function ProviderEditProfileScreen({
     if (telefono && !validatePhone(telefono)) errs.telefono = 'Ingresa un numero de telefono valido.';
     if (!validateRequired(descripcion)) errs.descripcion = 'La descripcion es requerida.';
     else if (descripcion.trim().length < 20) errs.descripcion = 'La descripcion debe tener al menos 20 caracteres.';
+    if (experienciaResumen.trim().length > 1000) errs.experienciaResumen = 'El resumen no puede superar 1000 caracteres.';
     if (!departamento) errs.departamento = 'Selecciona tu departamento.';
     if (categoriaIds.length === 0) errs.categoriaIds = 'Selecciona al menos una categoria.';
     if (tarifaHora && !validateNumeric(tarifaHora)) errs.tarifaHora = 'Ingresa una tarifa valida.';
@@ -174,6 +178,7 @@ export default function ProviderEditProfileScreen({
         nombre: nombre.trim(),
         telefono: telefono.trim() || null,
         descripcion: descripcion.trim(),
+        experiencia_resumen: experienciaResumen.trim() || null,
         departamento,
         municipio: municipio.trim() || null,
         categoria_id: parseInt(categoriaIds[0], 10),
@@ -181,8 +186,15 @@ export default function ProviderEditProfileScreen({
         tarifa_hora: tarifaHora ? parseFloat(tarifaHora) : null,
         tarifa_proyecto: tarifaProyecto ? parseFloat(tarifaProyecto) : null,
         nivel,
-        color_acento: colorAcento,
       };
+
+      // Una edicion normal no debe reenviar personalizacion historica. Solo se
+      // incluye el color si el usuario realmente lo cambio; quitarlo siempre
+      // es valido y agregar/reemplazar queda reservado a Premium activo.
+      if (isEditing && colorAcento !== colorAcentoInicial
+          && (colorAcento === null || premiumActivo)) {
+        payload.color_acento = colorAcento;
+      }
 
       const data = isEditing
         ? await updateProvider(providerProfile.id, payload)
@@ -286,6 +298,21 @@ export default function ProviderEditProfileScreen({
           error={errors.descripcion}
           style={s.field}
         />
+
+        <Text style={s.label}>Resumen de experiencia profesional</Text>
+        <Input
+          placeholder="Resume tu trayectoria, especialidades y logros relevantes (opcional)"
+          value={experienciaResumen}
+          onChangeText={(v) => { setExperienciaResumen(v); clearError('experienciaResumen'); }}
+          multiline
+          numberOfLines={6}
+          maxLength={1000}
+          error={errors.experienciaResumen}
+          style={s.field}
+        />
+        <Text style={[s.fieldCounter, experienciaResumen.length > 1000 && s.fieldCounterError]}>
+          {experienciaResumen.length}/1000
+        </Text>
 
         <Text style={s.label}>Departamento *</Text>
         <TouchableOpacity
@@ -418,13 +445,19 @@ export default function ProviderEditProfileScreen({
             La portada y el color de acento se ven en tu perfil publico. Las dos son
             opcionales: sin ellas tu perfil usa el degradado de ServiGT.
           </Text>
+          {!premiumActivo ? (
+            <Text style={s.premiumHint}>
+              Necesitas Premium activo para agregar o reemplazar la personalizacion.
+              Puedes quitar cualquier personalizacion guardada.
+            </Text>
+          ) : null}
 
           <Text style={s.label}>Portada</Text>
           <TouchableOpacity
             style={s.portadaWrap}
-            onPress={() => portadaInputRef.current?.click()}
+            onPress={() => premiumActivo && portadaInputRef.current?.click()}
             activeOpacity={0.85}
-            disabled={uploadingPortada}
+            disabled={uploadingPortada || !premiumActivo}
             accessibilityRole="button"
             accessibilityLabel="Cambiar portada"
           >
@@ -433,7 +466,9 @@ export default function ProviderEditProfileScreen({
             ) : (
               <View style={[s.portadaImg, s.portadaEmpty]}>
                 <Text style={s.portadaEmptyText}>
-                  {uploadingPortada ? 'Subiendo...' : 'Toca para subir una portada'}
+                  {uploadingPortada
+                    ? 'Subiendo...'
+                    : premiumActivo ? 'Toca para subir una portada' : 'Portada disponible con Premium activo'}
                 </Text>
                 <Text style={s.portadaEmptyHint}>JPG, PNG o WebP · maximo 6 MB</Text>
               </View>
@@ -447,14 +482,16 @@ export default function ProviderEditProfileScreen({
 
           {currentPortada ? (
             <View style={s.portadaActions}>
-              <Button
-                kind="ghost"
-                size="sm"
-                onPress={() => portadaInputRef.current?.click()}
-                disabled={uploadingPortada}
-              >
-                Cambiar
-              </Button>
+              {premiumActivo ? (
+                <Button
+                  kind="ghost"
+                  size="sm"
+                  onPress={() => portadaInputRef.current?.click()}
+                  disabled={uploadingPortada}
+                >
+                  Cambiar
+                </Button>
+              ) : null}
               <Button
                 kind="ghost"
                 size="sm"
@@ -466,7 +503,7 @@ export default function ProviderEditProfileScreen({
             </View>
           ) : null}
 
-          {Platform.OS === 'web' && (
+          {Platform.OS === 'web' && premiumActivo && (
             <input
               ref={portadaInputRef}
               type="file"
@@ -483,8 +520,14 @@ export default function ProviderEditProfileScreen({
               return (
                 <TouchableOpacity
                   key={color.value}
-                  onPress={() => setColorAcento(color.value)}
-                  style={[s.colorDot, { backgroundColor: color.value }, activo && s.colorDotActive]}
+                  onPress={() => premiumActivo && setColorAcento(color.value)}
+                  disabled={!premiumActivo}
+                  style={[
+                    s.colorDot,
+                    { backgroundColor: color.value },
+                    activo && s.colorDotActive,
+                    !premiumActivo && s.brandControlDisabled,
+                  ]}
                   accessibilityRole="button"
                   accessibilityLabel={color.label}
                   accessibilityState={{ selected: activo }}
@@ -496,7 +539,12 @@ export default function ProviderEditProfileScreen({
 
             <TouchableOpacity
               onPress={() => setColorAcento(null)}
-              style={[s.colorReset, !colorAcento && s.colorResetActive]}
+              disabled={!colorAcento}
+              style={[
+                s.colorReset,
+                !colorAcento && s.colorResetActive,
+                !colorAcento && s.brandControlDisabled,
+              ]}
               accessibilityRole="button"
               accessibilityState={{ selected: !colorAcento }}
             >
@@ -507,7 +555,9 @@ export default function ProviderEditProfileScreen({
           </View>
           {/* sectionHint trae marginTop negativo: al envolverse los colores en pantallas angostas pisaba la fila. */}
           <Text style={[s.sectionHint, { marginTop: 12 }]}>
-            El color se guarda al presionar Guardar, junto al resto del perfil.
+            {premiumActivo
+              ? 'El color se guarda al presionar Guardar, junto al resto del perfil.'
+              : 'Tu color guardado no se muestra publicamente mientras Premium este inactivo.'}
           </Text>
         </Card>
       ) : null}
@@ -518,6 +568,10 @@ export default function ProviderEditProfileScreen({
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: T.canvas },
   content: { padding: 24, paddingBottom: 44, width: '100%', maxWidth: 1120, alignSelf: 'center' },
+  fieldCounter: { color: T.muted, fontSize: 12, textAlign: 'right', marginTop: -10, marginBottom: 12 },
+  fieldCounterError: { color: T.danger },
+  premiumHint: { color: T.warn, fontSize: 13, lineHeight: 19, marginBottom: 12 },
+  brandControlDisabled: { opacity: 0.42 },
   backBtn: { alignSelf: 'flex-start', paddingVertical: 8, paddingRight: 12, marginBottom: 12 },
   backText: { color: T.blue, fontSize: 14, fontWeight: '800' },
   hero: {

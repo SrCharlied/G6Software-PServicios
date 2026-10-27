@@ -47,6 +47,7 @@ describe('SessionContext restore', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     logout.mockResolvedValue();
+    clearSession.mockResolvedValue();
   });
 
   it('restaura con /me e ignora un rol local manipulado', async () => {
@@ -92,5 +93,33 @@ describe('SessionContext restore', () => {
     expect(clearSession).toHaveBeenCalledTimes(1);
     expect(latestSession(onSession).user).toBeNull();
     expect(latestSession(onSession).providerProfile).toBeNull();
+  });
+
+  it('signOut espera la limpieza persistente antes de resolver', async () => {
+    loadStoredSession.mockResolvedValue(null);
+    const onSession = jest.fn(); await renderProvider(onSession);
+    await act(async () => latestSession(onSession).signIn({ id: 9, role: 'cliente' }));
+    let finish; let resolved = false;
+    clearSession.mockImplementationOnce(() => new Promise((resolve) => { finish = resolve; }));
+    let pending;
+    await act(async () => { pending = latestSession(onSession).signOut().then(() => { resolved = true; }); await Promise.resolve(); });
+    expect(resolved).toBe(false);
+    await act(async () => { finish(); await pending; });
+    expect(resolved).toBe(true);
+    expect(latestSession(onSession).user).toBeNull();
+  });
+
+  it('endSession limpia usuario, perfil y chat sin usar el token ya revocado', async () => {
+    loadStoredSession.mockResolvedValue(null);
+    const onSession = jest.fn(); await renderProvider(onSession);
+    await act(async () => {
+      latestSession(onSession).signIn({ id: 9, role: 'proveedor' }, { id: 7 });
+      latestSession(onSession).setSelectedProvider({ id: 8 });
+      latestSession(onSession).setChatParams({ userId: 4, name: 'Contacto' });
+    });
+    await act(async () => latestSession(onSession).endSession());
+    expect(clearSession).toHaveBeenCalledTimes(1);
+    expect(logout).not.toHaveBeenCalled();
+    expect(latestSession(onSession)).toMatchObject({ user: null, providerProfile: null, selectedProvider: null, chatParams: { userId: null, name: '' } });
   });
 });

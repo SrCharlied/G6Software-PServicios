@@ -112,6 +112,7 @@ class ProviderController extends Controller
             'tarifa_hora'       => 'nullable|numeric|min:0',
             'tarifa_proyecto'   => 'nullable|numeric|min:0',
             'nivel'             => 'nullable|in:novato,intermedio,experto',
+            'experiencia_resumen' => 'nullable|string|max:1000',
         ]);
 
         $categoriaIds = $validated['categoria_ids'] ?? [];
@@ -176,6 +177,7 @@ class ProviderController extends Controller
             'tarifa_hora'       => 'nullable|numeric|min:0',
             'tarifa_proyecto'   => 'nullable|numeric|min:0',
             'nivel'             => 'nullable|in:novato,intermedio,experto',
+            'experiencia_resumen' => 'nullable|string|max:1000',
             // Hex de 6 digitos con almohadilla. Se valida en el servidor para
             // que no entre nada que luego se inyecte como color en la UI.
             'color_acento'      => 'nullable|regex:/^#[0-9a-fA-F]{6}$/',
@@ -185,7 +187,11 @@ class ProviderController extends Controller
         // valida aqui y no en el request para poder distinguir "no mando color"
         // de "mando color sin Premium": lo primero es una edicion normal de
         // perfil, lo segundo es un intento de usar una prestacion que no tiene.
-        if (array_key_exists('color_acento', $validated)
+        $agregaOReemplazaColor = array_key_exists('color_acento', $validated)
+            && $validated['color_acento'] !== null
+            && $validated['color_acento'] !== $proveedor->color_acento;
+
+        if ($agregaOReemplazaColor
             && !$request->user()->can('personalizarMarca', $proveedor)) {
             return $this->error(
                 'El color de acento es una prestacion de Premium activo.',
@@ -298,7 +304,10 @@ class ProviderController extends Controller
             return $this->error('Proveedor no encontrado', 404);
         }
 
-        $this->authorize('personalizarMarca', $proveedor);
+        // Quitar una personalizacion propia no es una prestacion Premium. El
+        // plan solo restringe agregar o reemplazar la portada; el duenno debe
+        // poder retirarla aunque nunca haya pagado o su ciclo haya vencido.
+        $this->authorize('manage', $proveedor);
 
         $proveedor->update(['portada' => null]);
 

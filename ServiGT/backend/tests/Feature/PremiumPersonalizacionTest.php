@@ -106,6 +106,42 @@ class PremiumPersonalizacionTest extends TestCase
         $this->assertSame('Nueva descripcion profesional', $proveedor->fresh()->descripcion);
     }
 
+    public function test_payload_historico_con_color_sin_cambio_no_bloquea_edicion_normal(): void
+    {
+        $proveedor = $this->proveedorConPremium('vencido');
+        $proveedor->update(['color_acento' => '#123456']);
+        $this->actuarComoDuenno($proveedor);
+
+        $this->putJson("/api/providers/{$proveedor->id}", [
+            'descripcion' => 'Descripcion actualizada sin cambiar la marca',
+            'color_acento' => '#123456',
+        ])->assertOk();
+
+        $this->assertSame(
+            'Descripcion actualizada sin cambiar la marca',
+            $proveedor->fresh()->descripcion
+        );
+    }
+
+    public function test_duenno_puede_quitar_color_y_portada_con_premium_vencido(): void
+    {
+        $proveedor = $this->proveedorConPremium('vencido');
+        $proveedor->update([
+            'color_acento' => '#123456',
+            'portada' => '/storage/portadas/historica.jpg',
+        ]);
+        $this->actuarComoDuenno($proveedor);
+
+        $this->putJson("/api/providers/{$proveedor->id}", ['color_acento' => null])
+            ->assertOk();
+        $this->deleteJson("/api/providers/{$proveedor->id}/portada")
+            ->assertOk();
+
+        $proveedor->refresh();
+        $this->assertNull($proveedor->color_acento);
+        $this->assertNull($proveedor->portada);
+    }
+
     public function test_subir_portada_exige_premium_activo(): void
     {
         $sinPremium = $this->proveedorConPremium(null);

@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import { Text, TouchableOpacity } from 'react-native';
-import MaterialConfirmModal from './material/MaterialConfirmModal';
+import ConfirmActionModal from './ConfirmActionModal';
 
 export default function LogoutButton({ onLogout, style, textStyle, label = 'Cerrar sesion' }) {
   const [visible, setVisible] = useState(false);
@@ -18,7 +18,8 @@ export default function LogoutButton({ onLogout, style, textStyle, label = 'Cerr
     <TouchableOpacity style={style} accessibilityRole="button" onPress={() => { setError(''); setVisible(true); }}>
       <Text style={textStyle}>{label}</Text>
     </TouchableOpacity>
-    <MaterialConfirmModal visible={visible} procesando={busy} onConfirm={confirm} onCancel={() => { if (!lock.current) setVisible(false); }}
-      texto={{ titulo: 'Cerrar sesion', mensaje: `Vas a salir de tu cuenta de ServiGT.${error ? ` ${error}` : ''}`, confirmar: 'Confirmar salida', kind: 'danger' }} />
+    <ConfirmActionModal visible={visible} processing={busy} onConfirm={confirm} onCancel={() => { if (!lock.current) setVisible(false); }}
+      title="Cerrar sesion" message="Tu sesion se cerrara en este dispositivo. ¿Deseas continuar?"
+      confirmLabel="Cerrar sesion" confirmKind="danger" error={error} />
   </>;
 }

@@ -87,13 +87,13 @@ for (const width of [1440, 1024, 390]) {
     await page.waitForURL('**/dashboard');
     if (width === 390) await page.getByLabel('Abrir menu').click();
     await page.getByRole('button', { name: 'Cerrar sesion', exact: true }).click();
-    await page.getByText('No, volver', { exact: true }).click();
+    await page.getByText('Cancelar', { exact: true }).click();
     expect(logoutCount).toBe(0);
     expect(await page.evaluate(() => localStorage.getItem('servigt_token'))).toBe('fixture-token');
     if (width === 390) await expect(page.getByRole('button', { name: 'Cerrar sesion', exact: true })).toBeVisible();
     await page.getByRole('button', { name: 'Cerrar sesion', exact: true }).click();
     await screenshot(page, 'logout', width);
-    await page.getByText('Confirmar salida', { exact: true }).click();
+    await page.getByRole('dialog').getByText('Cerrar sesion', { exact: true }).last().click();
     await expect.poll(() => logoutCount).toBe(1);
     await expect.poll(() => page.evaluate(() => localStorage.getItem('servigt_token'))).toBeNull();
   });

@@ -12,7 +12,7 @@ class DocumentoLegalController extends Controller
 
     public function vigentes(): JsonResponse
     {
-        $documentos = DocumentoLegal::vigentes();
+        $documentos = DocumentoLegal::aprobadosVigentes();
         if ($documentos->count() !== 2) return $this->error('No hay terminos y privacidad aprobados y vigentes disponibles.', 503);
         return $this->success('Documentos legales vigentes', ['documentos' => $documentos])->header('Cache-Control', 'no-store');
     }

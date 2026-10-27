@@ -66,7 +66,7 @@ class AuthController extends Controller
         $validated['name']  = trim($validated['name']);
 
         $user = DB::transaction(function () use ($validated) {
-            $documentos = DocumentoLegal::vigentes();
+            $documentos = DocumentoLegal::aprobadosVigentes();
             if ($documentos->count() !== 2) throw new HttpResponseException($this->error('No hay terminos y privacidad aprobados y vigentes disponibles.', 503));
             foreach ($documentos as $documento) {
                 $aceptacion = collect($validated['aceptaciones_legales'])->first(fn ($item) => (int) $item['documento_legal_id'] === $documento->id);

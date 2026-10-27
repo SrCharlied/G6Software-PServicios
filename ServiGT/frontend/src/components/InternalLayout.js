@@ -110,8 +110,8 @@ export default function InternalLayout({ children, section }) {
   const activePath = resolveActivePath(items, pathname ?? '');
 
   const handleLogout = async () => {
-    setMobileMenuOpen(false);
     await signOut();
+    setMobileMenuOpen(false);
     router.replace('/home');
   };
 

@@ -69,7 +69,6 @@ try {
 
 // ── Seed admin por defecto ─────────────────────────────────────────────────
 $requiredSchemaChecks = [
-    "SELECT to_regclass('documentos_legales') IS NOT NULL AND to_regclass('aceptaciones_legales') IS NOT NULL",
     "SELECT to_regclass('publicaciones_servicio') IS NOT NULL",
     "SELECT to_regclass('publicaciones_material') IS NOT NULL
         AND to_regclass('publicaciones_material_imagenes') IS NOT NULL
@@ -97,6 +96,24 @@ $requiredSchemaChecks = [
         SELECT 1 FROM information_schema.columns
         WHERE table_name = 'servicios' AND column_name = 'publicacion_id'
     )",
+    "SELECT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'proveedores' AND column_name = 'experiencia_resumen'
+    ) AND EXISTS (
+        SELECT 1 FROM pg_constraint
+        WHERE conrelid = 'proveedores'::regclass
+          AND conname = 'proveedores_experiencia_resumen_check'
+    )",
+    "SELECT to_regclass('documentos_legales') IS NOT NULL
+        AND to_regclass('aceptaciones_legales') IS NOT NULL
+        AND (SELECT COUNT(*) = 3 FROM information_schema.columns
+            WHERE table_schema = 'public' AND table_name = 'documentos_legales'
+            AND column_name IN ('hash_sha256', 'aprobado_por', 'aprobado_at'))",
+    "SELECT to_regclass('solicitudes_eliminacion_cuenta') IS NOT NULL
+        AND EXISTS (
+            SELECT 1 FROM information_schema.columns
+            WHERE table_name = 'users' AND column_name = 'estado_cuenta'
+        )",
 ];
 
 foreach ($requiredSchemaChecks as $checkSql) {
@@ -104,6 +121,19 @@ foreach ($requiredSchemaChecks as $checkSql) {
         fwrite(STDERR, "[!] El esquema no contiene la estructura esperada de publicaciones.\n");
         exit(1);
     }
+}
+
+// HU 1.6: el backfill no agrega una cuarta categoria al pivote. PDO no muestra
+// el NOTICE de init.sql, asi que el aviso se repite aqui; no detiene el arranque.
+$sinPrincipal = (int) $pdo->query(
+    'SELECT COUNT(*) FROM proveedores p
+      WHERE p.categoria_id IS NOT NULL
+        AND NOT EXISTS (SELECT 1 FROM proveedor_categorias pc
+                         WHERE pc.proveedor_id = p.id AND pc.categoria_id = p.categoria_id)'
+)->fetchColumn();
+if ($sinPrincipal > 0) {
+    fwrite(STDERR, "[!] {$sinPrincipal} proveedor(es) tienen tres categorias sin incluir la principal.\n");
+    fwrite(STDERR, "    Revisalos a mano: el backfill no excede el maximo de tres.\n");
 }
 
 // ── Seed admin (task 4.1) ──────────────────────────────────────────────────
@@ -230,16 +260,16 @@ foreach ($legados as $correoLegado) {
 
 // ── Seed proveedores de ejemplo ────────────────────────────────────────────
 $sampleProviders = [
-    ['Juan Perez',      'Plomería',     'Guatemala',      'Mixco',              '5555-0101', 75.00, 4.8, 'experto',     'Plomero con 15 anos de experiencia en instalaciones residenciales.'],
-    ['Maria Lopez',     'Electricidad', 'Sacatepequez',   'Antigua Guatemala',  '5555-0102', 90.00, 4.5, 'experto',     'Electricista certificada, instalaciones y reparaciones.'],
-    ['Carlos Ramirez',  'Pintura',      'Quetzaltenango', 'Quetzaltenango',     '5555-0103', 60.00, 4.2, 'intermedio',  'Pintura de interiores y exteriores con acabados finos.'],
-    ['Ana Garcia',      'Carpintería',  'Chimaltenango',  'Chimaltenango',      '5555-0104', 85.00, 4.7, 'experto',     'Muebles a la medida y reparaciones de madera.'],
-    ['Luis Morales',    'Limpieza',     'Guatemala',      'Guatemala',          '5555-0105', 45.00, 4.0, 'intermedio',  'Limpieza profunda de hogares y oficinas.'],
-    ['Sofia Castillo',  'Jardinería',   'Escuintla',      'Escuintla',          '5555-0106', 50.00, 3.9, 'intermedio',  'Diseno y mantenimiento de jardines.'],
-    ['Pedro Vasquez',   'Albañilería',  'Huehuetenango',  'Huehuetenango',      '5555-0107', 70.00, 4.3, 'intermedio',  'Construccion y remodelacion de obra civil.'],
-    ['Lucia Mendez',    'Mecánica',     'Izabal',         'Puerto Barrios',     '5555-0108', 80.00, 4.6, 'experto',     'Mecanica automotriz general y diagnostico.'],
-    ['Diego Hernandez', 'Tecnología',   'Guatemala',      'Villa Nueva',        '5555-0109', 95.00, 4.4, 'intermedio',  'Soporte tecnico, redes y reparacion de equipos.'],
-    ['Elena Flores',    'Enseñanza',    'Alta Verapaz',   'Coban',              '5555-0110', 55.00, 4.9, 'experto',     'Tutoria academica de matematicas y ciencias.'],
+    ['Juan Perez',      'Plomería',     'Guatemala',      'Mixco',              '55550101', 75.00, 4.8, 'experto',     'Plomero con 15 anos de experiencia en instalaciones residenciales.'],
+    ['Maria Lopez',     'Electricidad', 'Sacatepequez',   'Antigua Guatemala',  '55550102', 90.00, 4.5, 'experto',     'Electricista certificada, instalaciones y reparaciones.'],
+    ['Carlos Ramirez',  'Pintura',      'Quetzaltenango', 'Quetzaltenango',     '55550103', 60.00, 4.2, 'intermedio',  'Pintura de interiores y exteriores con acabados finos.'],
+    ['Ana Garcia',      'Carpintería',  'Chimaltenango',  'Chimaltenango',      '55550104', 85.00, 4.7, 'experto',     'Muebles a la medida y reparaciones de madera.'],
+    ['Luis Morales',    'Limpieza',     'Guatemala',      'Guatemala',          '55550105', 45.00, 4.0, 'intermedio',  'Limpieza profunda de hogares y oficinas.'],
+    ['Sofia Castillo',  'Jardinería',   'Escuintla',      'Escuintla',          '55550106', 50.00, 3.9, 'intermedio',  'Diseno y mantenimiento de jardines.'],
+    ['Pedro Vasquez',   'Albañilería',  'Huehuetenango',  'Huehuetenango',      '55550107', 70.00, 4.3, 'intermedio',  'Construccion y remodelacion de obra civil.'],
+    ['Lucia Mendez',    'Mecánica',     'Izabal',         'Puerto Barrios',     '55550108', 80.00, 4.6, 'experto',     'Mecanica automotriz general y diagnostico.'],
+    ['Diego Hernandez', 'Tecnología',   'Guatemala',      'Villa Nueva',        '55550109', 95.00, 4.4, 'intermedio',  'Soporte tecnico, redes y reparacion de equipos.'],
+    ['Elena Flores',    'Enseñanza',    'Alta Verapaz',   'Coban',              '55550110', 55.00, 4.9, 'experto',     'Tutoria academica de matematicas y ciencias.'],
 ];
 
 // ── Seed de datos demo (task 4.1) ──────────────────────────────────────────
@@ -274,7 +304,14 @@ $insertUser      = $pdo->prepare(
 );
 $insertProveedor = $pdo->prepare(
     'INSERT INTO proveedores (user_id, nombre, email, telefono, descripcion, departamento, municipio, categoria_id, tarifa_hora, calificacion_promedio, nivel)
-     VALUES (:user_id, :nombre, :email, :telefono, :descripcion, :departamento, :municipio, :categoria_id, :tarifa_hora, :calificacion, :nivel)'
+     VALUES (:user_id, :nombre, :email, :telefono, :descripcion, :departamento, :municipio, :categoria_id, :tarifa_hora, :calificacion, :nivel)
+     RETURNING id'
+);
+// La categoria principal tambien vive en el pivote (HU 1.6): el backfill de
+// init.sql ya corrio antes de este seed, asi que se inserta aqui mismo.
+$insertPivote = $pdo->prepare(
+    'INSERT INTO proveedor_categorias (proveedor_id, categoria_id) VALUES (:proveedor_id, :categoria_id)
+     ON CONFLICT (proveedor_id, categoria_id) DO NOTHING'
 );
 
 foreach ($sampleProviders as $i => $p) {
@@ -313,6 +350,10 @@ foreach ($sampleProviders as $i => $p) {
         'tarifa_hora'  => $tarifa,
         'calificacion' => $calificacion,
         'nivel'        => $nivel,
+    ]);
+    $insertPivote->execute([
+        'proveedor_id' => $insertProveedor->fetchColumn(),
+        'categoria_id' => $categoriaId,
     ]);
 
     $createdProviders++;

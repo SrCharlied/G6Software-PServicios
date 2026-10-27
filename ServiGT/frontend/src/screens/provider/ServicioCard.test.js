@@ -57,10 +57,15 @@ describe('ServicioCard aviso de trayecto', () => {
   });
 
   it('no ofrece el aviso antes de aceptar la solicitud', () => {
-    const { queryByText, getByText } = renderCard('pendiente');
+    const { queryByText, getByText, handlers } = renderCard('pendiente');
 
     expect(queryByText('Voy en camino')).toBeNull();
     expect(getByText('Aceptar')).toBeTruthy();
+    fireEvent.press(getByText('Aceptar'));
+    expect(handlers.onAccept).toHaveBeenCalledWith(expect.objectContaining({
+      id: 21,
+      descripcion: 'Reparar una fuga de agua',
+    }));
   });
 
   it('no ofrece el aviso con el trabajo ya iniciado', () => {

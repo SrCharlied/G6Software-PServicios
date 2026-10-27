@@ -884,6 +884,79 @@ BEGIN
 END $$;
 
 -- ============================================================
+-- Sprint 10: documentos legales versionados y aceptacion (HU 2.1)
+-- ============================================================
+-- Cada version de terminos o privacidad es una fila inmutable. La vigente de
+-- cada tipo se deriva (la de mayor vigente_desde ya alcanzado), asi que no hay
+-- una bandera `vigente` que actualizar ni que pueda desincronizarse. Publicar
+-- una version nueva es un INSERT; nunca se edita ni se borra una anterior, y
+-- no exige reaceptacion a quien acepto una version previa.
+
+CREATE TABLE IF NOT EXISTS documentos_legales (
+    id BIGSERIAL PRIMARY KEY,
+    tipo VARCHAR(20) NOT NULL CHECK (tipo IN ('terminos','privacidad')),
+    version VARCHAR(20) NOT NULL CHECK (LENGTH(BTRIM(version)) > 0),
+    titulo VARCHAR(255) NOT NULL CHECK (LENGTH(BTRIM(titulo)) > 0),
+    contenido TEXT NOT NULL CHECK (LENGTH(BTRIM(contenido)) > 0),
+    -- SHA-256 hex del contenido. Lo calcula el trigger; el valor enviado se ignora.
+    hash_sha256 CHAR(64) NOT NULL,
+    vigente_desde TIMESTAMP WITHOUT TIME ZONE NOT NULL,
+    created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (tipo, version),
+    UNIQUE (tipo, vigente_desde)
+);
+CREATE INDEX IF NOT EXISTS idx_documentos_legales_vigencia
+    ON documentos_legales (tipo, vigente_desde DESC);
+
+-- Una aceptacion por usuario y version. Es evidencia: RESTRICT impide perderla
+-- por un borrado en cascada (la eliminacion de cuenta anonimiza, no borra).
+CREATE TABLE IF NOT EXISTS aceptaciones_legales (
+    id BIGSERIAL PRIMARY KEY,
+    user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+    documento_legal_id BIGINT NOT NULL REFERENCES documentos_legales(id) ON DELETE RESTRICT,
+    aceptado_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (user_id, documento_legal_id)
+);
+CREATE INDEX IF NOT EXISTS idx_aceptaciones_legales_documento
+    ON aceptaciones_legales (documento_legal_id);
+
+CREATE OR REPLACE FUNCTION documentos_legales_hash() RETURNS trigger AS $fn$
+BEGIN
+    NEW.hash_sha256 := encode(sha256(convert_to(NEW.contenido, 'UTF8')), 'hex');
+    RETURN NEW;
+END;
+$fn$ LANGUAGE plpgsql;
+
+-- Compartida por ambas tablas: una version publicada o una aceptacion
+-- registrada no se modifica ni se elimina.
+CREATE OR REPLACE FUNCTION legal_inmutable() RETURNS trigger AS $fn$
+BEGIN
+    RAISE EXCEPTION '% es inmutable: no admite %', TG_TABLE_NAME, TG_OP;
+END;
+$fn$ LANGUAGE plpgsql;
+
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'trg_documentos_legales_hash') THEN
+        CREATE TRIGGER trg_documentos_legales_hash
+            BEFORE INSERT ON documentos_legales
+            FOR EACH ROW EXECUTE FUNCTION documentos_legales_hash();
+    END IF;
+
+    IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'trg_documentos_legales_inmutable') THEN
+        CREATE TRIGGER trg_documentos_legales_inmutable
+            BEFORE UPDATE OR DELETE ON documentos_legales
+            FOR EACH ROW EXECUTE FUNCTION legal_inmutable();
+    END IF;
+
+    IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'trg_aceptaciones_legales_inmutable') THEN
+        CREATE TRIGGER trg_aceptaciones_legales_inmutable
+            BEFORE UPDATE OR DELETE ON aceptaciones_legales
+            FOR EACH ROW EXECUTE FUNCTION legal_inmutable();
+    END IF;
+END $$;
+
+-- ============================================================
 -- 3. Seed de catalogo
 -- ============================================================
 INSERT INTO categorias (nombre, descripcion, icono) VALUES

@@ -104,6 +104,8 @@ $requiredSchemaChecks = [
         WHERE conrelid = 'proveedores'::regclass
           AND conname = 'proveedores_experiencia_resumen_check'
     )",
+    "SELECT to_regclass('documentos_legales') IS NOT NULL
+        AND to_regclass('aceptaciones_legales') IS NOT NULL",
 ];
 
 foreach ($requiredSchemaChecks as $checkSql) {

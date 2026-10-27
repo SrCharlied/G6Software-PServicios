@@ -73,6 +73,9 @@ CREATE TABLE IF NOT EXISTS proveedores (
     email VARCHAR(255) NOT NULL UNIQUE,
     telefono VARCHAR(20),
     descripcion TEXT,
+    experiencia_resumen TEXT CHECK (
+        experiencia_resumen IS NULL OR char_length(experiencia_resumen) <= 1000
+    ),
     departamento VARCHAR(100) NOT NULL,
     municipio VARCHAR(100),
     categoria_id BIGINT REFERENCES categorias(id) ON DELETE RESTRICT,
@@ -538,6 +541,22 @@ ALTER TABLE proveedores ADD COLUMN IF NOT EXISTS premium_renovaciones INT NOT NU
 -- de marca de siempre.
 ALTER TABLE proveedores ADD COLUMN IF NOT EXISTS portada VARCHAR(500);
 ALTER TABLE proveedores ADD COLUMN IF NOT EXISTS color_acento VARCHAR(7);
+
+-- Resumen profesional opcional. El CHECK refuerza el maximo de la API y se
+-- agrega tambien a instalaciones con volumen existente.
+ALTER TABLE proveedores ADD COLUMN IF NOT EXISTS experiencia_resumen TEXT;
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint
+        WHERE conrelid = 'proveedores'::regclass
+          AND conname = 'proveedores_experiencia_resumen_check'
+    ) THEN
+        ALTER TABLE proveedores
+            ADD CONSTRAINT proveedores_experiencia_resumen_check
+            CHECK (experiencia_resumen IS NULL OR char_length(experiencia_resumen) <= 1000);
+    END IF;
+END $$;
 
 -- Publicaciones y trazabilidad nullable desde servicios. El snapshot conserva
 -- datos minimos aunque luego la publicacion se edite o elimine.

@@ -199,6 +199,13 @@ export default function ProviderDetailScreen({
         </Card>
       ) : null}
 
+      {proveedor.experiencia_resumen ? (
+        <Card style={styles.card}>
+          <Text style={styles.cardTitle}>Experiencia profesional</Text>
+          <Text style={styles.descText}>{proveedor.experiencia_resumen}</Text>
+        </Card>
+      ) : null}
+
       {user && esCliente && !esMiPerfil ? (
         <Card style={[styles.card, { gap: 10 }]}>
           <Button

@@ -96,6 +96,14 @@ $requiredSchemaChecks = [
         SELECT 1 FROM information_schema.columns
         WHERE table_name = 'servicios' AND column_name = 'publicacion_id'
     )",
+    "SELECT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'proveedores' AND column_name = 'experiencia_resumen'
+    ) AND EXISTS (
+        SELECT 1 FROM pg_constraint
+        WHERE conrelid = 'proveedores'::regclass
+          AND conname = 'proveedores_experiencia_resumen_check'
+    )",
     "SELECT to_regclass('documentos_legales') IS NOT NULL
         AND to_regclass('aceptaciones_legales') IS NOT NULL",
     "SELECT to_regclass('solicitudes_eliminacion_cuenta') IS NOT NULL

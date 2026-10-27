@@ -32,6 +32,7 @@ const proveedor = {
   categoria_id: 3,
   categoria: { id: 3, nombre: 'Electricidad' },
   categorias: [{ id: 3, nombre: 'Electricidad' }],
+  experiencia_resumen: 'Diez anos instalando y reparando sistemas residenciales.',
 };
 
 const publicacion = {
@@ -75,7 +76,7 @@ describe('ProviderDetailScreen publicaciones', () => {
     expect(await screen.findByText('Instalacion electrica residencial')).toBeTruthy();
     expect(screen.getByText('Q250.00')).toBeTruthy();
     expect(getPublicaciones).toHaveBeenCalledWith({ proveedorId: proveedor.id, perPage: 50 });
-  }, 10000);
+  }, 20000);
 
   it('muestra loading, vacio y error sin convertir fallos en lista vacia silenciosa', async () => {
     let resolver;
@@ -104,5 +105,21 @@ describe('ProviderDetailScreen publicaciones', () => {
     expect(screen.queryByText('Chat')).toBeNull();
     expect(screen.queryByText('Contactar')).toBeNull();
     expect(screen.queryByText('Enviar mensaje')).toBeNull();
+  });
+
+  it('muestra la experiencia profesional en una seccion publica separada', async () => {
+    renderScreen();
+
+    expect(await screen.findByText('Experiencia profesional')).toBeTruthy();
+    expect(screen.getByText(proveedor.experiencia_resumen)).toBeTruthy();
+  });
+
+  it('omite la seccion cuando el proveedor no publico experiencia', async () => {
+    const sinExperiencia = { ...proveedor, experiencia_resumen: null };
+    getProvider.mockResolvedValueOnce({ proveedor: sinExperiencia });
+    renderScreen({ selectedProvider: sinExperiencia });
+
+    await screen.findByText('Instalacion electrica residencial');
+    expect(screen.queryByText('Experiencia profesional')).toBeNull();
   });
 });

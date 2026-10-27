@@ -1017,6 +1017,39 @@ UPDATE proveedores
  WHERE telefono ~ '^[0-9]{4}-[0-9]{4}$';
 
 -- ============================================================
+-- Sprint 10: categoria principal tambien en el pivote (HU 1.6)
+-- ============================================================
+-- El catalogo y la busqueda pasaran a leer proveedor_categorias; antes de ese
+-- cambio cada categoria principal debe estar en el pivote o el proveedor
+-- desapareceria de su propia categoria. ON CONFLICT lo hace idempotente.
+-- Se respeta el maximo de tres: si un perfil ya tiene tres categorias en el
+-- pivote sin la principal no se le agrega una cuarta; se reporta para que
+-- lo resuelva la regla de principal de 1.6.b.
+INSERT INTO proveedor_categorias (proveedor_id, categoria_id)
+SELECT p.id, p.categoria_id
+  FROM proveedores p
+ WHERE p.categoria_id IS NOT NULL
+   AND (SELECT COUNT(*) FROM proveedor_categorias pc WHERE pc.proveedor_id = p.id) < 3
+ON CONFLICT (proveedor_id, categoria_id) DO NOTHING;
+
+DO $$
+DECLARE
+    sin_principal INT;
+BEGIN
+    SELECT COUNT(*) INTO sin_principal
+      FROM proveedores p
+     WHERE p.categoria_id IS NOT NULL
+       AND NOT EXISTS (
+           SELECT 1 FROM proveedor_categorias pc
+            WHERE pc.proveedor_id = p.id AND pc.categoria_id = p.categoria_id
+       );
+
+    IF sin_principal > 0 THEN
+        RAISE NOTICE '% proveedor(es) con tres categorias en el pivote sin incluir la principal', sin_principal;
+    END IF;
+END $$;
+
+-- ============================================================
 -- 3. Seed de catalogo
 -- ============================================================
 INSERT INTO categorias (nombre, descripcion, icono) VALUES

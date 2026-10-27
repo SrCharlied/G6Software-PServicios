@@ -120,6 +120,19 @@ foreach ($requiredSchemaChecks as $checkSql) {
     }
 }
 
+// HU 1.6: el backfill no agrega una cuarta categoria al pivote. PDO no muestra
+// el NOTICE de init.sql, asi que el aviso se repite aqui; no detiene el arranque.
+$sinPrincipal = (int) $pdo->query(
+    'SELECT COUNT(*) FROM proveedores p
+      WHERE p.categoria_id IS NOT NULL
+        AND NOT EXISTS (SELECT 1 FROM proveedor_categorias pc
+                         WHERE pc.proveedor_id = p.id AND pc.categoria_id = p.categoria_id)'
+)->fetchColumn();
+if ($sinPrincipal > 0) {
+    fwrite(STDERR, "[!] {$sinPrincipal} proveedor(es) tienen tres categorias sin incluir la principal.\n");
+    fwrite(STDERR, "    Revisalos a mano: el backfill no excede el maximo de tres.\n");
+}
+
 // ── Seed admin (task 4.1) ──────────────────────────────────────────────────
 // Antes esto creaba `admin@gmail.com` con la contrasena literal `admin` en
 // cualquier base vacia: cualquiera que levantara el compose tal cual quedaba
@@ -288,7 +301,14 @@ $insertUser      = $pdo->prepare(
 );
 $insertProveedor = $pdo->prepare(
     'INSERT INTO proveedores (user_id, nombre, email, telefono, descripcion, departamento, municipio, categoria_id, tarifa_hora, calificacion_promedio, nivel)
-     VALUES (:user_id, :nombre, :email, :telefono, :descripcion, :departamento, :municipio, :categoria_id, :tarifa_hora, :calificacion, :nivel)'
+     VALUES (:user_id, :nombre, :email, :telefono, :descripcion, :departamento, :municipio, :categoria_id, :tarifa_hora, :calificacion, :nivel)
+     RETURNING id'
+);
+// La categoria principal tambien vive en el pivote (HU 1.6): el backfill de
+// init.sql ya corrio antes de este seed, asi que se inserta aqui mismo.
+$insertPivote = $pdo->prepare(
+    'INSERT INTO proveedor_categorias (proveedor_id, categoria_id) VALUES (:proveedor_id, :categoria_id)
+     ON CONFLICT (proveedor_id, categoria_id) DO NOTHING'
 );
 
 foreach ($sampleProviders as $i => $p) {
@@ -327,6 +347,10 @@ foreach ($sampleProviders as $i => $p) {
         'tarifa_hora'  => $tarifa,
         'calificacion' => $calificacion,
         'nivel'        => $nivel,
+    ]);
+    $insertPivote->execute([
+        'proveedor_id' => $insertProveedor->fetchColumn(),
+        'categoria_id' => $categoriaId,
     ]);
 
     $createdProviders++;

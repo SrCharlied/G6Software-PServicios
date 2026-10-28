@@ -565,13 +565,24 @@ export const getNotificaciones = async () => {
   }
 };
 
+// Un conteo ausente o malformado es un error, no un cero: el badge no puede
+// afirmar "sin pendientes" cuando no sabe cuantas hay.
+export const parseUnreadCount = (data) => {
+  const count = data?.no_leidas;
+  if (!Number.isInteger(count) || count < 0) {
+    throw new Error('No se pudo cargar el conteo de notificaciones.');
+  }
+  return count;
+};
+
 export const getUnreadNotificationsCount = async () => {
+  let response;
   try {
-    const response = await api.get('/notificaciones');
-    return response.data.no_leidas || 0;
+    response = await api.get('/notificaciones');
   } catch (error) {
     throwApiError(error, 'No se pudo cargar el conteo de notificaciones.');
   }
+  return parseUnreadCount(response.data);
 };
 
 export const marcarNotificacionLeida = async (id) => {

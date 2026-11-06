@@ -1,6 +1,7 @@
-# Matriz funcional backend - alcance PT y dependencias
+# Matriz funcional backend - Sprint 10 integrado
 
-Fecha: 2026-10-26. PostgreSQL de Compose. `php -m` no lista PCOV/Xdebug:
+Fecha: 2026-11-05, sobre `dev` en `d3ce952` (incluye 1.6.b, 3.1.b, 5.1,
+1.5.a y 1.5.b/c). PostgreSQL de Compose. `php -m` no lista PCOV/Xdebug:
 no hay porcentaje medido de lineas backend. Esto es una matriz funcional,
 no una forma de atribuir cobertura de codigo o cierre a tareas incompletas.
 
@@ -14,11 +15,20 @@ no una forma de atribuir cobertura de codigo o cierre a tareas incompletas.
 | Registro y aceptaciones atomicas | RegistroLegalTest: faltante/duplicado/obsoleto/rollback/sin textos/login historico | Aprobado con fixtures aislados |
 | Sesion y limites existentes | AuthSecurityTest, RateLimitingTest y matriz de autorizacion existente | Aprobado |
 | Comprobante propio/snapshot/historicas | ComprobanteCompraTest y suite completa de creditos | Aprobado |
-| Anonimizado/reauth/bloqueos/revocacion | 3.1 no integrado, politicas pendientes | Pendiente |
-| Retencion y limpieza de archivos/manifiesto | 3.1 no integrado, politicas pendientes | Pendiente |
+| Anonimizado/reauth/bloqueos/revocacion | AnonimizacionCuentaSprint10Test (12): auth, admin 403, password, bloqueos 409 y reintento, tombstone con historial, tokens revocados, idempotencia, rollback | Aprobado |
+| Retencion y limpieza de archivos/manifiesto | LimpiezaArchivosCuentaSprint10Test (9), EliminacionCuentaSchemaSprint10Test (10) | Aprobado |
+| Categorias multiples (1.6.b) | CategoriasMultiplesSprint10Test (15): maximo 3, principal dentro del conjunto, rollback, catalogo y filtro | Aprobado |
+| Autorizar antes de validar (5.1) | AutorizarAntesDeValidarSprint10Test (10) | Aprobado |
+| Conteo de notificaciones no leidas (1.5.a) | NotificacionConteoSprint10Test (3), NotificacionLecturaTest | Aprobado |
 
-8/10 filas cuentan con pruebas aprobadas: **80% de esta matriz definida**,
-no 80% de lineas ni de todo el Sprint 10. Las dos filas faltantes son
-criticas y bloquean eliminacion/cierre, aunque el resto este verde.
-Resultado suite final: 697 pruebas, 3179 aserciones. La aprobacion humana
-y la prueba integrada con contenido legal real permanecen pendientes.
+13/13 filas cuentan con pruebas aprobadas: **100% de esta matriz definida**,
+no 100% de lineas ni de todo el Sprint 10.
+
+Resultado suite final backend: 772 pruebas, 3560 aserciones, 0 fallos
+(`docker compose --profile test run --rm backend_test`, `db_test` recreada).
+Frontend en el mismo SHA: Jest 43 suites / 377 pruebas en verde y
+`npm run build:web` exporta `dist`.
+
+Pendiente fuera de esta matriz: aprobacion humana, prueba integrada con
+contenido legal real, pantalla de eliminacion (3.2), limite de 3 categorias
+en la UI (1.6.c), despliegue y smoke sobre el SHA desplegado (6.1).

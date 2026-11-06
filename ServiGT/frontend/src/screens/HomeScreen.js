@@ -20,21 +20,7 @@ import NotificationBell from '../components/NotificationBell';
 import { getProviders, storageUrl } from '../services/api';
 import { T } from '../theme';
 import { Avatar, Button, Card, StatusChip, Stars } from '../components/ui';
-
-// Evita escribir un rango unicode de marcas diacriticas como literal de regex
-// (̀-ͯ): se filtra por code point para no depender de como el
-// editor/herramienta interprete esa secuencia de escape.
-const normalizeText = (value) =>
-  (value || '')
-    .toString()
-    .normalize('NFD')
-    .split('')
-    .filter((ch) => {
-      const code = ch.codePointAt(0);
-      return code < 0x0300 || code > 0x036f;
-    })
-    .join('')
-    .toLowerCase();
+import { coincideBusquedaProveedor, normalizeText } from '../utils/busquedaProveedores';
 
 // `showBell`: en desktop la campana la provee el sidebar de InternalLayout, asi
 // que aqui se oculta para no duplicarla. En movil no hay sidebar y esta es la
@@ -135,11 +121,7 @@ export default function HomeScreen({ useLayoutNavigation = false } = {}) {
   };
 
   const normalizedQuery   = normalizeText(searchQuery.trim());
-  const filteredProviders = proveedores.filter((prov) => {
-    if (!normalizedQuery) return true;
-    return [prov.nombre, prov.descripcion, prov.departamento, prov.municipio, prov.telefono, prov.categoria?.nombre]
-      .some((f) => normalizeText(f).includes(normalizedQuery));
-  });
+  const filteredProviders = proveedores.filter((prov) => coincideBusquedaProveedor(prov, searchQuery));
 
   const handleProviderPress = useCallback((prov) => {
     setSelectedProvider(prov);

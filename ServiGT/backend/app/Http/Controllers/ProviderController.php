@@ -12,15 +12,39 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\ValidationException;
 
 class ProviderController extends Controller
 {
     use ApiResponse, AuthorizesRequests;
 
-    public function index(): JsonResponse
+    /** Maximo de categorias por perfil (HU 1.6, plan Sprint 10). */
+    public const MAX_CATEGORIAS = 3;
+
+    /**
+     * Reglas del conjunto de categorias, compartidas por alta y edicion. Solo
+     * categorias existentes del catalogo administrado: no hay categorias
+     * libres.
+     */
+    private const REGLAS_CONJUNTO_CATEGORIAS = [
+        'categoria_ids'   => 'sometimes|array|min:1|max:' . self::MAX_CATEGORIAS,
+        'categoria_ids.*' => 'integer|distinct|exists:categorias,id',
+    ];
+
+    public function index(Request $request): JsonResponse
     {
-        $proveedores = Proveedor::with('categoria')
+        $validated = $request->validate([
+            'categoria_id' => 'sometimes|integer',
+        ]);
+
+        // HU 1.6.b: el pivote es la fuente de verdad, asi que el filtro por
+        // categoria encuentra tambien a quien la ofrece como secundaria.
+        $proveedores = Proveedor::with(['categoria', 'categorias'])
             ->visibleEnCatalogo()
+            ->when(isset($validated['categoria_id']), fn ($q) => $q->whereHas(
+                'categorias',
+                fn ($c) => $c->where('categorias.id', $validated['categoria_id'])
+            ))
             ->orderBy('calificacion_promedio', 'desc')
             ->get();
 
@@ -109,21 +133,18 @@ class ProviderController extends Controller
             'descripcion'       => 'required|string|min:20|max:500',
             'departamento'      => 'required|string|max:100',
             'municipio'         => 'nullable|string|max:100',
-            'categoria_id'      => 'nullable|exists:categorias,id',
-            'categoria_ids'     => 'sometimes|array|min:1',
-            'categoria_ids.*'   => 'exists:categorias,id',
+            'categoria_id'      => 'nullable|integer|exists:categorias,id',
+            ...self::REGLAS_CONJUNTO_CATEGORIAS,
             'tarifa_hora'       => 'nullable|numeric|min:0',
             'tarifa_proyecto'   => 'nullable|numeric|min:0',
             'nivel'             => 'nullable|in:novato,intermedio,experto',
             'experiencia_resumen' => 'nullable|string|max:1000',
         ]);
 
-        $categoriaIds = $validated['categoria_ids'] ?? [];
+        $categorias = $this->resolverCategorias($validated, []);
         unset($validated['categoria_ids']);
-
-        // Derive primary categoria_id from first selection when not explicitly set
-        if (empty($validated['categoria_id']) && !empty($categoriaIds)) {
-            $validated['categoria_id'] = $categoriaIds[0];
+        if ($categorias !== null) {
+            $validated['categoria_id'] = $categorias['principal'];
         }
 
         // La identidad se deriva de la sesion, nunca del payload: evita que un
@@ -134,7 +155,16 @@ class ProviderController extends Controller
             // Transaccion propia: si el insert choca contra el indice unico,
             // Laravel hace ROLLBACK TO SAVEPOINT solo de este bloque en vez de
             // dejar abortada la transaccion completa de la peticion.
-            $proveedor = DB::transaction(fn () => Proveedor::create($validated));
+            // Perfil y pivote van juntos (HU 1.6.b): un fallo al sincronizar
+            // no deja un perfil con principal pero sin categorias.
+            $proveedor = DB::transaction(function () use ($validated, $categorias) {
+                $proveedor = Proveedor::create($validated);
+                if ($categorias !== null) {
+                    $proveedor->categorias()->sync($categorias['ids']);
+                }
+
+                return $proveedor;
+            });
         } catch (QueryException $e) {
             // El chequeo de arriba no cierra la carrera: si otra peticion del
             // mismo usuario gano entre el exists() y este insert, el arbitro
@@ -144,12 +174,6 @@ class ProviderController extends Controller
             }
 
             return $this->error('Ya tienes un perfil de proveedor.', 422);
-        }
-
-        if (!empty($categoriaIds)) {
-            $proveedor->categorias()->sync($categoriaIds);
-        } elseif (!empty($validated['categoria_id'])) {
-            $proveedor->categorias()->sync([$validated['categoria_id']]);
         }
 
         $proveedor->load(['categoria', 'categorias']);
@@ -174,9 +198,9 @@ class ProviderController extends Controller
             'descripcion'       => 'sometimes|required|string|min:20|max:500',
             'departamento'      => 'sometimes|required|string|max:100',
             'municipio'         => 'nullable|string|max:100',
-            'categoria_id'      => 'sometimes|nullable|exists:categorias,id',
-            'categoria_ids'     => 'sometimes|array|min:1',
-            'categoria_ids.*'   => 'exists:categorias,id',
+            // Sin `nullable`: la principal se cambia, no se quita (HU 1.6.b).
+            'categoria_id'      => 'sometimes|required|integer|exists:categorias,id',
+            ...self::REGLAS_CONJUNTO_CATEGORIAS,
             'tarifa_hora'       => 'nullable|numeric|min:0',
             'tarifa_proyecto'   => 'nullable|numeric|min:0',
             'nivel'             => 'nullable|in:novato,intermedio,experto',
@@ -202,16 +226,26 @@ class ProviderController extends Controller
             );
         }
 
-        $categoriaIds = $validated['categoria_ids'] ?? null;
-        unset($validated['categoria_ids']);
+        // Lock del perfil: dos ediciones simultaneas de categorias se
+        // serializan y la segunda valida contra el conjunto ya confirmado.
+        // Principal y pivote se confirman o revierten juntos (HU 1.6.b).
+        DB::transaction(function () use ($proveedor, $validated) {
+            $bloqueado = Proveedor::whereKey($proveedor->id)->lockForUpdate()->firstOrFail();
 
-        if ($categoriaIds !== null) {
-            $validated['categoria_id'] = $categoriaIds[0];
-            $proveedor->categorias()->sync($categoriaIds);
-        }
+            $actuales = $bloqueado->categorias()->pluck('categorias.id')
+                ->map(fn ($id) => (int) $id)->all();
+            $categorias = $this->resolverCategorias($validated, $actuales);
+            unset($validated['categoria_ids']);
 
-        $proveedor->update($validated);
-        $proveedor->load(['categoria', 'categorias', 'disponibilidad']);
+            if ($categorias !== null) {
+                $validated['categoria_id'] = $categorias['principal'];
+                $bloqueado->categorias()->sync($categorias['ids']);
+            }
+
+            $bloqueado->update($validated);
+        });
+
+        $proveedor->refresh()->load(['categoria', 'categorias', 'disponibilidad']);
 
         return $this->success('Perfil actualizado correctamente', [
             'proveedor' => (new ProveedorResource($proveedor, ProveedorResource::PROPIO))->resolve(),
@@ -361,6 +395,56 @@ class ProviderController extends Controller
         $this->authorize('manage', $documento->proveedor);
 
         return Storage::disk('local')->download($documento->ruta_archivo, $documento->nombre_archivo);
+    }
+
+    /**
+     * Resuelve principal + conjunto a partir del payload ya validado (HU 1.6.b).
+     *
+     *  - Con `categoria_ids`: ese es el conjunto; la principal es
+     *    `categoria_id` si viene (debe pertenecer al conjunto) o la primera.
+     *  - Solo con `categoria_id`: cambia la principal dentro del conjunto
+     *    actual. Si el perfil aun no tiene categorias, la principal pasa a ser
+     *    su unica categoria.
+     *  - Sin ninguno: null, no se tocan las categorias.
+     *
+     * La principal siempre forma parte del pivote, asi que leer cualquiera de
+     * las dos fuentes no da resultados contradictorios.
+     *
+     * @param  int[]  $actuales
+     * @return array{principal:int, ids:int[]}|null
+     */
+    private function resolverCategorias(array $validated, array $actuales): ?array
+    {
+        $principal = isset($validated['categoria_id']) ? (int) $validated['categoria_id'] : null;
+
+        if (array_key_exists('categoria_ids', $validated)) {
+            $ids = array_map('intval', $validated['categoria_ids']);
+            $principal ??= $ids[0];
+
+            if (!in_array($principal, $ids, true)) {
+                throw ValidationException::withMessages([
+                    'categoria_id' => 'La categoria principal debe estar entre las categorias seleccionadas.',
+                ]);
+            }
+
+            return ['principal' => $principal, 'ids' => $ids];
+        }
+
+        if ($principal === null) {
+            return null;
+        }
+
+        if ($actuales === []) {
+            return ['principal' => $principal, 'ids' => [$principal]];
+        }
+
+        if (!in_array($principal, $actuales, true)) {
+            throw ValidationException::withMessages([
+                'categoria_id' => 'La categoria principal debe estar entre las categorias del perfil. Envia categoria_ids para cambiar el conjunto.',
+            ]);
+        }
+
+        return ['principal' => $principal, 'ids' => $actuales];
     }
 
     /**

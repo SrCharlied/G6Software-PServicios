@@ -68,6 +68,9 @@ class ProveedorResource extends JsonResource
             'tarifa_proyecto'       => $this->tarifa_proyecto,
             'categoria_id'          => $this->categoria_id,
             'categoria'             => $this->categoriaResumida(),
+            // HU 1.6.b: el catalogo y su buscador filtran por todas las
+            // categorias del perfil, no solo por la principal.
+            'categorias'            => $this->categoriasResumidas(),
             'premium_estado'        => $this->premium_estado,
         ];
 
@@ -87,7 +90,6 @@ class ProveedorResource extends JsonResource
             'total_calificaciones' => (int) ($this->total_calificaciones ?? 0),
             'portada'              => $marcaActiva ? $this->portada : null,
             'color_acento'         => $marcaActiva ? $this->color_acento : null,
-            'categorias'           => $this->categoriasResumidas(),
             'disponibilidad'       => $this->whenLoaded('disponibilidad'),
         ];
 
@@ -131,8 +133,12 @@ class ProveedorResource extends JsonResource
             return null;
         }
 
+        // La principal primero y el resto por nombre: el pivote no guarda
+        // orden y la tarjeta muestra la primera como etiqueta principal.
         return $this->categorias
+            ->sortBy(fn ($categoria) => [(int) $categoria->id !== (int) $this->categoria_id, $categoria->nombre])
             ->map(fn ($categoria) => ['id' => $categoria->id, 'nombre' => $categoria->nombre])
+            ->values()
             ->all();
     }
 }

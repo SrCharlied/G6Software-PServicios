@@ -20,6 +20,7 @@ import { useToast } from '../context/ToastContext';
 import { T } from '../theme';
 import PublicacionCard from '../components/PublicacionCard';
 import { Avatar, Button, Card, PremiumBadge, ProfileCover, StatusChip, Stars } from '../components/ui';
+import { categoriasParaMostrar } from '../utils/categoriasProveedor';
 
 const DIAS = ['Dom', 'Lun', 'Mar', 'Mie', 'Jue', 'Vie', 'Sab'];
 
@@ -133,9 +134,7 @@ export default function ProviderDetailScreen({
     return date.toLocaleDateString('es-GT', { day: '2-digit', month: 'short', year: 'numeric' });
   };
 
-  const categorias = proveedor.categorias?.length > 0
-    ? proveedor.categorias
-    : proveedor.categoria ? [proveedor.categoria] : [];
+  const categorias = categoriasParaMostrar(proveedor);
 
   const ProfileColumn = (
     <View style={twoColumns ? styles.colLeft : undefined}>
@@ -156,7 +155,12 @@ export default function ProviderDetailScreen({
 
         <View style={styles.chipsWrap}>
           {categorias.map((cat) => (
-            <StatusChip key={cat.id} variant="info" label={cat.nombre} dot={false} />
+            <StatusChip
+              key={cat.id}
+              variant={cat.principal ? 'info' : 'neutral'}
+              label={cat.principal && categorias.length > 1 ? `${cat.nombre} · Principal` : cat.nombre}
+              dot={false}
+            />
           ))}
           {proveedor.nivel ? (
             <StatusChip

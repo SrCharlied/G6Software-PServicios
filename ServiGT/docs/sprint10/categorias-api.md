@@ -59,15 +59,29 @@ usan el mismo orden.
 La búsqueda de texto del Home (`src/utils/busquedaProveedores.js`) compara
 contra todas las categorías del perfil.
 
+## UI (HU 1.6.c)
+
+- `src/components/CategoriaSelector.js`, usado en el registro y en la edición
+  de perfil: muestra el contador `N/3`, bloquea una cuarta categoría y deja
+  elegir la principal de forma explícita. La principal va primero en la lista
+  y se envía como `categoria_id`.
+- Un perfil histórico con más de 3 categorías ve un aviso y no puede guardar
+  hasta dejar 3 (validación local con el mismo mensaje que el límite).
+- Tarjeta del catálogo: la principal y `+N` con las demás. Detalle: todas, con
+  la principal marcada. Panel del proveedor: lista con «(principal)».
+- Reglas puras en `src/utils/categoriasProveedor.js` (`MAX_CATEGORIAS = 3`,
+  igual que el backend).
+- Evidencia: `evidencia/s10-categorias-*.png` (1440, 1024 y 390).
+
 ## Fuera de esta task
 
-- **1.6.c (AS):** limitar la selección a 3 en el registro y en la edición de
-  perfil, y mostrar la principal y las categorías en las tarjetas. Hoy, si la
-  UI deja marcar 4 o más, el backend responde `422`.
 - **1.6.d (MR):** pruebas ampliadas (históricos y UI).
 - No hay `CHECK` ni trigger en la BD que limite el pivote a 3. El límite se
   aplica en la aplicación, con el lock. Si se quiere en la BD, el cambio de
   esquema le corresponde a D.
 
-Pruebas: `backend/tests/Feature/CategoriasMultiplesSprint10Test.php` (15) y
-`frontend/src/utils/busquedaProveedores.test.js` (6).
+Pruebas: `backend/tests/Feature/CategoriasMultiplesSprint10Test.php` (15),
+`frontend/src/utils/busquedaProveedores.test.js` (6),
+`frontend/src/utils/categoriasProveedor.test.js` (6),
+`frontend/src/components/CategoriaSelector.test.js` (3) y dos casos nuevos en
+`frontend/src/screens/ProviderEditProfileScreen.test.js`.

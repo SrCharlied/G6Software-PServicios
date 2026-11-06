@@ -21,6 +21,7 @@ import { getProviders, storageUrl } from '../services/api';
 import { T } from '../theme';
 import { Avatar, Button, Card, StatusChip, Stars } from '../components/ui';
 import { coincideBusquedaProveedor, normalizeText } from '../utils/busquedaProveedores';
+import { categoriasParaMostrar } from '../utils/categoriasProveedor';
 
 // `showBell`: en desktop la campana la provee el sidebar de InternalLayout, asi
 // que aqui se oculta para no duplicarla. En movil no hay sidebar y esta es la
@@ -44,6 +45,7 @@ function TopBar({ onMenuPress, showBell }) {
 function ProviderCard({ prov, onPress, style }) {
   const photoUri = storageUrl(prov.foto_perfil);
   const rating = Number(prov.calificacion_promedio || 0);
+  const [principal, ...otras] = categoriasParaMostrar(prov);
 
   return (
     <TouchableOpacity activeOpacity={0.88} onPress={onPress} style={style}>
@@ -54,7 +56,17 @@ function ProviderCard({ prov, onPress, style }) {
         </View>
 
         <View style={styles.provChipsRow}>
-          <StatusChip variant="info" label={prov.categoria?.nombre || 'Sin categoria'} size="sm" dot={false} />
+          <View style={styles.provCatChips}>
+            <StatusChip variant="info" label={principal?.nombre || 'Sin categoria'} size="sm" dot={false} />
+            {otras.length > 0 ? (
+              <StatusChip
+                variant="neutral"
+                label={`+${otras.length}`}
+                size="sm"
+                dot={false}
+              />
+            ) : null}
+          </View>
           {rating > 0 ? (
             <View style={styles.ratingRow}>
               <Stars value={rating} size={12} />
@@ -315,6 +327,7 @@ const styles = StyleSheet.create({
   provHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 8 },
   provName: { fontSize: 16, fontWeight: '700', color: T.ink, flex: 1 },
   provChipsRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8, gap: 8 },
+  provCatChips: { flexDirection: 'row', alignItems: 'center', gap: 4, flexShrink: 1 },
   ratingRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   ratingText: { fontSize: 12, color: T.muted, fontWeight: '600' },
   provDesc: { fontSize: 13, color: T.muted, lineHeight: 19, marginBottom: 8 },

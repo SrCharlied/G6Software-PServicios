@@ -140,3 +140,51 @@ describe('ProviderEditProfileScreen telefono y descripcion', () => {
     }
   });
 });
+
+describe('ProviderEditProfileScreen categorias (HU 1.6.c)', () => {
+  const CATALOGO = [
+    { id: 1, nombre: 'Albanileria' },
+    { id: 3, nombre: 'Electricidad' },
+    { id: 5, nombre: 'Plomeria' },
+    { id: 7, nombre: 'Pintura' },
+  ];
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    getCategorias.mockResolvedValue({ categorias: CATALOGO });
+    updateProvider.mockResolvedValue({ proveedor: profile });
+  });
+
+  it('envia la principal elegida como categoria_id y primera del conjunto', async () => {
+    const screen = renderScreen({
+      categoria_id: 3,
+      categorias: [{ id: 5, nombre: 'Plomeria' }, { id: 3, nombre: 'Electricidad' }],
+    });
+    await screen.findByLabelText('Principal: Plomeria');
+    fireEvent.press(screen.getByLabelText('Principal: Plomeria'));
+    fireEvent.press(screen.getByText('Guardar cambios'));
+
+    await waitFor(() => expect(updateProvider).toHaveBeenCalledTimes(1));
+    expect(updateProvider.mock.calls[0][1]).toEqual(expect.objectContaining({
+      categoria_id: 5,
+      categoria_ids: [5, 3],
+    }));
+  });
+
+  it('un perfil historico con cuatro categorias no se guarda hasta dejar tres', async () => {
+    const screen = renderScreen({ categoria_id: 1, categorias: CATALOGO });
+    await screen.findByText(/Tu perfil tiene 4 categorías/);
+
+    fireEvent.press(screen.getByText('Guardar cambios'));
+    expect(screen.getByText(/máximo 3 categorías; quita 1/)).toBeTruthy();
+    expect(updateProvider).not.toHaveBeenCalled();
+
+    fireEvent.press(screen.getByLabelText('Categoría Pintura'));
+    fireEvent.press(screen.getByText('Guardar cambios'));
+    await waitFor(() => expect(updateProvider).toHaveBeenCalledTimes(1));
+    expect(updateProvider.mock.calls[0][1]).toEqual(expect.objectContaining({
+      categoria_id: 1,
+      categoria_ids: [1, 3, 5],
+    }));
+  });
+});

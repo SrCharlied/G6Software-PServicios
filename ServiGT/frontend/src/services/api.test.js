@@ -336,3 +336,33 @@ describe('api del panel de seguridad (Sprint 9)', () => {
     });
   });
 });
+
+describe('conteo de notificaciones no leidas (HU 1.5)', () => {
+  afterEach(() => { jest.dontMock('axios'); jest.dontMock('./sessionStorage'); });
+
+  it('devuelve el conteo exacto que informa el backend', async () => {
+    const { apiModule, client } = buildApiModule();
+    client.get.mockResolvedValueOnce({ data: { notificaciones: [], no_leidas: 73 } });
+    await expect(apiModule.getUnreadNotificationsCount()).resolves.toBe(73);
+    expect(client.get).toHaveBeenCalledWith('/notificaciones');
+  });
+
+  it('cero legitimo se conserva como cero', async () => {
+    const { apiModule, client } = buildApiModule();
+    client.get.mockResolvedValueOnce({ data: { notificaciones: [], no_leidas: 0 } });
+    await expect(apiModule.getUnreadNotificationsCount()).resolves.toBe(0);
+  });
+
+  it.each([undefined, null, '3', -1, 2.5])('un conteo invalido (%p) es error, no cero', async (valor) => {
+    const { apiModule, client } = buildApiModule();
+    client.get.mockResolvedValueOnce({ data: { notificaciones: [], no_leidas: valor } });
+    await expect(apiModule.getUnreadNotificationsCount())
+      .rejects.toThrow('No se pudo cargar el conteo de notificaciones.');
+  });
+
+  it('un fallo de red se propaga como error', async () => {
+    const { apiModule, client } = buildApiModule();
+    client.get.mockRejectedValueOnce({ isAxiosError: true, response: { status: 500, data: {} } });
+    await expect(apiModule.getUnreadNotificationsCount()).rejects.toMatchObject({ status: 500 });
+  });
+});

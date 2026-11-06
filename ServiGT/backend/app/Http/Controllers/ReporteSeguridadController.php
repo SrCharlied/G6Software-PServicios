@@ -202,13 +202,26 @@ class ReporteSeguridadController extends Controller
 
     private function registrar(Request $request, int $servicioId, bool $interrumpe): JsonResponse
     {
+        $user = $request->user();
+
+        // Autorizar antes de validar (HU 5.1, Sprint 10): un tercero o el admin
+        // reciben 403 sin conocer las reglas del cuerpo. Dentro de la
+        // transaccion se repite el chequeo sobre la fila bloqueada.
+        $servicio = Servicio::query()->with('proveedor')->find($servicioId);
+
+        if (!$servicio) {
+            return $this->error('Servicio no encontrado.', 404);
+        }
+
+        if ($this->contraparteDe($servicio, $user->id) === null) {
+            return $this->error('Solo el cliente o el proveedor del servicio pueden reportar.', 403);
+        }
+
         $validated = $request->validate([
             'categoria'       => 'required|string|in:' . implode(',', ReporteSeguridad::CATEGORIAS),
             'descripcion'     => 'required|string|min:5|max:2000',
             'idempotency_key' => 'required|string|max:80',
         ]);
-
-        $user = $request->user();
 
         try {
             return DB::transaction(function () use ($request, $servicioId, $validated, $interrumpe, $user) {

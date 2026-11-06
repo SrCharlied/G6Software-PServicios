@@ -14,6 +14,8 @@ import { Feather } from '@expo/vector-icons';
 import { useToast } from '../context/ToastContext';
 import { validateEmail, validatePhone, validatePassword, validateRequired } from '../utils/validation';
 import ServiGTLogo from '../components/ServiGTLogo';
+import CategoriaSelector from '../components/CategoriaSelector';
+import { validarSeleccionCategorias } from '../utils/categoriasProveedor';
 import { T } from '../theme';
 
 const DEPARTAMENTOS = [
@@ -219,7 +221,8 @@ export default function RegisterScreen({ navigation, onRegisterSuccess }) {
     else if (descripcion.trim().length < 20) errs.descripcion = 'La descripción debe tener al menos 20 caracteres.';
     else if (descripcion.trim().length > 500) errs.descripcion = 'La descripción no debe superar 500 caracteres.';
     if (!departamento) errs.departamento = 'Selecciona tu departamento.';
-    if (categoriaIds.length === 0) errs.categoriaIds = 'Selecciona al menos una categoría.';
+    const errorCategorias = validarSeleccionCategorias(categoriaIds);
+    if (errorCategorias) errs.categoriaIds = errorCategorias;
     if (Object.keys(errs).length) { setErrors(errs); return; }
     setErrors({});
 
@@ -433,40 +436,18 @@ export default function RegisterScreen({ navigation, onRegisterSuccess }) {
       />
 
       <Text style={styles.inputLabel}>
-        Categorías de servicio * — selecciona todas las que apliquen
+        Categorías de servicio * — elige hasta 3
       </Text>
-      {loadingCats ? (
-        <ActivityIndicator color="#4589d4" style={{ marginVertical: 12 }} />
-      ) : (
-        <View style={styles.chipGrid}>
-          {categorias.map((c) => {
-            const selected = categoriaIds.includes(String(c.id));
-            return (
-              <TouchableOpacity
-                key={c.id}
-                style={[styles.chip, selected && styles.chipSelected]}
-                onPress={() => {
-                  setCategoriaIds((prev) =>
-                    prev.includes(String(c.id))
-                      ? prev.filter((x) => x !== String(c.id))
-                      : [...prev, String(c.id)]
-                  );
-                  clearError('categoriaIds');
-                }}
-                activeOpacity={0.8}
-              >
-                {selected && <Text style={styles.chipCheck}>✓ </Text>}
-                <Text style={[styles.chipText, selected && styles.chipTextSelected]}>
-                  {c.nombre}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-      )}
-      {errors.categoriaIds
-        ? <Text style={styles.fieldError}>{errors.categoriaIds}</Text>
-        : null}
+      <CategoriaSelector
+        categorias={categorias}
+        value={categoriaIds}
+        loading={loadingCats}
+        error={errors.categoriaIds}
+        onChange={(ids) => {
+          setCategoriaIds(ids);
+          clearError('categoriaIds');
+        }}
+      />
 
       <TouchableOpacity
         style={[styles.btnPrimary, loading && styles.btnDisabled]}
@@ -698,42 +679,6 @@ const styles = StyleSheet.create({
   textArea: {
     height: 110,
     textAlignVertical: 'top',
-  },
-
-  // Category multi-select chips
-  chipGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: 4,
-  },
-  chip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 13,
-    paddingVertical: 8,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: T.inputBorder,
-    backgroundColor: T.white,
-  },
-  chipSelected: {
-    backgroundColor: T.blue,
-    borderColor: T.blue,
-  },
-  chipCheck: {
-    fontSize: 11,
-    color: T.paper,
-    fontWeight: '700',
-  },
-  chipText: {
-    fontSize: 13,
-    color: '#555',
-    fontWeight: '500',
-  },
-  chipTextSelected: {
-    color: T.paper,
-    fontWeight: '600',
   },
 
   // Role selector

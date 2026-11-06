@@ -23,6 +23,8 @@ import { useToast } from '../context/ToastContext';
 import { validateRequired, validatePhone, validateNumeric } from '../utils/validation';
 import { T } from '../theme';
 import { Button, Card, Input, StatusChip } from '../components/ui';
+import CategoriaSelector from '../components/CategoriaSelector';
+import { MAX_CATEGORIAS, idsInicialesDelPerfil, validarSeleccionCategorias } from '../utils/categoriasProveedor';
 
 const DEPARTAMENTOS = [
   'Alta Verapaz', 'Baja Verapaz', 'Chimaltenango', 'Chiquimula', 'El Progreso',
@@ -73,11 +75,7 @@ export default function ProviderEditProfileScreen({
   const [loadingCats, setLoadingCats] = useState(true);
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState({});
-  const [categoriaIds, setCategoriaIds] = useState(() => {
-    if (providerProfile?.categorias?.length > 0) return providerProfile.categorias.map((c) => String(c.id));
-    if (providerProfile?.categoria_id) return [String(providerProfile.categoria_id)];
-    return [];
-  });
+  const [categoriaIds, setCategoriaIds] = useState(() => idsInicialesDelPerfil(providerProfile));
   const [localPhotoUri, setLocalPhotoUri] = useState(null);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [localPortadaUri, setLocalPortadaUri] = useState(null);
@@ -167,7 +165,8 @@ export default function ProviderEditProfileScreen({
     else if (descripcion.trim().length > 500) errs.descripcion = 'La descripcion no debe superar 500 caracteres.';
     if (experienciaResumen.trim().length > 1000) errs.experienciaResumen = 'El resumen no puede superar 1000 caracteres.';
     if (!departamento) errs.departamento = 'Selecciona tu departamento.';
-    if (categoriaIds.length === 0) errs.categoriaIds = 'Selecciona al menos una categoria.';
+    const errorCategorias = validarSeleccionCategorias(categoriaIds);
+    if (errorCategorias) errs.categoriaIds = errorCategorias;
     if (tarifaHora && !validateNumeric(tarifaHora)) errs.tarifaHora = 'Ingresa una tarifa valida.';
     if (tarifaProyecto && !validateNumeric(tarifaProyecto)) errs.tarifaProyecto = 'Ingresa una tarifa valida.';
     if (Object.keys(errs).length) { setErrors(errs); return; }
@@ -401,35 +400,21 @@ export default function ProviderEditProfileScreen({
         )}
 
         <Text style={s.label}>Categorias de servicio *</Text>
-        {loadingCats ? (
-          <ActivityIndicator color={T.blue} style={{ marginVertical: 10 }} />
-        ) : (
-          <View style={s.chipGrid}>
-            {categorias.map((cat) => {
-              const selected = categoriaIds.includes(String(cat.id));
-              return (
-                <TouchableOpacity
-                  key={cat.id}
-                  style={[s.chip, selected && s.chipSelected]}
-                  onPress={() => {
-                    setCategoriaIds((prev) =>
-                      prev.includes(String(cat.id))
-                        ? prev.filter((x) => x !== String(cat.id))
-                        : [...prev, String(cat.id)]
-                    );
-                    clearError('categoriaIds');
-                  }}
-                  activeOpacity={0.8}
-                >
-                  <Text style={[s.chipText, selected && s.chipTextSelected]}>
-                    {selected ? '* ' : ''}{cat.nombre}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        )}
-        {errors.categoriaIds ? <Text style={s.fieldError}>{errors.categoriaIds}</Text> : null}
+        <CategoriaSelector
+          categorias={categorias}
+          value={categoriaIds}
+          loading={loadingCats}
+          error={errors.categoriaIds}
+          onChange={(ids) => {
+            setCategoriaIds(ids);
+            clearError('categoriaIds');
+          }}
+        />
+        {categoriaIds.length > MAX_CATEGORIAS && !errors.categoriaIds ? (
+          <Text style={s.fieldError}>
+            Tu perfil tiene {categoriaIds.length} categorías. Deja máximo {MAX_CATEGORIAS} para poder guardar.
+          </Text>
+        ) : null}
 
         <Button full size="lg" loading={saving} disabled={saving} onPress={handleSave} style={s.saveButton}>
           {isEditing ? 'Guardar cambios' : 'Crear perfil'}
@@ -691,20 +676,6 @@ const s = StyleSheet.create({
   twoCol: { gap: 0 },
   twoColWide: { flexDirection: 'row', gap: 12 },
   col: { flex: 1, minWidth: 0 },
-  chipGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 8 },
-  chip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 13,
-    paddingVertical: 8,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: T.inputBorder,
-    backgroundColor: T.white,
-  },
-  chipSelected: { backgroundColor: T.blue, borderColor: T.blue },
-  chipText: { fontSize: 13, color: T.text, fontWeight: '700' },
-  chipTextSelected: { color: T.white },
   saveButton: { marginTop: 10 },
   cancelBtn: { padding: 14, borderRadius: 8, alignItems: 'center', marginTop: 4 },
   cancelBtnText: { color: T.muted, fontSize: 15, fontWeight: '700' },

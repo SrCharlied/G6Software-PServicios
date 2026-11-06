@@ -175,6 +175,32 @@ export const logout = async () => {
   }
 };
 
+// ── Eliminacion de cuenta (HU 3.1/3.2) ────────────────────────────────────
+// Contrato: docs/sprint10/eliminacion-api.md. Estas funciones no limpian la
+// sesion local: eso le toca a quien llama, y solo tras un 200.
+
+export const getImpactoEliminacion = async () => {
+  try {
+    const response = await api.get('/cuenta/eliminacion/impacto');
+    return response.data;
+  } catch (error) {
+    throwApiError(error, 'No se pudo consultar el impacto de eliminar tu cuenta.');
+  }
+};
+
+export const solicitarEliminacionCuenta = async ({ password, confirmacion, idempotencyKey }) => {
+  try {
+    const response = await api.post('/cuenta/eliminacion', {
+      password,
+      confirmacion,
+      idempotency_key: idempotencyKey,
+    });
+    return response.data;
+  } catch (error) {
+    throwApiError(error, 'No se pudo eliminar la cuenta.');
+  }
+};
+
 export const getMe = async (config = {}) => {
   try {
     const response = await api.get('/me', config);

@@ -76,6 +76,28 @@ Requiere Sanctum. Tiene un límite de 5 solicitudes por minuto por usuario
 - Después de un `200`, el token ya no sirve: cualquier llamada posterior
   responde `401`.
 
+## Pantalla (HU 3.2.a/b)
+
+Ruta `/cuenta` («Mi cuenta» en el menú de cliente y proveedor; un admin se
+redirige a `/admin`). `src/screens/CuentaScreen.js`:
+
+- Al entrar consulta el impacto. Con bloqueos los lista y no muestra el
+  formulario; sin bloqueos avisa qué se cerrará. Un error de la consulta se
+  muestra tal cual, con «Reintentar».
+- Pide la contraseña actual y la palabra `ELIMINAR` exacta. Un candado
+  interno y el botón en «cargando» evitan el doble envío.
+- Clave de idempotencia por intento: se reutiliza si el resultado quedó en
+  duda (red, timeout, 5xx) y se descarta tras una respuesta definitiva
+  (`409`, `422`).
+- `409`: muestra los bloqueos actuales. `422`: error en el campo. `429`:
+  cuánto esperar. En todos la sesión se conserva.
+- `200`: la ruta (`app/(protected)/cuenta.js`) llama a `endSession` (token,
+  usuario y chat locales, sin `/logout` porque el token ya fue revocado),
+  muestra un aviso y navega a `/landing`.
+
+Evidencia contra el stack local: `evidencia/s10-cuenta-*.png` (1440, 1024 y
+390: impacto, bloqueo, contraseña incorrecta y cuenta eliminada).
+
 ## Efectos colaterales
 
 - `POST /api/servicios` a un proveedor anonimizado responde `404`, igual que

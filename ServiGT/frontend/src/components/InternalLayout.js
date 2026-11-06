@@ -18,6 +18,7 @@ const NAV_BY_ROLE = {
     { label: 'Mis pedidos',  path: '/pedidos/mios', icon: 'clipboard', match: ['/pedidos/'] },
     { label: 'Mis servicios', path: '/solicitudes', icon: 'briefcase', match: ['/solicitud', '/calificar/'] },
     { label: 'Mensajes',     path: '/chat', icon: 'message-circle' },
+    { label: 'Mi cuenta',    path: '/cuenta', icon: 'settings' },
   ],
   proveedor: [
     { label: 'Mi panel',       path: '/dashboard', icon: 'grid' },
@@ -28,6 +29,7 @@ const NAV_BY_ROLE = {
     { label: 'Mensajes',       path: '/chat', icon: 'message-circle' },
     { label: 'Materiales',     path: '/bolsa-materiales', icon: 'package', match: ['/bolsa-materiales/', '/reservas-materiales'] },
     { label: 'Mi perfil',      path: '/profile/edit', icon: 'user' },
+    { label: 'Mi cuenta',      path: '/cuenta', icon: 'settings' },
   ],
   admin: [
     { label: 'Panel admin', path: '/admin', icon: 'shield' },

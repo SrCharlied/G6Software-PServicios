@@ -74,7 +74,11 @@ export default function ServicioCard({
 
       {canAccept ? (
         <View style={styles.actionRow}>
-          <TouchableOpacity style={styles.acceptBtn} onPress={() => onAccept(servicio.id)}>
+          <TouchableOpacity
+            style={styles.acceptBtn}
+            onPress={() => onAccept(servicio)}
+            disabled={!onAccept}
+          >
             <Text style={styles.acceptBtnText}>Aceptar</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.rejectBtn} onPress={() => onReject(servicio.id)}>

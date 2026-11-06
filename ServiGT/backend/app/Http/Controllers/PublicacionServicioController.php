@@ -33,6 +33,7 @@ class PublicacionServicioController extends Controller
         $query = PublicacionServicio::query()
             ->with(['proveedor', 'categoria'])
             ->where('estado', 'activa')
+            ->whereHas('proveedor', fn ($q) => $q->visibleEnCatalogo())
             ->orderByDesc('created_at');
 
         if (isset($validated['categoria_id'])) {
@@ -80,6 +81,7 @@ class PublicacionServicioController extends Controller
     {
         $publicacion = PublicacionServicio::with(['proveedor', 'categoria'])
             ->where('estado', 'activa')
+            ->whereHas('proveedor', fn ($q) => $q->visibleEnCatalogo())
             ->findOrFail($id);
 
         $limite = $this->limiteEfectivo($publicacion->proveedor);

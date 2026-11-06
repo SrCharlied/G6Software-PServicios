@@ -114,4 +114,23 @@ return [
 
     'password_timeout' => env('AUTH_PASSWORD_TIMEOUT', 10800),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Registro: dominios de correo reservados
+    |--------------------------------------------------------------------------
+    |
+    | Lista separada por comas de dominios que NO resuelven en DNS (por ejemplo
+    | servigt.test) y que el registro acepta sin verificar. Vacia por defecto.
+    | Solo se respeta con APP_ENV=local o testing; en produccion se ignora y
+    | todo dominio debe tener registros MX/A/AAAA.
+    |
+    */
+
+    'registro' => [
+        'dominios_reservados' => array_values(array_filter(array_map(
+            static fn ($d) => strtolower(trim($d)),
+            explode(',', (string) env('AUTH_REGISTRO_DOMINIOS_RESERVADOS', ''))
+        ))),
+    ],
+
 ];

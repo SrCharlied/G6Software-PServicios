@@ -355,6 +355,8 @@ class RoleSeparationSprint9Test extends TestCase
     {
         return array_merge([
             'nombre'       => 'Perfil de prueba ' . uniqid(),
+            'telefono'     => '55550101',
+            'descripcion'  => 'Perfil profesional para pruebas de roles.',
             'email'        => 'perfil.' . uniqid() . '@servigt.test',
             'departamento' => 'Guatemala',
         ], $extra);

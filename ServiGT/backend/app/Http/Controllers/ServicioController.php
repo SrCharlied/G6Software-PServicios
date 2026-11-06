@@ -62,6 +62,12 @@ class ServicioController extends Controller
             return $this->error('No puedes solicitarte un servicio a ti mismo.', 403);
         }
 
+        // Una cuenta anonimizada ya no recibe solicitudes (HU 3.1.b); mismo
+        // 404 que el detalle publico de ese proveedor.
+        if ($proveedorSolicitado?->user?->estaAnonimizada()) {
+            return $this->error('Proveedor no encontrado.', 404);
+        }
+
         $validated['cliente_id']    = $user->id;
         $validated['estado']        = 'pendiente';
         $validated['codigo_inicio'] = str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);

@@ -39,6 +39,7 @@ import CalificacionesPanel from './provider/CalificacionesPanel';
 import DisponibilidadPanel from './provider/DisponibilidadPanel';
 import DocumentosPanel from './provider/DocumentosPanel';
 import { FinalizarServicioModal, IniciarServicioModal } from './provider/ProviderModals';
+import ConfirmActionModal from '../components/ConfirmActionModal';
 import { buildDisponibilidad, TABS } from './provider/providerUtils';
 
 /**
@@ -76,6 +77,9 @@ export default function ProviderDashboardScreen({
   const [uploading, setUploading] = useState(false);
   const [savingDisponibilidad, setSavingDisponibilidad] = useState(false);
   const [mutatingServiceId, setMutatingServiceId] = useState(null);
+  const [acceptTarget, setAcceptTarget] = useState(null);
+  const [acceptError, setAcceptError] = useState('');
+  const [accepting, setAccepting] = useState(false);
 
   const [iniciarTarget, setIniciarTarget] = useState(null); // servicio | null
   const [codigoInput, setCodigoInput] = useState('');
@@ -246,11 +250,36 @@ export default function ProviderDashboardScreen({
     }
   };
 
-  const handleAccept = async (id) => {
+  const openAccept = (servicio) => {
+    setAcceptTarget(servicio);
+    setAcceptError('');
+  };
+
+  const closeAccept = () => {
+    if (accepting) return;
+    setAcceptTarget(null);
+    setAcceptError('');
+  };
+
+  const handleAccept = async () => {
+    if (!acceptTarget || accepting) return;
+    const id = acceptTarget.id;
+    setAccepting(true);
     setMutatingServiceId(id);
-    try { await aceptarServicio(id); toast('Solicitud aceptada.', 'success'); await refreshSolicitudes(); }
-    catch (error) { toast(error.message, 'error'); }
-    finally { setMutatingServiceId(null); }
+    setAcceptError('');
+    try {
+      await aceptarServicio(id);
+      toast('Solicitud aceptada.', 'success');
+      setAcceptTarget(null);
+      await refreshSolicitudes();
+    } catch (error) {
+      // El modal permanece abierto con la misma solicitud para que el usuario
+      // pueda entender el fallo y reintentar sin perder contexto.
+      setAcceptError(error.message);
+    } finally {
+      setAccepting(false);
+      setMutatingServiceId(null);
+    }
   };
 
   // Aviso opcional de trayecto. El backend solo admite `aceptado -> en_camino`
@@ -424,7 +453,7 @@ export default function ProviderDashboardScreen({
             loading={loadingSolicitudes}
             mutatingServiceId={mutatingServiceId}
             onRefresh={refreshSolicitudes}
-            onAccept={handleAccept}
+            onAccept={openAccept}
             onReject={handleReject}
             onIniciar={openIniciar}
             onFinalizar={openFinalizar}
@@ -507,6 +536,20 @@ export default function ProviderDashboardScreen({
         onChange={(v) => { setCodigoInput(v.replace(/\D/g, '').slice(0, 6)); setCodigoError(''); }}
         onConfirm={submitIniciar}
         onClose={closeIniciar}
+      />
+
+      <ConfirmActionModal
+        visible={!!acceptTarget}
+        title="Aceptar solicitud directa"
+        message={acceptTarget
+          ? `Vas a aceptar la solicitud de ${acceptTarget.cliente?.name || 'este cliente'} para ${acceptTarget.categoria?.nombre || 'este servicio'}. ${acceptTarget.descripcion || ''}`
+          : ''}
+        confirmLabel="Aceptar solicitud"
+        confirmKind="success"
+        processing={accepting}
+        error={acceptError}
+        onCancel={closeAccept}
+        onConfirm={handleAccept}
       />
 
       <FinalizarServicioModal

@@ -3,6 +3,7 @@ import { usePathname, useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { Pressable, SafeAreaView, StyleSheet, Text, TouchableOpacity, useWindowDimensions, View } from 'react-native';
 import NotificationBell from './NotificationBell';
+import LogoutButton from './LogoutButton';
 import { useSession } from '../context/SessionContext';
 import { T } from '../theme';
 
@@ -17,6 +18,7 @@ const NAV_BY_ROLE = {
     { label: 'Mis pedidos',  path: '/pedidos/mios', icon: 'clipboard', match: ['/pedidos/'] },
     { label: 'Mis servicios', path: '/solicitudes', icon: 'briefcase', match: ['/solicitud', '/calificar/'] },
     { label: 'Mensajes',     path: '/chat', icon: 'message-circle' },
+    { label: 'Mi cuenta',    path: '/cuenta', icon: 'settings' },
   ],
   proveedor: [
     { label: 'Mi panel',       path: '/dashboard', icon: 'grid' },
@@ -27,6 +29,7 @@ const NAV_BY_ROLE = {
     { label: 'Mensajes',       path: '/chat', icon: 'message-circle' },
     { label: 'Materiales',     path: '/bolsa-materiales', icon: 'package', match: ['/bolsa-materiales/', '/reservas-materiales'] },
     { label: 'Mi perfil',      path: '/profile/edit', icon: 'user' },
+    { label: 'Mi cuenta',      path: '/cuenta', icon: 'settings' },
   ],
   admin: [
     { label: 'Panel admin', path: '/admin', icon: 'shield' },
@@ -109,8 +112,8 @@ export default function InternalLayout({ children, section }) {
   const activePath = resolveActivePath(items, pathname ?? '');
 
   const handleLogout = async () => {
-    setMobileMenuOpen(false);
     await signOut();
+    setMobileMenuOpen(false);
     router.replace('/home');
   };
 
@@ -163,9 +166,7 @@ export default function InternalLayout({ children, section }) {
                 ))}
               </View>
 
-              <TouchableOpacity style={styles.mobileLogoutBtn} onPress={handleLogout} activeOpacity={0.75}>
-                <Text style={styles.mobileLogoutText}>Cerrar sesion</Text>
-              </TouchableOpacity>
+              <LogoutButton style={styles.mobileLogoutBtn} textStyle={styles.mobileLogoutText} onLogout={handleLogout} />
             </View>
           </View>
         ) : null}
@@ -221,9 +222,7 @@ export default function InternalLayout({ children, section }) {
           ))}
         </View>
 
-        <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout} activeOpacity={0.75}>
-          <Text style={styles.logoutText}>Cerrar sesion</Text>
-        </TouchableOpacity>
+        <LogoutButton style={styles.logoutBtn} textStyle={styles.logoutText} onLogout={handleLogout} />
       </View>
 
       <View style={styles.content}>

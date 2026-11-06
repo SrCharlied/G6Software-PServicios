@@ -26,10 +26,10 @@ describe('validateEmail', () => {
 });
 
 describe('validatePhone', () => {
-  it('acepta numeros guatemaltecos con distintos formatos', () => {
-    expect(validatePhone('5555-4444')).toBe(true);
-    expect(validatePhone('+502 5555 4444')).toBe(true);
-    expect(validatePhone('(502) 2222-3333')).toBe(true);
+  it('acepta solo ocho digitos locales', () => {
+    expect(validatePhone('55554444')).toBe(true);
+    expect(validatePhone(' 22223333 ')).toBe(true);
+    for (const value of ['5555-4444', '+502 5555 4444', '(502) 2222-3333', '1234567', '123456789']) expect(validatePhone(value)).toBe(false);
   });
 
   it('rechaza numeros demasiado cortos o con letras', () => {

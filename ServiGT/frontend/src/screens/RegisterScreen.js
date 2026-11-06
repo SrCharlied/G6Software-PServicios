@@ -9,10 +9,13 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { register, createProvider, getCategorias, uploadDocumento } from '../services/api';
+import { register, createProvider, getCategorias, uploadDocumento, getDocumentosLegales } from '../services/api';
+import { Feather } from '@expo/vector-icons';
 import { useToast } from '../context/ToastContext';
 import { validateEmail, validatePhone, validatePassword, validateRequired } from '../utils/validation';
 import ServiGTLogo from '../components/ServiGTLogo';
+import CategoriaSelector from '../components/CategoriaSelector';
+import { validarSeleccionCategorias } from '../utils/categoriasProveedor';
 import { T } from '../theme';
 
 const DEPARTAMENTOS = [
@@ -98,6 +101,7 @@ export default function RegisterScreen({ navigation, onRegisterSuccess }) {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [passwordConfirmation, setPasswordConfirmation] = useState('');
   const [role, setRole] = useState('cliente');
 
   // Paso 2
@@ -119,6 +123,24 @@ export default function RegisterScreen({ navigation, onRegisterSuccess }) {
   const [registeredUser, setRegisteredUser] = useState(null);
   const [providerProfile, setProviderProfile] = useState(null);
   const fileInputRef = useRef(null);
+  const registerLock = useRef(false);
+  const legalRequest = useRef(0);
+  const [documentosLegales, setDocumentosLegales] = useState([]);
+  const [aceptaciones, setAceptaciones] = useState({});
+  const [loadingLegal, setLoadingLegal] = useState(true);
+  const [legalError, setLegalError] = useState('');
+
+  const loadLegal = async () => {
+    const attempt = ++legalRequest.current;
+    setLoadingLegal(true); setLegalError(''); setAceptaciones({}); setDocumentosLegales([]);
+    try {
+      const data = await getDocumentosLegales();
+      if (data.documentos?.length !== 2 || !['terminos', 'privacidad'].every((tipo) => data.documentos.some((d) => d.tipo === tipo && d.id && d.version))) throw new Error('Los documentos legales no estan disponibles.');
+      if (attempt === legalRequest.current) setDocumentosLegales(data.documentos);
+    } catch (err) { if (attempt === legalRequest.current) setLegalError(err.message); }
+    finally { if (attempt === legalRequest.current) setLoadingLegal(false); }
+  };
+  useEffect(() => { loadLegal(); return () => { legalRequest.current += 1; }; }, []);
 
   const clearError = (field) => setErrors((e) => ({ ...e, [field]: null }));
 
@@ -133,7 +155,7 @@ export default function RegisterScreen({ navigation, onRegisterSuccess }) {
       const cats = data.categorias || [];
       setCategorias(cats);
     } catch {
-      toast('No se pudieron cargar las categorias.', 'warning');
+      toast('No se pudieron cargar las categorías.', 'warning');
     } finally {
       setLoadingCats(false);
     }
@@ -141,23 +163,31 @@ export default function RegisterScreen({ navigation, onRegisterSuccess }) {
 
   // ── Paso 1: registrar usuario ─────────────────────────────────────────
   const handleStep1 = async () => {
+    if (registerLock.current) return;
     const errs = {};
     if (!validateRequired(name)) errs.name = 'El nombre es requerido.';
     else if (name.trim().length > 255) errs.name = 'El nombre no debe superar 255 caracteres.';
     if (!validateRequired(email)) errs.email = 'El correo es requerido.';
-    else if (!validateEmail(email)) errs.email = 'El formato del correo no es valido.';
+    else if (!validateEmail(email)) errs.email = 'El formato del correo no es válido.';
     else if (email.trim().length > 255) errs.email = 'El correo no debe superar 255 caracteres.';
     if (!validatePassword(password)) {
       errs.password = password.length < 6
-        ? 'La contrasena debe tener al menos 6 caracteres.'
-        : 'La contrasena no debe superar los 72 bytes.';
+        ? 'La contraseña debe tener al menos 6 caracteres.'
+        : 'La contraseña no debe superar los 72 bytes.';
     }
+    if (!passwordConfirmation) errs.passwordConfirmation = 'Confirma tu contraseña.';
+    else if (passwordConfirmation !== password) errs.passwordConfirmation = 'Las contraseñas no coinciden.';
+    if (documentosLegales.length !== 2 || !documentosLegales.every((doc) => aceptaciones[doc.id])) errs.legal = 'Debes revisar y aceptar terminos y privacidad vigentes.';
     if (Object.keys(errs).length) { setErrors(errs); return; }
     setErrors({});
 
+    registerLock.current = true;
     setLoading(true);
     try {
-      const data = await register(name.trim(), email.trim().toLowerCase(), password, role);
+      const data = await register(
+        name.trim(), email.trim().toLowerCase(), password, passwordConfirmation, role,
+        documentosLegales.map((doc) => ({ documento_legal_id: doc.id, version: doc.version, aceptado: true })),
+      );
       setRegisteredUser(data.user);
       if (role === 'proveedor') {
         setStep(2);
@@ -165,6 +195,7 @@ export default function RegisterScreen({ navigation, onRegisterSuccess }) {
         onRegisterSuccess && onRegisterSuccess(data.user, null);
       }
     } catch (error) {
+      if (error.status === 409) await loadLegal();
       const backendErrors = error.data?.errors;
       if (backendErrors && typeof backendErrors === 'object') {
         setErrors(Object.fromEntries(
@@ -176,6 +207,7 @@ export default function RegisterScreen({ navigation, onRegisterSuccess }) {
       }
       toast(error.message, 'error');
     } finally {
+      registerLock.current = false;
       setLoading(false);
     }
   };
@@ -183,12 +215,14 @@ export default function RegisterScreen({ navigation, onRegisterSuccess }) {
   // ── Paso 2: crear perfil de proveedor ────────────────────────────────
   const handleStep2 = async () => {
     const errs = {};
-    if (!validateRequired(telefono)) errs.telefono = 'El telefono es requerido.';
-    else if (!validatePhone(telefono)) errs.telefono = 'Ingresa un numero de telefono valido.';
+    if (!validateRequired(telefono)) errs.telefono = 'El teléfono es requerido.';
+    else if (!validatePhone(telefono)) errs.telefono = 'Ingresa un teléfono local de 8 dígitos.';
     if (!validateRequired(descripcion)) errs.descripcion = 'Describe los servicios que ofreces.';
-    else if (descripcion.trim().length < 20) errs.descripcion = 'La descripcion debe tener al menos 20 caracteres.';
+    else if (descripcion.trim().length < 20) errs.descripcion = 'La descripción debe tener al menos 20 caracteres.';
+    else if (descripcion.trim().length > 500) errs.descripcion = 'La descripción no debe superar 500 caracteres.';
     if (!departamento) errs.departamento = 'Selecciona tu departamento.';
-    if (categoriaIds.length === 0) errs.categoriaIds = 'Selecciona al menos una categoría.';
+    const errorCategorias = validarSeleccionCategorias(categoriaIds);
+    if (errorCategorias) errs.categoriaIds = errorCategorias;
     if (Object.keys(errs).length) { setErrors(errs); return; }
     setErrors({});
 
@@ -223,7 +257,7 @@ export default function RegisterScreen({ navigation, onRegisterSuccess }) {
     if (!providerProfile) return;
     const maxBytes = 5 * 1024 * 1024;
     if (file.size > maxBytes) {
-      toast('El archivo supera el limite de 5 MB.', 'warning');
+      toast('El archivo supera el límite de 5 MB.', 'warning');
       return;
     }
     setUploading(true);
@@ -286,7 +320,7 @@ export default function RegisterScreen({ navigation, onRegisterSuccess }) {
       />
       {errors.name ? <Text style={styles.fieldError}>{errors.name}</Text> : null}
 
-      <Text style={styles.inputLabel}>Correo electronico</Text>
+      <Text style={styles.inputLabel}>Correo electrónico</Text>
       <TextInput
         style={[styles.input, errors.email && styles.inputError]}
         placeholder="correo@ejemplo.com"
@@ -295,14 +329,32 @@ export default function RegisterScreen({ navigation, onRegisterSuccess }) {
       />
       {errors.email ? <Text style={styles.fieldError}>{errors.email}</Text> : null}
 
-      <Text style={styles.inputLabel}>Contrasena</Text>
+      <Text style={styles.inputLabel}>Contraseña</Text>
       <TextInput
         style={[styles.input, errors.password && styles.inputError]}
-        placeholder="Minimo 6 caracteres, maximo 72 bytes"
+        placeholder="Mínimo 6 caracteres, máximo 72 bytes"
         value={password} onChangeText={(v) => { setPassword(v); clearError('password'); }}
         secureTextEntry
       />
       {errors.password ? <Text style={styles.fieldError}>{errors.password}</Text> : null}
+
+      <Text style={styles.inputLabel}>Confirmar contraseña</Text>
+      <TextInput
+        style={[styles.input, errors.passwordConfirmation && styles.inputError]}
+        placeholder="Repite tu contraseña"
+        value={passwordConfirmation}
+        onChangeText={(v) => { setPasswordConfirmation(v); clearError('passwordConfirmation'); }}
+        secureTextEntry
+      />
+      {errors.passwordConfirmation ? <Text style={styles.fieldError}>{errors.passwordConfirmation}</Text> : null}
+      {loadingLegal ? <Text style={styles.inputLabel}>Cargando documentos legales...</Text> : null}
+      {legalError ? <View><Text style={styles.fieldError}>{legalError}</Text><TouchableOpacity onPress={loadLegal}><Text style={styles.linkText}>Reintentar documentos</Text></TouchableOpacity></View> : null}
+      {documentosLegales.map((doc) => <TouchableOpacity key={doc.id} accessibilityRole="checkbox" accessibilityLabel={`Acepto ${doc.tipo}`} aria-checked={!!aceptaciones[doc.id]} accessibilityState={{ checked: !!aceptaciones[doc.id], disabled: loading }} disabled={loading}
+        style={styles.legalCheck} onPress={() => { setAceptaciones((prev) => ({ ...prev, [doc.id]: !prev[doc.id] })); clearError('legal'); }}>
+        <Feather name={aceptaciones[doc.id] ? 'check-square' : 'square'} size={22} color={T.blue} />
+        <Text style={styles.legalText}>{`Acepto ${doc.tipo === 'terminos' ? 'terminos y condiciones' : 'privacidad'} (version ${doc.version})`}</Text>
+      </TouchableOpacity>)}
+      {errors.legal ? <Text style={styles.fieldError}>{errors.legal}</Text> : null}
 
       <Text style={styles.inputLabel}>Tipo de cuenta</Text>
       <View style={styles.roleRow}>
@@ -336,7 +388,7 @@ export default function RegisterScreen({ navigation, onRegisterSuccess }) {
       </TouchableOpacity>
 
       <TouchableOpacity onPress={() => navigation?.navigate('Login')}>
-        <Text style={styles.linkText}>Ya tienes cuenta? Inicia sesion</Text>
+        <Text style={styles.linkText}>¿Ya tienes cuenta? Inicia sesión</Text>
       </TouchableOpacity>
     </View>
   );
@@ -349,23 +401,24 @@ export default function RegisterScreen({ navigation, onRegisterSuccess }) {
         Esta informacion aparecera en el listado publico de proveedores.
       </Text>
 
-      <Text style={styles.inputLabel}>Telefono *</Text>
+      <Text style={styles.inputLabel}>Teléfono *</Text>
       <TextInput
         style={[styles.input, errors.telefono && styles.inputError]}
-        placeholder="Ej: 5555-1234"
+        placeholder="Ej: 55551234"
         value={telefono} onChangeText={(v) => { setTelefono(v); clearError('telefono'); }}
         keyboardType="phone-pad"
       />
       {errors.telefono ? <Text style={styles.fieldError}>{errors.telefono}</Text> : null}
 
-      <Text style={styles.inputLabel}>Descripcion de tus servicios *</Text>
+      <Text style={styles.inputLabel}>Descripción de tus servicios *</Text>
       <TextInput
         style={[styles.input, styles.textArea, errors.descripcion && styles.inputError]}
-        placeholder="Describe que servicios ofreces, tu experiencia y horarios..."
+        placeholder="Describe qué servicios ofreces, tu experiencia y horarios..."
         value={descripcion} onChangeText={(v) => { setDescripcion(v); clearError('descripcion'); }}
-        multiline numberOfLines={4}
+        multiline numberOfLines={4} maxLength={500}
       />
       {errors.descripcion ? <Text style={styles.fieldError}>{errors.descripcion}</Text> : null}
+      <Text style={styles.inputLabel}>{`${descripcion.length}/500 caracteres`}</Text>
 
       <Dropdown
         label="Departamento *"
@@ -383,40 +436,18 @@ export default function RegisterScreen({ navigation, onRegisterSuccess }) {
       />
 
       <Text style={styles.inputLabel}>
-        Categorías de servicio * — selecciona todas las que apliquen
+        Categorías de servicio * — elige hasta 3
       </Text>
-      {loadingCats ? (
-        <ActivityIndicator color="#4589d4" style={{ marginVertical: 12 }} />
-      ) : (
-        <View style={styles.chipGrid}>
-          {categorias.map((c) => {
-            const selected = categoriaIds.includes(String(c.id));
-            return (
-              <TouchableOpacity
-                key={c.id}
-                style={[styles.chip, selected && styles.chipSelected]}
-                onPress={() => {
-                  setCategoriaIds((prev) =>
-                    prev.includes(String(c.id))
-                      ? prev.filter((x) => x !== String(c.id))
-                      : [...prev, String(c.id)]
-                  );
-                  clearError('categoriaIds');
-                }}
-                activeOpacity={0.8}
-              >
-                {selected && <Text style={styles.chipCheck}>✓ </Text>}
-                <Text style={[styles.chipText, selected && styles.chipTextSelected]}>
-                  {c.nombre}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-      )}
-      {errors.categoriaIds
-        ? <Text style={styles.fieldError}>{errors.categoriaIds}</Text>
-        : null}
+      <CategoriaSelector
+        categorias={categorias}
+        value={categoriaIds}
+        loading={loadingCats}
+        error={errors.categoriaIds}
+        onChange={(ids) => {
+          setCategoriaIds(ids);
+          clearError('categoriaIds');
+        }}
+      />
 
       <TouchableOpacity
         style={[styles.btnPrimary, loading && styles.btnDisabled]}
@@ -472,7 +503,7 @@ export default function RegisterScreen({ navigation, onRegisterSuccess }) {
         </>
       ) : (
         <View style={styles.uploadNote}>
-          <Text style={styles.uploadNoteText}>La carga de archivos esta disponible en la version web.</Text>
+          <Text style={styles.uploadNoteText}>La carga de archivos está disponible en la versión web.</Text>
         </View>
       )}
 
@@ -509,7 +540,7 @@ export default function RegisterScreen({ navigation, onRegisterSuccess }) {
       <View style={styles.pageInner}>
         <View style={styles.logoWrap}><ServiGTLogo size={28} mode="dark" /></View>
         <Text style={styles.pageTitle}>Crear cuenta</Text>
-        <Text style={styles.appSubtitle}>Unete a la comunidad de ServiGT con datos reales de tu cuenta.</Text>
+        <Text style={styles.appSubtitle}>Únete a la comunidad de ServiGT con datos reales de tu cuenta.</Text>
 
         {/* Indicador de pasos solo para proveedor (o si ya paso del paso 1) */}
         {(role === 'proveedor' || step > 1) && <StepIndicator />}
@@ -517,6 +548,10 @@ export default function RegisterScreen({ navigation, onRegisterSuccess }) {
         {step === 1 && renderStep1()}
         {step === 2 && renderStep2()}
         {step === 3 && renderStep3()}
+        <View style={styles.roleRow}>
+          <TouchableOpacity accessibilityRole="link" onPress={() => navigation?.navigate('Terminos')}><Text style={styles.linkText}>Terminos y condiciones</Text></TouchableOpacity>
+          <TouchableOpacity accessibilityRole="link" onPress={() => navigation?.navigate('Privacidad')}><Text style={styles.linkText}>Privacidad</Text></TouchableOpacity>
+        </View>
       </View>
     </ScrollView>
   );
@@ -524,6 +559,8 @@ export default function RegisterScreen({ navigation, onRegisterSuccess }) {
 
 // ── Estilos ────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
+  legalCheck: { flexDirection: 'row', gap: 10, alignItems: 'center', marginVertical: 8 },
+  legalText: { flex: 1, color: T.text, fontSize: 13, lineHeight: 19 },
   container: {
     flexGrow: 1,
     padding: 24,
@@ -642,42 +679,6 @@ const styles = StyleSheet.create({
   textArea: {
     height: 110,
     textAlignVertical: 'top',
-  },
-
-  // Category multi-select chips
-  chipGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: 4,
-  },
-  chip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 13,
-    paddingVertical: 8,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: T.inputBorder,
-    backgroundColor: T.white,
-  },
-  chipSelected: {
-    backgroundColor: T.blue,
-    borderColor: T.blue,
-  },
-  chipCheck: {
-    fontSize: 11,
-    color: T.paper,
-    fontWeight: '700',
-  },
-  chipText: {
-    fontSize: 13,
-    color: '#555',
-    fontWeight: '500',
-  },
-  chipTextSelected: {
-    color: T.paper,
-    fontWeight: '600',
   },
 
   // Role selector

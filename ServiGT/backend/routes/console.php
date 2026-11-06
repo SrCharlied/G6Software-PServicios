@@ -13,3 +13,5 @@ use Illuminate\Support\Facades\Schedule;
 */
 
 Schedule::command('pedidos:expirar')->hourly();
+// Reintento de borrado de archivos de cuentas anonimizadas (HU 3.1).
+Schedule::command('cuentas:limpiar-archivos')->hourly();

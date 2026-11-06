@@ -17,6 +17,7 @@ class Proveedor extends Model
         'email',
         'telefono',
         'descripcion',
+        'experiencia_resumen',
         'departamento',
         'municipio',
         'categoria_id',
@@ -28,6 +29,10 @@ class Proveedor extends Model
         'premium_vence_at',
         'premium_ciclo_key',
         'premium_renovaciones',
+        'premium_recurrente',
+        'premium_cancela_al_final',
+        'stripe_customer_id',
+        'stripe_subscription_id',
         'portada',
         'color_acento',
     ];
@@ -39,6 +44,8 @@ class Proveedor extends Model
         'premium_inicio_at'     => 'datetime',
         'premium_vence_at'      => 'datetime',
         'premium_renovaciones'  => 'integer',
+        'premium_recurrente'    => 'boolean',
+        'premium_cancela_al_final' => 'boolean',
     ];
 
     protected $appends = [
@@ -99,6 +106,20 @@ class Proveedor extends Model
     public function compras()
     {
         return $this->hasMany(CompraCredito::class, 'proveedor_id');
+    }
+
+    /**
+     * Excluye perfiles cuya cuenta fue anonimizada (HU 3.1). Un proveedor
+     * heredado sin user_id sigue visible: no hay cuenta que eliminar.
+     */
+    public function scopeVisibleEnCatalogo($query)
+    {
+        return $query->whereNotExists(function ($sub) {
+            $sub->selectRaw('1')
+                ->from('users')
+                ->whereColumn('users.id', 'proveedores.user_id')
+                ->where('users.estado_cuenta', 'anonimizada');
+        });
     }
 
     /**

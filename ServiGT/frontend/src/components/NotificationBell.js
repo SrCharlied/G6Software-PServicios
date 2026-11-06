@@ -1,7 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  AppState,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -18,6 +20,7 @@ import {
   loadStoredSession,
   marcarNotificacionLeida,
   marcarTodasLeidas,
+  parseUnreadCount,
 } from '../services/api';
 import { destinoNotificacion } from '../utils/notificationRoutes';
 import { T } from '../theme';
@@ -29,6 +32,8 @@ export default function NotificationBell({ onPress, tone = 'dark' }) {
   const router = useRouter();
   const { user, sessionLoading } = useSession();
   const [unreadCount, setUnreadCount] = useState(0);
+  // Si el conteo no se pudo cargar, el badge lo dice en lugar de mostrar 0.
+  const [countError, setCountError] = useState(false);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
   const [notifications, setNotifications] = useState([]);
@@ -36,34 +41,69 @@ export default function NotificationBell({ onPress, tone = 'dark' }) {
   const [listError, setListError] = useState('');
   const [itemError, setItemError] = useState('');
   const [markingAll, setMarkingAll] = useState(false);
+  const mountedRef = useRef(true);
+  const countInFlight = useRef(false);
 
   useEffect(() => {
-    let mounted = true;
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; };
+  }, []);
 
-    const loadCount = async () => {
-      if (sessionLoading) return;
-      if (!user || !loadStoredSession()) {
-        setUnreadCount(0);
-        setLoading(false);
-        return;
+  const refreshCount = useCallback(async () => {
+    if (sessionLoading) return;
+    if (!user || !loadStoredSession()) {
+      setUnreadCount(0);
+      setCountError(false);
+      setLoading(false);
+      return;
+    }
+    // Foco y visibilitychange llegan juntos en web: una sola peticion a la vez.
+    if (countInFlight.current) return;
+    countInFlight.current = true;
+
+    try {
+      const count = await getUnreadNotificationsCount();
+      if (mountedRef.current) {
+        setUnreadCount(count);
+        setCountError(false);
       }
-
-      try {
-        const count = await getUnreadNotificationsCount();
-        if (mounted) setUnreadCount(count);
-      } catch {
-        if (mounted) setUnreadCount(0);
-      } finally {
-        if (mounted) setLoading(false);
-      }
-    };
-
-    loadCount();
-
-    return () => { mounted = false; };
+    } catch {
+      if (mountedRef.current) setCountError(true);
+    } finally {
+      countInFlight.current = false;
+      if (mountedRef.current) setLoading(false);
+    }
   }, [sessionLoading, user]);
 
+  useEffect(() => {
+    refreshCount();
+  }, [refreshCount]);
+
+  // Refresco al recuperar el foco, sin polling: solo reacciona a que la app
+  // (nativo) o la pestana/ventana (web) vuelva a estar activa.
+  useEffect(() => {
+    const appStateSub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') refreshCount();
+    });
+
+    const hasWindow = Platform.OS === 'web'
+      && typeof window !== 'undefined'
+      && typeof window.addEventListener === 'function';
+    const onWindowFocus = () => refreshCount();
+    if (hasWindow) window.addEventListener('focus', onWindowFocus);
+
+    return () => {
+      appStateSub?.remove?.();
+      if (hasWindow) window.removeEventListener('focus', onWindowFocus);
+    };
+  }, [refreshCount]);
+
   const badgeText = unreadCount > 99 ? '99+' : String(unreadCount);
+  const bellLabel = countError
+    ? 'Notificaciones, no se pudo cargar el conteo'
+    : unreadCount > 0
+      ? `Notificaciones, ${unreadCount} sin leer`
+      : 'Notificaciones';
 
   const loadNotifications = async () => {
     setListLoading(true);
@@ -73,6 +113,7 @@ export default function NotificationBell({ onPress, tone = 'dark' }) {
     if (!user || !loadStoredSession()) {
       setNotifications([]);
       setUnreadCount(0);
+      setCountError(false);
       setListLoading(false);
       setListError('No se encontro una sesion activa. Inicia sesion nuevamente.');
       return;
@@ -81,7 +122,12 @@ export default function NotificationBell({ onPress, tone = 'dark' }) {
     try {
       const data = await getNotificaciones();
       setNotifications(data.notificaciones || []);
-      setUnreadCount(data.no_leidas || 0);
+      try {
+        setUnreadCount(parseUnreadCount(data));
+        setCountError(false);
+      } catch {
+        setCountError(true);
+      }
     } catch (error) {
       setListError(error.message);
     } finally {
@@ -162,11 +208,17 @@ export default function NotificationBell({ onPress, tone = 'dark' }) {
         onPress={handlePress}
         activeOpacity={0.75}
         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        accessibilityRole="button"
+        accessibilityLabel={bellLabel}
       >
         <Feather name="bell" size={18} color={tone === 'light' ? T.white : T.ink} />
         {loading ? (
           <View style={styles.loader}>
             <ActivityIndicator size="small" color={T.blue} />
+          </View>
+        ) : countError ? (
+          <View style={[styles.badge, styles.badgeError]} testID="notification-count-error">
+            <Text style={styles.badgeText}>!</Text>
           </View>
         ) : unreadCount > 0 ? (
           <View style={styles.badge}>
@@ -287,6 +339,9 @@ const styles = StyleSheet.create({
     borderColor: T.paper,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  badgeError: {
+    backgroundColor: T.warn,
   },
   badgeText: {
     color: '#fff',

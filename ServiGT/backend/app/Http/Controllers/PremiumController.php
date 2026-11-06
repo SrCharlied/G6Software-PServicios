@@ -51,6 +51,11 @@ class PremiumController extends Controller
      */
     public function activar(Request $request): JsonResponse
     {
+        // Con pasarela real no existe activacion gratuita: Premium solo se paga.
+        if (config('services.payments.driver') !== 'simulated') {
+            return $this->error('La activacion gratuita esta deshabilitada. Paga Premium con tarjeta.', 403);
+        }
+
         $proveedor = Proveedor::where('user_id', $request->user()->id)->first();
 
         if (!$proveedor) {
@@ -158,7 +163,7 @@ class PremiumController extends Controller
         return self::CREDITOS_POR_CICLO;
     }
 
-    private function formatearEstadoPremium(Proveedor $proveedor): array
+    public function formatearEstadoPremium(Proveedor $proveedor): array
     {
         $proveedor->refresh();
 
@@ -187,6 +192,12 @@ class PremiumController extends Controller
             'creditos_por_ciclo'    => self::CREDITOS_POR_CICLO,
             'ciclo_actual'          => $proveedor->premium_ciclo_key,
             'ultima_acreditacion_at'=> $ultimaAcreditacion?->created_at,
+            'recurrente'            => $estado === 'activo' && (bool) $proveedor->premium_recurrente,
+            'cancela_al_final'      => $estado === 'activo' && (bool) $proveedor->premium_cancela_al_final,
+            // Fecha del siguiente cobro: solo si se renueva sola y no se cancelo.
+            'proximo_cobro_at'      => $estado === 'activo' && $proveedor->premium_recurrente && !$proveedor->premium_cancela_al_final
+                ? $proveedor->premium_vence_at
+                : null,
             'beneficios'            => self::BENEFICIOS,
             'nota_slots'            => 'Premium no modifica los slots de cotizacion durante Sprint 6.',
         ];

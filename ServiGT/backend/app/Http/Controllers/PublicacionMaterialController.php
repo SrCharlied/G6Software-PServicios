@@ -50,6 +50,7 @@ class PublicacionMaterialController extends Controller
             ->with(['imagenes', 'vendedor', 'reservas' => fn ($q) => $q->where('comprador_id', $proveedor->id)])
             ->whereIn('estado', ['disponible', 'reservado'])
             ->where('vendedor_id', '!=', $proveedor->id)
+            ->whereHas('vendedor', fn ($q) => $q->visibleEnCatalogo())
             ->orderByDesc('created_at')
             ->orderByDesc('id');
 
@@ -116,9 +117,12 @@ class PublicacionMaterialController extends Controller
             ->withCount(['reservas as reservas_pendientes_count' => fn ($q) => $q->where('estado', 'pendiente')])
             ->find($id);
 
+        // Quien ya tiene una reserva conserva el historial aunque el vendedor
+        // se haya anonimizado; para el resto el lote sale del catalogo.
         $visible = $publicacion && (
             $publicacion->vendedor_id === $proveedor->id
-            || in_array($publicacion->estado, ['disponible', 'reservado'], true)
+            || (in_array($publicacion->estado, ['disponible', 'reservado'], true)
+                && !$publicacion->vendedor?->user?->estaAnonimizada())
             || $publicacion->reservas->isNotEmpty()
         );
 

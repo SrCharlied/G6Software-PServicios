@@ -336,3 +336,68 @@ describe('api del panel de seguridad (Sprint 9)', () => {
     });
   });
 });
+
+describe('conteo de notificaciones no leidas (HU 1.5)', () => {
+  afterEach(() => { jest.dontMock('axios'); jest.dontMock('./sessionStorage'); });
+
+  it('devuelve el conteo exacto que informa el backend', async () => {
+    const { apiModule, client } = buildApiModule();
+    client.get.mockResolvedValueOnce({ data: { notificaciones: [], no_leidas: 73 } });
+    await expect(apiModule.getUnreadNotificationsCount()).resolves.toBe(73);
+    expect(client.get).toHaveBeenCalledWith('/notificaciones');
+  });
+
+  it('cero legitimo se conserva como cero', async () => {
+    const { apiModule, client } = buildApiModule();
+    client.get.mockResolvedValueOnce({ data: { notificaciones: [], no_leidas: 0 } });
+    await expect(apiModule.getUnreadNotificationsCount()).resolves.toBe(0);
+  });
+
+  it.each([undefined, null, '3', -1, 2.5])('un conteo invalido (%p) es error, no cero', async (valor) => {
+    const { apiModule, client } = buildApiModule();
+    client.get.mockResolvedValueOnce({ data: { notificaciones: [], no_leidas: valor } });
+    await expect(apiModule.getUnreadNotificationsCount())
+      .rejects.toThrow('No se pudo cargar el conteo de notificaciones.');
+  });
+
+  it('un fallo de red se propaga como error', async () => {
+    const { apiModule, client } = buildApiModule();
+    client.get.mockRejectedValueOnce({ isAxiosError: true, response: { status: 500, data: {} } });
+    await expect(apiModule.getUnreadNotificationsCount()).rejects.toMatchObject({ status: 500 });
+  });
+});
+
+describe('eliminacion de cuenta (HU 3.2)', () => {
+  afterEach(() => { jest.dontMock('axios'); jest.dontMock('./sessionStorage'); });
+
+  it('consulta el impacto sin modificar nada', async () => {
+    const { apiModule, client } = buildApiModule();
+    client.get.mockResolvedValueOnce({ data: { puede_eliminar: true, bloqueos: [], se_cerrara: {} } });
+    await expect(apiModule.getImpactoEliminacion()).resolves.toEqual(expect.objectContaining({ puede_eliminar: true }));
+    expect(client.get).toHaveBeenCalledWith('/cuenta/eliminacion/impacto');
+  });
+
+  it('envia contraseña, confirmacion y clave con los nombres del contrato', async () => {
+    const { apiModule, client } = buildApiModule();
+    client.post.mockResolvedValueOnce({ data: { success: true, solicitud: { id: 3, estado: 'completada' } } });
+    await apiModule.solicitarEliminacionCuenta({ password: 'x', confirmacion: 'ELIMINAR', idempotencyKey: 'k-1' });
+    expect(client.post).toHaveBeenCalledWith('/cuenta/eliminacion', {
+      password: 'x',
+      confirmacion: 'ELIMINAR',
+      idempotency_key: 'k-1',
+    });
+  });
+
+  it('un 409 conserva status, bloqueos y la sesion local', async () => {
+    const { apiModule, client, storage } = buildApiModule();
+    storage.values.servigt_token = 'tok';
+    storage.values.chat_9 = '{}';
+    client.post.mockRejectedValueOnce({
+      isAxiosError: true,
+      response: { status: 409, data: { success: false, message: 'Bloqueada', bloqueos: [{ codigo: 'servicios_activos' }] } },
+    });
+    await expect(apiModule.solicitarEliminacionCuenta({ password: 'x', confirmacion: 'ELIMINAR', idempotencyKey: 'k' }))
+      .rejects.toMatchObject({ status: 409, message: 'Bloqueada', data: { bloqueos: [{ codigo: 'servicios_activos' }] } });
+    expect(storage.values).toEqual(expect.objectContaining({ servigt_token: 'tok', chat_9: '{}' }));
+  });
+});

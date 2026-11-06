@@ -152,9 +152,12 @@ export const login = async (email, password) => {
   }
 };
 
-export const register = async (name, email, password, role) => {
+export const register = async (name, email, password, passwordConfirmation, role, aceptacionesLegales) => {
   try {
-    const response = await api.post('/register', { name, email, password, role });
+    const response = await api.post('/register', {
+      name, email, password, password_confirmation: passwordConfirmation, role,
+      aceptaciones_legales: aceptacionesLegales,
+    });
     const { user, token } = response.data;
     await saveSession(token, user);
     return response.data;
@@ -172,6 +175,32 @@ export const logout = async () => {
   }
 };
 
+// ── Eliminacion de cuenta (HU 3.1/3.2) ────────────────────────────────────
+// Contrato: docs/sprint10/eliminacion-api.md. Estas funciones no limpian la
+// sesion local: eso le toca a quien llama, y solo tras un 200.
+
+export const getImpactoEliminacion = async () => {
+  try {
+    const response = await api.get('/cuenta/eliminacion/impacto');
+    return response.data;
+  } catch (error) {
+    throwApiError(error, 'No se pudo consultar el impacto de eliminar tu cuenta.');
+  }
+};
+
+export const solicitarEliminacionCuenta = async ({ password, confirmacion, idempotencyKey }) => {
+  try {
+    const response = await api.post('/cuenta/eliminacion', {
+      password,
+      confirmacion,
+      idempotency_key: idempotencyKey,
+    });
+    return response.data;
+  } catch (error) {
+    throwApiError(error, 'No se pudo eliminar la cuenta.');
+  }
+};
+
 export const getMe = async (config = {}) => {
   try {
     const response = await api.get('/me', config);
@@ -179,6 +208,11 @@ export const getMe = async (config = {}) => {
   } catch (error) {
     throwApiError(error, 'No se pudo obtener el usuario.');
   }
+};
+
+export const getDocumentosLegales = async () => {
+  try { return (await api.get('/legal/documentos/vigentes')).data; }
+  catch (error) { throwApiError(error, 'No se pudieron cargar los documentos legales.'); }
 };
 
 // ── Categorias ────────────────────────────────────────────────────────────
@@ -557,13 +591,24 @@ export const getNotificaciones = async () => {
   }
 };
 
+// Un conteo ausente o malformado es un error, no un cero: el badge no puede
+// afirmar "sin pendientes" cuando no sabe cuantas hay.
+export const parseUnreadCount = (data) => {
+  const count = data?.no_leidas;
+  if (!Number.isInteger(count) || count < 0) {
+    throw new Error('No se pudo cargar el conteo de notificaciones.');
+  }
+  return count;
+};
+
 export const getUnreadNotificationsCount = async () => {
+  let response;
   try {
-    const response = await api.get('/notificaciones');
-    return response.data.no_leidas || 0;
+    response = await api.get('/notificaciones');
   } catch (error) {
     throwApiError(error, 'No se pudo cargar el conteo de notificaciones.');
   }
+  return parseUnreadCount(response.data);
 };
 
 export const marcarNotificacionLeida = async (id) => {
@@ -636,6 +681,42 @@ export const comprarCreditos = async ({ paqueteId, idempotencyKey }) => {
   }
 };
 
+// Stripe Checkout: el backend crea (o recupera, por idempotency_key) la sesion
+// y devuelve { compra, client_secret, publishable_key }. client_secret null
+// significa que la compra ya no admite pago: consultar getCompraCredito.
+export const crearSesionPagoStripe = async ({ paqueteId, idempotencyKey }) => {
+  try {
+    const response = await api.post('/creditos/pagos/sesion', {
+      paquete_id: paqueteId,
+      idempotency_key: idempotencyKey,
+    });
+    return response.data;
+  } catch (error) {
+    throwApiError(error, 'No se pudo iniciar el pago con tarjeta.');
+  }
+};
+
+// Estado de una compra propia; el backend la concilia con Stripe si sigue pendiente.
+export const getCompraCredito = async (compraId) => {
+  try {
+    const response = await api.get(`/creditos/compras/${compraId}`);
+    return response.data;
+  } catch (error) {
+    throwApiError(error, 'No se pudo consultar la compra.');
+  }
+};
+
+// Comprobante informativo (snapshot guardado) de una compra propia completada.
+// 404 si la compra es ajena o histórica sin comprobante; 409 si aún no se completa.
+export const getComprobanteCompra = async (compraId) => {
+  try {
+    const response = await api.get(`/creditos/compras/${compraId}/comprobante`);
+    return response.data;
+  } catch (error) {
+    throwApiError(error, 'No se pudo cargar el comprobante.');
+  }
+};
+
 export const getCreditosTransacciones = async ({ page = 1, perPage = 15 } = {}) => {
   try {
     const response = await api.get('/creditos/transacciones', {
@@ -653,6 +734,40 @@ export const getPremiumMiEstado = async () => {
     return response.data;
   } catch (error) {
     throwApiError(error, 'No se pudo cargar el estado Premium.');
+  }
+};
+
+// Premium con Stripe. recurrente=false: pago unico de 30 dias; true: suscripcion
+// mensual. Devuelve { pago, client_secret, publishable_key }.
+export const crearSesionPagoPremium = async ({ recurrente, idempotencyKey }) => {
+  try {
+    const response = await api.post('/premium/pagos/sesion', {
+      recurrente,
+      idempotency_key: idempotencyKey,
+    });
+    return response.data;
+  } catch (error) {
+    throwApiError(error, 'No se pudo iniciar el pago de Premium.');
+  }
+};
+
+// Estado de un pago Premium propio; el backend lo concilia con Stripe si sigue pendiente.
+export const getPagoPremium = async (pagoId) => {
+  try {
+    const response = await api.get(`/premium/pagos/${pagoId}`);
+    return response.data;
+  } catch (error) {
+    throwApiError(error, 'No se pudo consultar el pago de Premium.');
+  }
+};
+
+// Cancela la renovacion al final del ciclo; Premium sigue activo hasta vence_at.
+export const cancelarSuscripcionPremium = async () => {
+  try {
+    const response = await api.post('/premium/suscripcion/cancelar');
+    return response.data;
+  } catch (error) {
+    throwApiError(error, 'No se pudo cancelar la suscripcion.');
   }
 };
 

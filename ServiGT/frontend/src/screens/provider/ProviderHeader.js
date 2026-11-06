@@ -1,6 +1,7 @@
 import { Text, TouchableOpacity, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { PremiumBadge } from '../../components/ui';
+import LogoutButton from '../../components/LogoutButton';
 import styles from './providerStyles';
 import { getAvailabilityText, getGreeting, isAvailableNow } from './providerUtils';
 
@@ -72,9 +73,7 @@ export default function ProviderHeader({
               <Text style={styles.headerGhostBtnText}>Editar perfil</Text>
             </TouchableOpacity>
           ) : null}
-          <TouchableOpacity style={styles.logoutBtn} onPress={onLogout}>
-            <Text style={styles.logoutBtnText}>Salir</Text>
-          </TouchableOpacity>
+          <LogoutButton style={styles.logoutBtn} textStyle={styles.logoutBtnText} onLogout={onLogout} label="Salir" />
         </View>
       </View>
     </LinearGradient>

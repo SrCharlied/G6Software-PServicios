@@ -24,6 +24,8 @@ class ProviderAuthorizationTest extends TestCase
         $this->postJson('/api/providers', [
             'user_id'      => $otro->id,
             'nombre'       => 'Taller Mecanico El Rayo',
+            'telefono'     => '55550101',
+            'descripcion'  => 'Servicios profesionales de mecanica.',
             'email'        => 'rayo@example.com',
             'departamento' => 'Guatemala',
         ])
@@ -76,10 +78,13 @@ class ProviderAuthorizationTest extends TestCase
 
         $this->postJson('/api/providers', [
             'nombre'       => 'Perfil perdedor de la carrera',
+            'telefono'     => '55550101',
+            'descripcion'  => 'Servicios profesionales de mecanica.',
             'email'        => 'perdedor-' . uniqid() . '@example.com',
             'departamento' => 'Guatemala',
         ])
             ->assertStatus(422)
+            ->assertJsonPath('message', 'Ya tienes un perfil de proveedor.')
             ->assertJsonPath('success', false);
 
         $this->assertDatabaseCount('proveedores', 1);
@@ -92,12 +97,16 @@ class ProviderAuthorizationTest extends TestCase
 
         $this->postJson('/api/providers', [
             'nombre'       => 'Plomeria Rapida',
+            'telefono'     => '55550101',
+            'descripcion'  => 'Servicios profesionales de plomeria.',
             'email'        => 'plomeria@example.com',
             'departamento' => 'Guatemala',
         ])->assertCreated();
 
         $this->postJson('/api/providers', [
             'nombre'       => 'Plomeria Rapida Dos',
+            'telefono'     => '55550101',
+            'descripcion'  => 'Servicios profesionales de plomeria.',
             'email'        => 'plomeria2@example.com',
             'departamento' => 'Guatemala',
         ])

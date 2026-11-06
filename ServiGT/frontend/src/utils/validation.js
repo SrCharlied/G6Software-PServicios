@@ -1,5 +1,5 @@
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
-const PHONE_RE = /^[+\d\s\-().]{7,20}$/;
+const PHONE_RE = /^[0-9]{8}$/;
 
 // bcrypt (el hasher del backend) trunca en silencio cualquier byte extra
 // arriba de 72, asi que el backend rechaza contrasenas mas largas. Se

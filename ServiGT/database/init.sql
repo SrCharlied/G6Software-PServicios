@@ -49,6 +49,8 @@ CREATE TABLE IF NOT EXISTS users (
     telefono VARCHAR(20),
     foto_perfil VARCHAR(500),
     documento_verificado BOOLEAN NOT NULL DEFAULT FALSE,
+    estado_cuenta VARCHAR(20) NOT NULL DEFAULT 'activa',
+    anonimizada_at TIMESTAMP WITHOUT TIME ZONE,
     created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
@@ -71,6 +73,9 @@ CREATE TABLE IF NOT EXISTS proveedores (
     email VARCHAR(255) NOT NULL UNIQUE,
     telefono VARCHAR(20),
     descripcion TEXT,
+    experiencia_resumen TEXT CHECK (
+        experiencia_resumen IS NULL OR char_length(experiencia_resumen) <= 1000
+    ),
     departamento VARCHAR(100) NOT NULL,
     municipio VARCHAR(100),
     categoria_id BIGINT REFERENCES categorias(id) ON DELETE RESTRICT,
@@ -92,6 +97,7 @@ CREATE TABLE IF NOT EXISTS proveedores (
 CREATE INDEX IF NOT EXISTS idx_proveedores_user_id ON proveedores (user_id);
 CREATE INDEX IF NOT EXISTS idx_proveedores_categoria_id ON proveedores (categoria_id);
 CREATE INDEX IF NOT EXISTS idx_proveedores_departamento ON proveedores (departamento);
+
 
 -- Documentos de identidad del proveedor
 CREATE TABLE IF NOT EXISTS documentos_proveedores (
@@ -178,6 +184,117 @@ CREATE TABLE IF NOT EXISTS compras_creditos (
     CONSTRAINT compras_creditos_proveedor_idem_uk UNIQUE (proveedor_id, idempotency_key)
 );
 CREATE INDEX IF NOT EXISTS idx_compras_creditos_proveedor ON compras_creditos (proveedor_id, created_at DESC);
+
+-- Pasarela Stripe (Checkout Session). La compra nace 'pendiente' y solo el webhook
+-- firmado (o la reconciliacion server-side contra la API de Stripe) la completa.
+ALTER TABLE compras_creditos ADD COLUMN IF NOT EXISTS metodo_pago VARCHAR(20) NOT NULL DEFAULT 'simulado';
+ALTER TABLE compras_creditos ADD COLUMN IF NOT EXISTS stripe_session_id VARCHAR(255);
+ALTER TABLE compras_creditos ADD COLUMN IF NOT EXISTS fallo_motivo VARCHAR(255);
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint
+        WHERE conrelid = 'compras_creditos'::regclass
+          AND conname = 'compras_creditos_metodo_pago_chk'
+    ) THEN
+        ALTER TABLE compras_creditos ADD CONSTRAINT compras_creditos_metodo_pago_chk
+            CHECK (metodo_pago IN ('simulado','stripe'));
+    END IF;
+END $$;
+CREATE UNIQUE INDEX IF NOT EXISTS uk_compras_creditos_stripe_session
+    ON compras_creditos (stripe_session_id) WHERE stripe_session_id IS NOT NULL;
+
+-- Comprobante informativo (HU 4.1). Solo las compras que se completan despues de
+-- esta version guardan snapshot; el folio es `referencia`. Las compras historicas
+-- ya completadas conservan NULL y no reciben comprobante completo. No es un
+-- documento fiscal (sin FEL ni PDF).
+ALTER TABLE compras_creditos ADD COLUMN IF NOT EXISTS comprobante_snapshot JSONB;
+ALTER TABLE compras_creditos ADD COLUMN IF NOT EXISTS comprobante_emitido_at TIMESTAMP WITHOUT TIME ZONE;
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint
+        WHERE conrelid = 'compras_creditos'::regclass
+          AND conname = 'compras_creditos_comprobante_chk'
+    ) THEN
+        ALTER TABLE compras_creditos ADD CONSTRAINT compras_creditos_comprobante_chk
+            CHECK (
+                (comprobante_snapshot IS NULL AND comprobante_emitido_at IS NULL)
+                OR (comprobante_snapshot IS NOT NULL AND comprobante_emitido_at IS NOT NULL
+                    AND estado = 'completada')
+            );
+    END IF;
+END $$;
+
+-- El snapshot es inmutable: una vez escrito no cambia, ni tampoco los datos de la
+-- compra que respalda. Y solo puede nacer en el mismo momento en que la compra se
+-- completa: una compra ya completada sin snapshot (historica) no puede recibirlo.
+CREATE OR REPLACE FUNCTION compras_creditos_comprobante_inmutable() RETURNS trigger AS $fn$
+BEGIN
+    IF OLD.comprobante_snapshot IS NOT NULL THEN
+        IF NEW.comprobante_snapshot IS DISTINCT FROM OLD.comprobante_snapshot
+           OR NEW.comprobante_emitido_at IS DISTINCT FROM OLD.comprobante_emitido_at
+           OR NEW.referencia IS DISTINCT FROM OLD.referencia
+           OR NEW.proveedor_id IS DISTINCT FROM OLD.proveedor_id
+           OR NEW.paquete_id IS DISTINCT FROM OLD.paquete_id
+           OR NEW.monto_gtq IS DISTINCT FROM OLD.monto_gtq
+           OR NEW.creditos_otorgados IS DISTINCT FROM OLD.creditos_otorgados
+           OR NEW.estado IS DISTINCT FROM OLD.estado
+           OR NEW.completada_at IS DISTINCT FROM OLD.completada_at THEN
+            RAISE EXCEPTION 'El comprobante de la compra % es inmutable', OLD.referencia;
+        END IF;
+    ELSIF NEW.comprobante_snapshot IS NOT NULL AND OLD.estado = 'completada' THEN
+        RAISE EXCEPTION 'La compra % ya estaba completada: no admite comprobante', OLD.referencia;
+    END IF;
+
+    RETURN NEW;
+END;
+$fn$ LANGUAGE plpgsql;
+
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'trg_compras_creditos_comprobante_inmutable') THEN
+        CREATE TRIGGER trg_compras_creditos_comprobante_inmutable
+            BEFORE UPDATE ON compras_creditos
+            FOR EACH ROW EXECUTE FUNCTION compras_creditos_comprobante_inmutable();
+    END IF;
+END $$;
+
+-- Eventos de webhook ya procesados: la PK es el arbitro de la idempotencia.
+CREATE TABLE IF NOT EXISTS stripe_eventos (
+    event_id VARCHAR(255) PRIMARY KEY,
+    tipo VARCHAR(100) NOT NULL,
+    created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Premium con Stripe: pago unico de 30 dias o suscripcion mensual recurrente.
+-- La cancelacion es al final del ciclo: premium_vence_at no se toca, solo se
+-- apaga la renovacion (premium_cancela_al_final) y Stripe deja de cobrar.
+ALTER TABLE proveedores ADD COLUMN IF NOT EXISTS premium_recurrente BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE proveedores ADD COLUMN IF NOT EXISTS premium_cancela_al_final BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE proveedores ADD COLUMN IF NOT EXISTS stripe_customer_id VARCHAR(255);
+ALTER TABLE proveedores ADD COLUMN IF NOT EXISTS stripe_subscription_id VARCHAR(255);
+CREATE UNIQUE INDEX IF NOT EXISTS uk_proveedores_stripe_subscription
+    ON proveedores (stripe_subscription_id) WHERE stripe_subscription_id IS NOT NULL;
+
+CREATE TABLE IF NOT EXISTS pagos_premium (
+    id BIGSERIAL PRIMARY KEY,
+    proveedor_id BIGINT NOT NULL REFERENCES proveedores(id) ON DELETE CASCADE,
+    recurrente BOOLEAN NOT NULL DEFAULT FALSE,
+    estado VARCHAR(20) NOT NULL DEFAULT 'pendiente'
+        CHECK (estado IN ('pendiente','completada','fallida','cancelada')),
+    referencia VARCHAR(20) NOT NULL UNIQUE,
+    idempotency_key VARCHAR(100) NOT NULL,
+    stripe_session_id VARCHAR(255),
+    fallo_motivo VARCHAR(255),
+    completada_at TIMESTAMP WITHOUT TIME ZONE,
+    created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT pagos_premium_proveedor_idem_uk UNIQUE (proveedor_id, idempotency_key)
+);
+CREATE UNIQUE INDEX IF NOT EXISTS uk_pagos_premium_stripe_session
+    ON pagos_premium (stripe_session_id) WHERE stripe_session_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_pagos_premium_proveedor ON pagos_premium (proveedor_id, created_at DESC);
 
 -- Publicaciones de servicios ofrecidos por proveedores
 CREATE TABLE IF NOT EXISTS publicaciones_servicio (
@@ -327,6 +444,13 @@ CREATE INDEX IF NOT EXISTS idx_notif_destinatario ON notificaciones (destinatari
 
 ALTER TABLE users ADD COLUMN IF NOT EXISTS role VARCHAR(20) NOT NULL DEFAULT 'cliente';
 ALTER TABLE users ADD COLUMN IF NOT EXISTS telefono VARCHAR(20);
+
+-- Ejecutar despues de agregar telefono a usuarios de esquemas anteriores.
+-- Normalizar solo el formato historico conocido; no reinterpretar prefijos.
+UPDATE users SET telefono = REPLACE(telefono, '-', '')
+WHERE telefono ~ '^[0-9]{4}-[0-9]{4}$';
+UPDATE proveedores SET telefono = REPLACE(telefono, '-', '')
+WHERE telefono ~ '^[0-9]{4}-[0-9]{4}$';
 ALTER TABLE users ADD COLUMN IF NOT EXISTS foto_perfil VARCHAR(500);
 ALTER TABLE users ADD COLUMN IF NOT EXISTS documento_verificado BOOLEAN NOT NULL DEFAULT FALSE;
 
@@ -425,6 +549,22 @@ ALTER TABLE proveedores ADD COLUMN IF NOT EXISTS premium_renovaciones INT NOT NU
 -- de marca de siempre.
 ALTER TABLE proveedores ADD COLUMN IF NOT EXISTS portada VARCHAR(500);
 ALTER TABLE proveedores ADD COLUMN IF NOT EXISTS color_acento VARCHAR(7);
+
+-- Resumen profesional opcional. El CHECK refuerza el maximo de la API y se
+-- agrega tambien a instalaciones con volumen existente.
+ALTER TABLE proveedores ADD COLUMN IF NOT EXISTS experiencia_resumen TEXT;
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint
+        WHERE conrelid = 'proveedores'::regclass
+          AND conname = 'proveedores_experiencia_resumen_check'
+    ) THEN
+        ALTER TABLE proveedores
+            ADD CONSTRAINT proveedores_experiencia_resumen_check
+            CHECK (experiencia_resumen IS NULL OR char_length(experiencia_resumen) <= 1000);
+    END IF;
+END $$;
 
 -- Publicaciones y trazabilidad nullable desde servicios. El snapshot conserva
 -- datos minimos aunque luego la publicacion se edite o elimine.
@@ -750,6 +890,212 @@ BEGIN
         CREATE TRIGGER trg_historial_reportes_seguridad_inmutable
             BEFORE UPDATE ON historial_reportes_seguridad
             FOR EACH ROW EXECUTE FUNCTION historial_reportes_seguridad_inmutable();
+    END IF;
+END $$;
+
+-- ============================================================
+-- Sprint 10: documentos legales versionados y aceptacion (HU 2.1)
+-- ============================================================
+-- Cada version de terminos o privacidad es una fila inmutable. La vigente de
+-- cada tipo se deriva (la de mayor vigente_desde ya alcanzado), asi que no hay
+-- una bandera `vigente` que actualizar ni que pueda desincronizarse. Publicar
+-- una version nueva es un INSERT; nunca se edita ni se borra una anterior, y
+-- no exige reaceptacion a quien acepto una version previa.
+
+-- Converge desde la primera version de Pablo sin reescribir textos ni evidencia.
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public'
+        AND table_name = 'documentos_legales' AND column_name = 'hash')
+        AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public'
+        AND table_name = 'documentos_legales' AND column_name = 'hash_sha256') THEN
+        ALTER TABLE documentos_legales RENAME COLUMN hash TO hash_sha256;
+    END IF;
+END $$;
+
+CREATE TABLE IF NOT EXISTS documentos_legales (
+    id BIGSERIAL PRIMARY KEY,
+    tipo VARCHAR(20) NOT NULL CHECK (tipo IN ('terminos','privacidad')),
+    version VARCHAR(40) NOT NULL CHECK (LENGTH(BTRIM(version)) > 0),
+    titulo VARCHAR(255) NOT NULL CHECK (LENGTH(BTRIM(titulo)) > 0),
+    contenido TEXT NOT NULL CHECK (LENGTH(BTRIM(contenido)) > 0),
+    -- SHA-256 hex del contenido. Lo calcula el trigger; el valor enviado se ignora.
+    hash_sha256 CHAR(64) NOT NULL,
+    aprobado_por VARCHAR(255) CHECK (LENGTH(BTRIM(aprobado_por)) > 0),
+    aprobado_at TIMESTAMPTZ,
+    vigente_desde TIMESTAMP WITHOUT TIME ZONE NOT NULL,
+    created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (tipo, version),
+    UNIQUE (tipo, vigente_desde)
+);
+-- Sin seed ni aprobacion implicita: las versiones anteriores de dev quedan sin
+-- aprobar hasta contar con evidencia real. El API publico exige aprobacion.
+ALTER TABLE documentos_legales ADD COLUMN IF NOT EXISTS aprobado_por VARCHAR(255)
+    CHECK (LENGTH(BTRIM(aprobado_por)) > 0);
+ALTER TABLE documentos_legales ADD COLUMN IF NOT EXISTS aprobado_at TIMESTAMPTZ;
+ALTER TABLE documentos_legales ALTER COLUMN aprobado_por DROP NOT NULL;
+ALTER TABLE documentos_legales ALTER COLUMN aprobado_at DROP NOT NULL;
+ALTER TABLE documentos_legales ALTER COLUMN version TYPE VARCHAR(40);
+CREATE UNIQUE INDEX IF NOT EXISTS documentos_legales_tipo_vigente_desde_key
+    ON documentos_legales (tipo, vigente_desde);
+CREATE INDEX IF NOT EXISTS idx_documentos_legales_vigencia
+    ON documentos_legales (tipo, vigente_desde DESC);
+
+-- Una aceptacion por usuario y version. Es evidencia: RESTRICT impide perderla
+-- por un borrado en cascada (la eliminacion de cuenta anonimiza, no borra).
+CREATE TABLE IF NOT EXISTS aceptaciones_legales (
+    id BIGSERIAL PRIMARY KEY,
+    user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+    documento_legal_id BIGINT NOT NULL REFERENCES documentos_legales(id) ON DELETE RESTRICT,
+    aceptado_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (user_id, documento_legal_id)
+);
+CREATE INDEX IF NOT EXISTS idx_aceptaciones_legales_documento
+    ON aceptaciones_legales (documento_legal_id);
+
+CREATE OR REPLACE FUNCTION documentos_legales_hash() RETURNS trigger AS $fn$
+BEGIN
+    NEW.hash_sha256 := encode(sha256(convert_to(NEW.contenido, 'UTF8')), 'hex');
+    RETURN NEW;
+END;
+$fn$ LANGUAGE plpgsql;
+
+-- Compartida por ambas tablas: una version publicada o una aceptacion
+-- registrada no se modifica ni se elimina.
+CREATE OR REPLACE FUNCTION legal_inmutable() RETURNS trigger AS $fn$
+BEGIN
+    RAISE EXCEPTION '% es inmutable: no admite %', TG_TABLE_NAME, TG_OP;
+END;
+$fn$ LANGUAGE plpgsql;
+
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'trg_documentos_legales_hash') THEN
+        CREATE TRIGGER trg_documentos_legales_hash
+            BEFORE INSERT ON documentos_legales
+            FOR EACH ROW EXECUTE FUNCTION documentos_legales_hash();
+    END IF;
+
+    IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'trg_documentos_legales_inmutable') THEN
+        CREATE TRIGGER trg_documentos_legales_inmutable
+            BEFORE UPDATE OR DELETE ON documentos_legales
+            FOR EACH ROW EXECUTE FUNCTION legal_inmutable();
+    END IF;
+
+    IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'trg_aceptaciones_legales_inmutable') THEN
+        CREATE TRIGGER trg_aceptaciones_legales_inmutable
+            BEFORE UPDATE OR DELETE ON aceptaciones_legales
+            FOR EACH ROW EXECUTE FUNCTION legal_inmutable();
+    END IF;
+END $$;
+
+-- ============================================================
+-- Sprint 10: estado de cuenta y solicitud de eliminacion (HU 3.1)
+-- ============================================================
+-- Eliminar una cuenta es anonimizarla y revocar su acceso: la fila de users
+-- nunca se borra, para no arrastrar en cascada servicios, compras, reportes ni
+-- aceptaciones legales. Todas las cuentas existentes convergen a 'activa'.
+
+ALTER TABLE users ADD COLUMN IF NOT EXISTS estado_cuenta VARCHAR(20) NOT NULL DEFAULT 'activa';
+ALTER TABLE users ADD COLUMN IF NOT EXISTS anonimizada_at TIMESTAMP WITHOUT TIME ZONE;
+
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint
+        WHERE conrelid = 'users'::regclass
+          AND conname = 'users_estado_cuenta_check'
+    ) THEN
+        ALTER TABLE users ADD CONSTRAINT users_estado_cuenta_check
+            CHECK (
+                (estado_cuenta = 'activa' AND anonimizada_at IS NULL)
+                OR (estado_cuenta = 'anonimizada' AND anonimizada_at IS NOT NULL)
+            );
+    END IF;
+END $$;
+
+-- Una solicitud por intento. `idempotency_key` repite el mismo intento sin
+-- duplicarlo; el indice parcial deja una sola solicitud en curso o completada
+-- por usuario (una rechazada por operaciones activas no impide reintentar).
+-- `manifiesto_archivos` se captura ANTES de anonimizar: despues ya no quedan
+-- rutas en el perfil para saber que limpiar.
+CREATE TABLE IF NOT EXISTS solicitudes_eliminacion_cuenta (
+    id BIGSERIAL PRIMARY KEY,
+    user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+    idempotency_key VARCHAR(80) NOT NULL CHECK (LENGTH(BTRIM(idempotency_key)) > 0),
+    estado VARCHAR(20) NOT NULL DEFAULT 'pendiente'
+        CHECK (estado IN ('pendiente','rechazada','limpieza_pendiente','completada')),
+    motivo_rechazo VARCHAR(255),
+    manifiesto_archivos JSONB NOT NULL DEFAULT '[]'::jsonb
+        CHECK (jsonb_typeof(manifiesto_archivos) = 'array'),
+    intentos_limpieza INT NOT NULL DEFAULT 0 CHECK (intentos_limpieza >= 0),
+    ultimo_error_limpieza TEXT,
+    anonimizada_at TIMESTAMP WITHOUT TIME ZONE,
+    completada_at TIMESTAMP WITHOUT TIME ZONE,
+    created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (user_id, idempotency_key),
+    CONSTRAINT solicitudes_eliminacion_estado_fechas_check CHECK (
+        (estado IN ('pendiente','rechazada') AND anonimizada_at IS NULL AND completada_at IS NULL)
+        OR (estado = 'limpieza_pendiente' AND anonimizada_at IS NOT NULL AND completada_at IS NULL)
+        OR (estado = 'completada' AND anonimizada_at IS NOT NULL AND completada_at IS NOT NULL)
+    ),
+    CONSTRAINT solicitudes_eliminacion_rechazo_check CHECK (
+        (estado = 'rechazada') = (motivo_rechazo IS NOT NULL)
+    )
+);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_solicitud_eliminacion_vigente
+    ON solicitudes_eliminacion_cuenta (user_id)
+    WHERE estado IN ('pendiente','limpieza_pendiente','completada');
+CREATE INDEX IF NOT EXISTS idx_solicitudes_eliminacion_limpieza
+    ON solicitudes_eliminacion_cuenta (estado, updated_at)
+    WHERE estado = 'limpieza_pendiente';
+
+-- ============================================================
+-- Sprint 10: telefono local de 8 digitos (HU 1.2)
+-- ============================================================
+-- El formato canonico es de 8 digitos sin separador. Solo se normaliza el
+-- formato heredado exacto ####-####; cualquier otro valor se deja intacto
+-- para revisarlo a mano en lugar de adivinar. Tras el primer arranque el
+-- patron ya no coincide, asi que el UPDATE no vuelve a tocar filas.
+UPDATE users
+   SET telefono = REPLACE(telefono, '-', '')
+ WHERE telefono ~ '^[0-9]{4}-[0-9]{4}$';
+
+UPDATE proveedores
+   SET telefono = REPLACE(telefono, '-', '')
+ WHERE telefono ~ '^[0-9]{4}-[0-9]{4}$';
+
+-- ============================================================
+-- Sprint 10: categoria principal tambien en el pivote (HU 1.6)
+-- ============================================================
+-- El catalogo y la busqueda pasaran a leer proveedor_categorias; antes de ese
+-- cambio cada categoria principal debe estar en el pivote o el proveedor
+-- desapareceria de su propia categoria. ON CONFLICT lo hace idempotente.
+-- Se respeta el maximo de tres: si un perfil ya tiene tres categorias en el
+-- pivote sin la principal no se le agrega una cuarta; se reporta para que
+-- lo resuelva la regla de principal de 1.6.b.
+INSERT INTO proveedor_categorias (proveedor_id, categoria_id)
+SELECT p.id, p.categoria_id
+  FROM proveedores p
+ WHERE p.categoria_id IS NOT NULL
+   AND (SELECT COUNT(*) FROM proveedor_categorias pc WHERE pc.proveedor_id = p.id) < 3
+ON CONFLICT (proveedor_id, categoria_id) DO NOTHING;
+
+DO $$
+DECLARE
+    sin_principal INT;
+BEGIN
+    SELECT COUNT(*) INTO sin_principal
+      FROM proveedores p
+     WHERE p.categoria_id IS NOT NULL
+       AND NOT EXISTS (
+           SELECT 1 FROM proveedor_categorias pc
+            WHERE pc.proveedor_id = p.id AND pc.categoria_id = p.categoria_id
+       );
+
+    IF sin_principal > 0 THEN
+        RAISE NOTICE '% proveedor(es) con tres categorias en el pivote sin incluir la principal', sin_principal;
     END IF;
 END $$;
 

@@ -3,6 +3,7 @@ import { PremiumBadge, ProfileCover } from '../../components/ui';
 import { storageUrl } from '../../services/api';
 import styles from './providerStyles';
 import { formatCurrency } from './providerUtils';
+import { categoriasParaMostrar } from '../../utils/categoriasProveedor';
 
 /**
  * Resumen del perfil publico del proveedor con su estado Premium detallado.
@@ -33,7 +34,11 @@ export default function PerfilPublicoCard({ profile, premiumInfo, onVerComoClien
       <Text style={styles.profileDescription}>{profile.descripcion}</Text>
 
       <View style={styles.profileMetaWrap}>
-        <Text style={styles.profileMeta}>{profile.categoria?.nombre || 'Sin categoria'}</Text>
+        <Text style={styles.profileMeta}>
+          {categoriasParaMostrar(profile)
+            .map((c) => (c.principal ? `${c.nombre} (principal)` : c.nombre))
+            .join(', ') || 'Sin categoria'}
+        </Text>
         <Text style={styles.profileMeta}>{profile.departamento}</Text>
         {profile.tarifa_hora ? (
           <Text style={styles.profileMeta}>Hora: {formatCurrency(profile.tarifa_hora)}</Text>

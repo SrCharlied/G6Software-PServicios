@@ -366,3 +366,38 @@ describe('conteo de notificaciones no leidas (HU 1.5)', () => {
     await expect(apiModule.getUnreadNotificationsCount()).rejects.toMatchObject({ status: 500 });
   });
 });
+
+describe('eliminacion de cuenta (HU 3.2)', () => {
+  afterEach(() => { jest.dontMock('axios'); jest.dontMock('./sessionStorage'); });
+
+  it('consulta el impacto sin modificar nada', async () => {
+    const { apiModule, client } = buildApiModule();
+    client.get.mockResolvedValueOnce({ data: { puede_eliminar: true, bloqueos: [], se_cerrara: {} } });
+    await expect(apiModule.getImpactoEliminacion()).resolves.toEqual(expect.objectContaining({ puede_eliminar: true }));
+    expect(client.get).toHaveBeenCalledWith('/cuenta/eliminacion/impacto');
+  });
+
+  it('envia contraseña, confirmacion y clave con los nombres del contrato', async () => {
+    const { apiModule, client } = buildApiModule();
+    client.post.mockResolvedValueOnce({ data: { success: true, solicitud: { id: 3, estado: 'completada' } } });
+    await apiModule.solicitarEliminacionCuenta({ password: 'x', confirmacion: 'ELIMINAR', idempotencyKey: 'k-1' });
+    expect(client.post).toHaveBeenCalledWith('/cuenta/eliminacion', {
+      password: 'x',
+      confirmacion: 'ELIMINAR',
+      idempotency_key: 'k-1',
+    });
+  });
+
+  it('un 409 conserva status, bloqueos y la sesion local', async () => {
+    const { apiModule, client, storage } = buildApiModule();
+    storage.values.servigt_token = 'tok';
+    storage.values.chat_9 = '{}';
+    client.post.mockRejectedValueOnce({
+      isAxiosError: true,
+      response: { status: 409, data: { success: false, message: 'Bloqueada', bloqueos: [{ codigo: 'servicios_activos' }] } },
+    });
+    await expect(apiModule.solicitarEliminacionCuenta({ password: 'x', confirmacion: 'ELIMINAR', idempotencyKey: 'k' }))
+      .rejects.toMatchObject({ status: 409, message: 'Bloqueada', data: { bloqueos: [{ codigo: 'servicios_activos' }] } });
+    expect(storage.values).toEqual(expect.objectContaining({ servigt_token: 'tok', chat_9: '{}' }));
+  });
+});

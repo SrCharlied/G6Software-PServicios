@@ -38,6 +38,9 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('stripe-webhook', fn (Request $request) => Limit::perMinute(120)->by('ip:'.$request->ip()));
 
         RateLimiter::for('premium', fn (Request $request) => Limit::perMinute(5)->by($this->rateKey($request)));
+
+        // Reautenticacion con contrasena (HU 3.1.b): limita el adivinado con un token robado.
+        RateLimiter::for('eliminacion-cuenta', fn (Request $request) => Limit::perMinute(5)->by($this->rateKey($request)));
     }
 
     private function rateKey(Request $request): string

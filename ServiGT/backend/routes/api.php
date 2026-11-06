@@ -13,6 +13,7 @@ use App\Http\Controllers\ReporteSeguridadController;
 use App\Http\Controllers\ReservaMaterialController;
 use App\Http\Controllers\ServicioController;
 use App\Http\Controllers\DisponibilidadController;
+use App\Http\Controllers\EliminacionCuentaController;
 use App\Http\Controllers\CalificacionController;
 use App\Http\Controllers\NotificacionController;
 use App\Http\Controllers\CotizacionController;
@@ -67,6 +68,11 @@ Route::middleware('auth:sanctum')->group(function () {
     // Sesion del usuario autenticado
     Route::get('/me',      [AuthController::class, 'me']);
     Route::post('/logout', [AuthController::class, 'logout']);
+
+    // Eliminacion de la propia cuenta: anonimiza y revoca acceso (HU 3.1.b)
+    Route::get('/cuenta/eliminacion/impacto', [EliminacionCuentaController::class, 'impacto']);
+    Route::post('/cuenta/eliminacion', [EliminacionCuentaController::class, 'solicitar'])
+        ->middleware('throttle:eliminacion-cuenta');
 
     // Perfil de proveedor
     Route::get('/providers/me',           [ProviderController::class, 'me']);
